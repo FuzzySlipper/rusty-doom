@@ -9,6 +9,7 @@ namespace LoadingBay.Game;
 /// <summary>Authoritative admitted-step product state plus narrowly owned generated Engine service adapters.</summary>
 internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSession
 {
+    private const double HudDiagnosticsCadenceSeconds = .25d;
     private readonly LoadingBayTuning _tuning;
     private readonly EntityWorld _entities = new([
         EngineComponentTypes.Transform,
@@ -46,6 +47,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private ProductUpdateFacts _facts;
     private bool _hasFacts;
     private bool _complete;
+    private bool _hudDirty = true;
+    private bool _hudDiagnosticsEnabled;
+    private double _hudDiagnosticElapsed;
     private bool _disposed;
     private ulong _dropped;
     private Action<EntityWorld>? _debugEntityWorldChanged;
@@ -110,14 +114,24 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             _world.Advance(LoadingBayAdmittedStepTicks.At(update.Facts, offset), Record);
         _engineServices?.Update(update, _tuning, Record, CanCollectCanonicalPickup, CollectCanonicalPickup, ApplyCanonicalHazard, ActivateCanonicalFloor, ActivateCanonicalLift, DiscoverCanonicalSecret, ActivateCanonicalDoor, CompleteCanonicalExit, _world.Capture, PrepareWeaponFire, SettleWeaponFire, DamageCanonicalBarrel, EligibleEnemyEntities, PrepareEnemyAttacks, SettleEnemyAttack, RecordProjectileOutcome, ApplyProjectileDamage, ActivateEncounter);
         if (_engineServices is not null) _playerSnapshot = _engineServices.CapturePlayer();
-        Publish();
+        PublishFromUpdate(update.Facts);
         return ProductUpdateResult.None;
     }
 
     public void Publish()
     {
         ThrowIfDisposed();
-        _engineServices?.Publish(Readout());
+        PublishHud(force: true);
+    }
+
+    /// <summary>Enables the bounded developer-only HUD diagnostic cadence for this live session.</summary>
+    public string Diagnostics(bool enabled)
+    {
+        ThrowIfDisposed();
+        _hudDiagnosticsEnabled = enabled;
+        _hudDiagnosticElapsed = 0d;
+        PublishHud(force: true);
+        return $"diagnostics={enabled};cadenceSeconds={HudDiagnosticsCadenceSeconds:R}";
     }
 
     public void Attach()
@@ -128,7 +142,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             Publish();
             return;
         }
-        _engineServices.Attach(Readout());
+        _engineServices.Attach(Readout(), _hudDiagnosticsEnabled);
     }
 
     public void ActivateSharedRealizations()
@@ -576,7 +590,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             return Reject("save.world-motion-restore-rejected");
         }
         if (triggerFacts is not null) foreach (CanonicalPickupTriggerStateFact triggerFact in triggerFacts) Record(triggerFact);
-        Record(new SnapshotRestoredFact(identity)); return Accept("save.restored");
+        Record(new SnapshotRestoredFact(identity));
+        PublishHud(force: true);
+        return Accept("save.restored");
     }
 
     internal LoadingBayReceipt Save(string slot)
@@ -602,8 +618,37 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(lifecycle.PickupEntityId);
             _pickupStates[lifecycle.PickupEntityId] = new LoadingBayPickupSnapshot(lifecycle.PickupEntityId, pickup.ItemId, pickup.ProgramId, lifecycle.Lifecycle, lifecycle.Cause, lifecycle.Tick, lifecycle.TriggerRevision);
         }
-        if (_journal.Count == _tuning.FactJournalCapacity) { _journal.Dequeue(); _dropped++; }
+        if (_journal.Count == _tuning.FactJournalCapacity)
+        {
+            LoadingBayFact evicted = _journal.Dequeue();
+            _dropped++;
+            if (evicted is not SemanticInputFact) _hudDirty = true;
+        }
         _journal.Enqueue(fact);
+        // Input intent alone can be reported every frame. Its resulting accepted,
+        // rejected, or gameplay fact still marks the read-only HUD dirty.
+        if (fact is not SemanticInputFact) _hudDirty = true;
+    }
+    private void PublishFromUpdate(ProductUpdateFacts update)
+    {
+        bool diagnosticSample = AdvanceHudDiagnostics(update);
+        PublishHud(force: _hudDirty || diagnosticSample);
+    }
+    private void PublishHud(bool force)
+    {
+        if (_engineServices is null) return;
+        _engineServices.Publish(Readout(), force, _hudDiagnosticsEnabled);
+        if (force) _hudDirty = false;
+    }
+    private bool AdvanceHudDiagnostics(ProductUpdateFacts update)
+    {
+        if (!_hudDiagnosticsEnabled || update.AdmittedStepCount == 0 ||
+            !double.IsFinite(update.FixedDeltaSeconds) || update.FixedDeltaSeconds <= 0d)
+            return false;
+        _hudDiagnosticElapsed += update.FixedDeltaSeconds * update.AdmittedStepCount;
+        if (_hudDiagnosticElapsed < HudDiagnosticsCadenceSeconds) return false;
+        _hudDiagnosticElapsed %= HudDiagnosticsCadenceSeconds;
+        return true;
     }
     private static string CanonicalPickupKey(ulong entityId) => $"e1m1.pickup.{entityId}";
     private void UpdatePickupState(LoadingBayE1M1PickupPlacement pickup, LoadingBayPickupLifecycle lifecycle, string cause, ulong tick, ulong triggerRevision)

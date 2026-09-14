@@ -14,7 +14,7 @@
     "test:ts": "pnpm --filter @rusty-engine-demo/project-content test",
     "typecheck": "tsc --build ts/tsconfig.json && nx run loading-bay:typecheck --skip-nx-cache",
     "verify": "bash scripts/verify.sh",
-    "check:provenance": "pnpm --filter @rusty-engine-demo/doom-e1m1-authoring check",
+    "check:provenance": "pnpm --filter @rusty-engine-demo/doom-e1m1-authoring check && python3 scripts/authoring/generate-recipe-sprites.py --check",
     "scan:e1m1-recipes": "node scripts/scan-e1m1-recipes.mjs",
     "test:e1m1-recipes": "node --test scripts/tests/e1m1-recipe-scan.test.mjs"
   },

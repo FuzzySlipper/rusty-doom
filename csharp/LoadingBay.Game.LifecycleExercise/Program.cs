@@ -6,6 +6,7 @@ using Rusty.Engine.Persistence;
 
 PlayerInputExercise.Run();
 StudyDoorExercise.Run();
+RecipeAnimationExercise.Run();
 
 var created = new List<RecordingSession>(); int attempts = 0;
 Require(new[]

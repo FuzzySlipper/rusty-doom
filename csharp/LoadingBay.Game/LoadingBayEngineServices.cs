@@ -149,20 +149,22 @@ internal sealed class LoadingBayEngineServices : IDisposable
 
     internal bool BarrelOccluded(LoadingBayE1M1BarrelDefinition source, LoadingBayE1M1BarrelDefinition target) => _worldInteractions.BarrelOccluded(source, target);
 
-    internal void Publish(LoadingBayReadout readout)
+    /// <summary>Updates retained Engine world services every frame, and publishes the costly UI snapshot only when requested.</summary>
+    internal void Publish(LoadingBayReadout readout, bool publishHud, bool diagnosticsEnabled)
     {
         ThrowIfDisposed();
         LoadingBayEngineServiceReadout serviceReadout = _worldServices.Publish(readout, _player);
         serviceReadout = serviceReadout with { Sky = _skyReadout, VoxelScene = _voxelPresentation.Readout };
         _readout = serviceReadout;
-        _hud.Publish(readout, LoadingBayAdmittedContent.ProjectPath, LoadingBayAdmittedContent.VoxelPath, serviceReadout);
+        if (publishHud)
+            _hud.Publish(readout, LoadingBayAdmittedContent.ProjectPath, LoadingBayAdmittedContent.VoxelPath, serviceReadout, diagnosticsEnabled);
     }
 
-    internal void Attach(LoadingBayReadout readout)
+    internal void Attach(LoadingBayReadout readout, bool diagnosticsEnabled)
     {
         ThrowIfDisposed();
         _voxelPresentation.Refresh();
-        Publish(readout);
+        Publish(readout, publishHud: true, diagnosticsEnabled: diagnosticsEnabled);
     }
 
     internal void ActivateSharedRealizations()
@@ -466,7 +468,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         ProductUpdate update,
         LoadingBayTuning tuning,
         Func<ulong, bool, ulong, LoadingBayCharacterStepEnvironment> prepareCharacterStep,
-        Action<ulong> reconcileAdmittedMovementStep)
+        Action<ulong> reconcileAdmittedMovementStep, bool movementEnabled = true)
     {
         ThrowIfDisposed();
         if (_camera is null) throw new InvalidOperationException("Loading Bay's E1M1 camera is not active.");
@@ -484,7 +486,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
                 LoadingBayCharacterStepEnvironment environment = prepareCharacterStep(tick, _motion.SupportEntityPresent, _motion.SupportEntity);
                 CharacterStepReceipt receipt = _spatial.ProposeCharacterStep(new CharacterStepRequest(
                     _session, _position, _motion, environment.Support, environment.Obstacles, _controller,
-                    new CharacterControllerCommand(_planarIntent, _lookState.YawRadians, _jumpPressed, _jumpHeld, false, Vector3.Zero, Vector3.Zero, delta, ++_sequence)));
+                    new CharacterControllerCommand(movementEnabled ? _planarIntent : Vector2.Zero, _lookState.YawRadians, movementEnabled && _jumpPressed, movementEnabled && _jumpHeld, false, Vector3.Zero, Vector3.Zero, delta, ++_sequence)));
                 _position = receipt.Transform.Translation;
                 _motion = receipt.Motion;
                 _continuation = Copy(_spatial.CaptureCharacterContinuation(new CharacterContinuationCaptureRequest(_session, receipt.Generation)));

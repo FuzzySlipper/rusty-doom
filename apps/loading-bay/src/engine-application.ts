@@ -2,6 +2,12 @@ import { InjectionToken } from "@angular/core";
 
 /** The runtime shell supplies this read-only projection port to the product UI. */
 export interface LoadingBayEngineApplication {
+  /** Engine-owned input arbitration for interactive overlays. */
+  readonly ui?: {
+    active(): boolean;
+    setInteractionMode(mode: "gameplay" | "interface" | "modal"): void;
+    focusGameplay(): void;
+  };
   readonly projection?: {
     subscribe(
       listener: (envelope: LoadingBayHudProjectionEnvelope | null) => void,

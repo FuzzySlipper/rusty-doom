@@ -148,7 +148,7 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
             instance = createdInstance;
             _appearance = createdAppearance;
             _instance = createdInstance;
-            _appearanceService.PublishSnapshot(new[] { AppearanceFact() });
+            PublishAppearanceSnapshot();
             _animation.SetPlayback(SampleOff());
             _readout = Read(false, 0);
             ValidateReadout(_readout);
@@ -167,9 +167,12 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
     internal void Publish(bool complete)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayExitButtonAnimation));
-        _appearanceService.PublishSnapshot(new[] { AppearanceFact() });
         if (complete && !_completionObserved)
         {
+            // Completion changes the visible cue. Reissue this animation's complete
+            // graphics snapshot once, while stationary frames keep its retained
+            // appearance and Engine-owned realization baseline untouched.
+            PublishAppearanceSnapshot();
             _animation.SetPlayback(PlayOn());
             _completionObserved = true;
             _readout = Read(true, checked(_readout.CompletionTransitionCount + 1));
@@ -194,6 +197,8 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
         ValidateReadout(reset);
         _completionObserved = false;
         _readout = reset;
+        // A committed gameplay generation begins from the authored off sample.
+        PublishAppearanceSnapshot();
         return checkpoint;
     }
 
@@ -206,6 +211,8 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
         ValidateReadout(restored);
         _completionObserved = checkpoint.CompletionObserved;
         _readout = restored;
+        // Rollback re-establishes the prior generation's complete graphics baseline.
+        PublishAppearanceSnapshot();
     }
 
     public void Dispose()
@@ -223,6 +230,8 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
         catch (Exception exception) { (failures ??= []).Add(exception); }
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
+
+    private void PublishAppearanceSnapshot() => _appearanceService.PublishSnapshot(new[] { AppearanceFact() });
 
     private AppearanceFact AppearanceFact() => new(_cue.ObjectId, false, 0, _cue.Transform, _appearance, true, RenderLayer.Scene);
 

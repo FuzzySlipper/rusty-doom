@@ -17,12 +17,17 @@ internal sealed class LoadingBayHudProjection : IDisposable
         _stream = _ui.OpenStream(new UiStreamRequest("loading-bay.hud", "loading-bay.hud.snapshot.v1"));
     }
 
-    internal void Publish(LoadingBayReadout readout, string projectPath, string voxelPath, LoadingBayEngineServiceReadout services)
+    /// <summary>Publishes a complete snapshot only after the session has found a gameplay change or requested a diagnostic sample.</summary>
+    internal void Publish(LoadingBayReadout readout, string projectPath, string voxelPath, LoadingBayEngineServiceReadout services, bool diagnosticsEnabled)
     {
         if (_disposed) return;
         LoadingBayUiValueBuilder value = new();
-        // Facts are bounded at the product journal and remain typed copies across the UI boundary.
-        uint facts = value.Array(readout.Facts.Select(fact => Fact(value, fact)).ToArray());
+        // Input intent can arrive every frame without changing gameplay. Keep it in
+        // the diagnostic stream, but do not make the default HUD churn on it.
+        IEnumerable<LoadingBayFact> hudFacts = diagnosticsEnabled
+            ? readout.Facts
+            : readout.Facts.Where(static fact => fact is not SemanticInputFact);
+        uint facts = value.Array(hudFacts.Select(fact => Fact(value, fact)).ToArray());
         uint pickups = value.Object(
             ("total", value.Number(readout.Pickups.Length)),
             ("active", value.Number(readout.Pickups.Count(pickup => pickup.Lifecycle == LoadingBayPickupLifecycle.Active))),
@@ -118,15 +123,17 @@ internal sealed class LoadingBayHudProjection : IDisposable
             ("enemyCount", value.Number(readout.Enemies.Length)),
             ("defeatedEnemies", value.Number(readout.Enemies.Count(enemy => enemy.Posture == LoadingBayEnemyPosture.Defeated))),
             ("generation", value.Number(readout.Generation)),
-            ("step", value.Number(readout.Step)),
+            ("step", value.Number(diagnosticsEnabled ? readout.Step : 0)),
             ("updateMode", value.String(readout.UpdateFacts.Mode.ToString())),
             ("lifecycle", value.String(readout.UpdateFacts.LifecycleState.ToString())),
-            ("controlRevision", value.Number(readout.UpdateFacts.ControlRevision)),
-            ("observedHostTimeNanoseconds", value.Number(readout.UpdateFacts.ObservedHostTimeNanoseconds)),
-            ("fixedStepHz", value.Number(readout.UpdateFacts.FixedStepHz)),
-            ("admittedSteps", value.Number(readout.UpdateFacts.AdmittedStepCount)),
-            ("droppedSteps", value.Number(readout.UpdateFacts.DroppedStepCount)),
-            ("fixedDeltaSeconds", value.Number(readout.UpdateFacts.FixedDeltaSeconds)),
+            ("controlRevision", value.Number(diagnosticsEnabled ? readout.UpdateFacts.ControlRevision : 0)),
+            ("observedHostTimeNanoseconds", value.Number(diagnosticsEnabled ? readout.UpdateFacts.ObservedHostTimeNanoseconds : 0)),
+            ("fixedStepHz", value.Number(diagnosticsEnabled ? readout.UpdateFacts.FixedStepHz : 0)),
+            ("admittedSteps", value.Number(diagnosticsEnabled ? readout.UpdateFacts.AdmittedStepCount : 0)),
+            ("droppedSteps", value.Number(diagnosticsEnabled ? readout.UpdateFacts.DroppedStepCount : 0)),
+            ("fixedDeltaSeconds", value.Number(diagnosticsEnabled ? readout.UpdateFacts.FixedDeltaSeconds : 0)),
+            ("diagnosticsEnabled", value.Bool(diagnosticsEnabled)),
+            ("diagnosticsCadenceSeconds", value.Number(.25d)),
             ("complete", value.Bool(readout.Complete)),
             ("pickups", pickups),
             ("catalog", catalog),
@@ -138,13 +145,13 @@ internal sealed class LoadingBayHudProjection : IDisposable
             ("weaponCooldowns", cooldowns),
             ("player", player),
             ("pendingSchedules", value.Number(readout.PendingSchedules)),
-            ("droppedFacts", value.Number(readout.DroppedFacts)),
+            ("droppedFacts", value.Number(diagnosticsEnabled ? readout.DroppedFacts : 0)),
             ("facts", facts),
             ("tuning", tuning),
             ("exitVisibility", value.Bool(services.Perception.Visible)),
             ("exitVisibilityRevision", value.Number(services.Perception.Revision)),
-            ("exitVisibilityCasts", value.Number(services.Perception.VisibilityCasts)),
-            ("exitOcclusionRejects", value.Number(services.Perception.OcclusionRejects)),
+            ("exitVisibilityCasts", value.Number(diagnosticsEnabled ? services.Perception.VisibilityCasts : 0)),
+            ("exitOcclusionRejects", value.Number(diagnosticsEnabled ? services.Perception.OcclusionRejects : 0)),
             ("presentationBillboards", value.Number(services.Presentation.ActiveBillboards)),
             ("animationCue", value.String(services.Animation.CueId)),
             ("animationRetainedAppearance", value.Bool(services.Animation.RetainedAppearance)),

@@ -36,9 +36,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(context);
         _entityWorldDebug = CreateEntityWorldDebugModule();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.");
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
 
-        if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") == "room-study")
+        if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
         {
             _skyBackground = new LoadingBaySkyBackground(context.Engine.Content, context.Content,
                 context.Engine.Graphics, context.Engine.CameraView);
@@ -114,7 +114,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
         _entityWorldDebug = CreateEntityWorldDebugModule();
         _session = _sessionFactory();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.");
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
         AdoptDebugWorld(_session);
     }
 
@@ -148,6 +148,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             return ProductUpdateResult.None;
         }
 
+        foreach (var input in update.Input)
+            if (input.Kind == InputEventKind.Key && input.Edge == InputEdge.Pressed && input.Keyboard == KeyboardControl.KeyR)
+            { Restart(); return ProductUpdateResult.None; }
         return RequireSession().Update(update);
     }
 
@@ -171,6 +174,15 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         if (_shutdown)
         {
+            return;
+        }
+
+        // Static DC extraction is startup work, never realtime input work.
+        if (_session is LoadingBayRoomStudy recipe)
+        {
+            recipe.Restart();
+            _started = true;
+            _paused = false;
             return;
         }
 
@@ -211,6 +223,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             {
                 // The lifecycle exercise's pure session seam has no Engine-owned
                 // realization to preflight, so it retains the direct publication.
+                if (replacement is LoadingBayRoomStudy) replacement.ActivateSharedRealizations();
                 replacement.Publish();
             }
         }
@@ -231,6 +244,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             throw;
         }
         DetachDebugWorld(previous);
+        previous.DeactivateSharedRealizations();
         _session = replacement;
         // Once the published replacement becomes current, it is the authoritative
         // continuation. A late old-session teardown failure cannot safely roll it
@@ -395,6 +409,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         LoadingBayEngineServiceReadout services = session.EngineReadout();
         LoadingBayPlayerSnapshot player = readout.PlayerState;
         return string.Join(';',
+            $"recipe={(session as LoadingBayRoomStudy)?.DiagnosticReadout}",
             $"lifecycle={(_shutdown ? "shutdown" : !_started ? "created" : _paused ? "paused" : "running")}",
             $"generation={readout.Generation}",
             $"step={readout.Step}",

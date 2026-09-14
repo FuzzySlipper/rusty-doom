@@ -6,15 +6,20 @@ namespace LoadingBay.Game;
 public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
 {
     private readonly Func<string> _readout;
+    private readonly Func<bool, string>? _diagnostics;
     private readonly Func<string>? _geometryAudit;
     private readonly Func<string, int, DebugCommandResult> _setTrack;
 
-    public LoadingBayLiveDebugModule(Func<string> readout, Func<string, int, DebugCommandResult> setTrack, Func<string>? geometryAudit = null)
+    public LoadingBayLiveDebugModule(Func<string> readout, Func<string, int, DebugCommandResult> setTrack, Func<string>? geometryAudit = null, Func<bool, string>? diagnostics = null)
     {
         _geometryAudit = geometryAudit;
+        _diagnostics = diagnostics;
         _readout = readout ?? throw new ArgumentNullException(nameof(readout));
         _setTrack = setTrack ?? throw new ArgumentNullException(nameof(setTrack));
     }
+
+    [DebugCommand("loading-bay.diagnostics", Description = "Enable or disable continuous HUD diagnostics (4 Hz); default is disabled.")]
+    public string Diagnostics(bool enabled) => _diagnostics?.Invoke(enabled) ?? "Diagnostics unavailable";
 
     [DebugCommand("loading-bay.readout", Description = "Shows the current bounded Loading Bay session readout.")]
     public string Readout() => _readout();

@@ -15,6 +15,7 @@ internal sealed class LoadingBayStudyDoor
         LoadingBayNorthWingRecipe.DoorMin, LoadingBayNorthWingRecipe.DoorMax)) { }
     internal LoadingBayStudyDoor(LoadingBayStudyDoorDefinition definition) => Definition = definition;
     internal bool Opening { get; private set; }
+    internal void Reset() { Opening = false; Height = 0; }
     internal float Height { get; private set; }
     internal Transform Placement => new(new(0, Height, 0), Quaternion.Identity, Vector3.One);
     internal CharacterObstacle Obstacle => new(Definition.Entity, Placement, Definition.Min,

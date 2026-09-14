@@ -5,7 +5,7 @@ using Rusty.Engine.Implicit;
 
 namespace LoadingBay.Game;
 
-/// <summary>Opt-in construction study: one retained DC room, mesh collision, and the ordinary FPS controller.</summary>
+/// <summary>Authored DC level with retained geometry and recipe-owned gameplay.</summary>
 internal sealed class LoadingBayRoomStudy : ILoadingBaySession
 {
     private LoadingBayStudyAudit? _studyAudit;
@@ -37,14 +37,23 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
     private readonly CharacterObstacle[] _doorObstacles = new CharacterObstacle[4];
     private readonly int[] _doorIndices = [-1, -1, -1, -1];
     private readonly LoadingBayPlayerScene _player = null!;
+    private readonly LoadingBayPlayerSnapshot _spawn = null!;
     private readonly UiStream _hud = null!;
     private ulong _hudSequence;
+    private readonly LoadingBayRecipeGameplay _gameplay = null!;
+    private ulong _publishedRevision = ulong.MaxValue;
+    private bool _diagnostics;
+    private double _diagnosticElapsed;
+    public string Diagnostics(bool enabled) { _diagnostics = enabled; PublishHud(); return DiagnosticReadout; }
+    internal string DiagnosticReadout => $"diagnostics={_diagnostics};hudPublications={_hudSequence};triggerPasses={_gameplay.TriggerPasses};kills={_gameplay.Kills};collected={_gameplay.Collected};{_gameplay.Describe()}";
     private ProductUpdateFacts _facts;
     private bool _active;
     private bool _disposed;
     private readonly LoadingBayTuning _tuning = LoadingBayTuning.E1M1 with
     {
         ContentIdentity = "doom-room-study",
+        MaximumHealth = 100,
+        MaximumArmor = 100,
         AuthoredPlayerPosition = LoadingBayStudyCoordinates.World(LoadingBayRoomRecipe.SpawnBase),
         InitialYawDegrees = 0,
         AuthoredPlayerKinematicHalfHeight = 0,
@@ -93,9 +102,11 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
             LoadingBaySouthPassageRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor, trim, ceiling, door, Emit);
             if (_doorIndices.Any(i => i < 0)) throw new InvalidOperationException("Study door surface is missing.");
             _player = new LoadingBayPlayerScene(engine, _tuning);
-            _player.PublishRoomMeshes(
-                _meshes.Select((mesh, i) => new StaticMeshAsset((ulong)i + 10000, new MeshResourceReference(mesh), 0, 0, 0, 0)).ToArray(),
-                _meshes.Select((_, i) => i).Where(i => !_doorIndices.Contains(i)).Select(i => new StaticMeshInstance((ulong)i + 10000, (ulong)i + 10000, _placements[i])).ToArray());
+            _spawn = _player.Capture();
+            var assets = _meshes.Select((mesh, i) => new StaticMeshAsset((ulong)i + 10000, new MeshResourceReference(mesh), 0, 0, 0, 0)).ToArray();
+            var instances = _meshes.Select((_, i) => i).Where(i => !_doorIndices.Contains(i)).Select(i => new StaticMeshInstance((ulong)i + 10000, (ulong)i + 10000, _placements[i])).ToArray();
+            _player.PublishRoomMeshes(assets, instances);
+            _gameplay = new(engine, _player, _doors);
             _hud = engine.Ui.OpenStream(new UiStreamRequest("loading-bay.hud", "loading-bay.hud.snapshot.v1"));
         }
         catch
@@ -130,18 +141,25 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
                 _doorObstacles[i] = _doors[i].Obstacle;
             }
             return new(default, _doorObstacles);
-        }, _ => { });
-        if (input.UseRequested)
+        }, tick => _gameplay.Advance(deltaSeconds, tick), !_gameplay.Dead && !_gameplay.Complete);
+        foreach (var key in update.Input)
+            if (key.Kind == InputEventKind.Key && key.Edge == InputEdge.Pressed)
+            { if (key.Keyboard == KeyboardControl.Digit1) _gameplay.SelectWeapon(RecipeWeapon.Fist); if (key.Keyboard == KeyboardControl.Digit2) _gameplay.SelectWeapon(RecipeWeapon.Pistol); if (key.Keyboard == KeyboardControl.Digit3) _gameplay.SelectWeapon(RecipeWeapon.Shotgun); }
+        if (input.FireRequested) _gameplay.Fire();
+        if (input.UseRequested && !_gameplay.Dead)
         {
             Vector3 position = _player.Capture().Position;
             foreach (LoadingBayStudyDoor doorState in _doors) if (doorState.Use(position)) break;
+            _gameplay.Use();
         }
         if (moved)
         {
             for (int i = 0; i < _doors.Length; i++)
                 _placements[_doorIndices[i]] = _placements[_doorIndices[i]] with { Translation = _doors[i].Placement.Translation };
-            PublishGeometry();
         }
+        if (moved || _gameplay.GeometryDirty) PublishGeometry();
+        _diagnosticElapsed += deltaSeconds * update.Facts.AdmittedStepCount;
+        if (_publishedRevision != _gameplay.Revision || (_diagnostics && _diagnosticElapsed >= LoadingBayRecipeGameplay.DiagnosticsInterval)) PublishHud();
         return ProductUpdateResult.None;
     }
 
@@ -151,18 +169,50 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
         _active = true;
     }
     public void DeactivateSharedRealizations() => _active = false;
+    internal void Restart()
+    {
+        _player.Restore(_spawn, _tuning);
+        for (int i = 0; i < _doors.Length; i++)
+        {
+            _doors[i].Reset();
+            _doorObstacles[i] = _doors[i].Obstacle;
+            _placements[_doorIndices[i]] = _placements[_doorIndices[i]] with { Translation = Vector3.Zero };
+        }
+        _gameplay.Restart();
+        Publish();
+    }
     public void Attach() => Publish();
     public void Publish()
     {
         if (!_active) return;
         PublishGeometry();
+        PublishHud();
+    }
+    private void PublishHud()
+    {
         LoadingBayUiValueBuilder value = new();
         List<(string, uint)> fields = [];
-        foreach (string key in new[] { "health", "armor", "bullets", "shells", "generation", "step", "droppedFacts", "pendingSchedules",
+        foreach (string key in new[] { "droppedFacts", "pendingSchedules",
             "exitVisibilityRevision", "presentationBillboards", "effectsVolume", "admittedSteps", "droppedSteps", "materialMappingCount" })
             fields.Add((key, value.Number(0)));
+        fields.Add(("health", value.Number(_gameplay.Health)));
+        fields.Add(("armor", value.Number(_gameplay.Armor)));
+        fields.Add(("bullets", value.Number(_gameplay.Bullets)));
+        fields.Add(("shells", value.Number(_gameplay.Shells)));
+        fields.Add(("generation", value.Number(_facts.Generation)));
+        fields.Add(("step", value.Number(_diagnostics ? _facts.SimulationStep : 0)));
+        fields.Add(("weapon", value.String(_gameplay.Weapon)));
+        fields.Add(("kills", value.Number(_gameplay.Kills)));
+        fields.Add(("totalEnemies", value.Number(_gameplay.Enemies.Length)));
+        fields.Add(("collected", value.Number(_gameplay.Collected)));
+        fields.Add(("totalPickups", value.Number(_gameplay.Pickups.Length)));
+        fields.Add(("dead", value.Bool(_gameplay.Dead)));
+        fields.Add(("complete", value.Bool(_gameplay.Complete)));
+        fields.Add(("message", value.String(_gameplay.Message)));
+        fields.Add(("weaponFlash", value.Bool(_gameplay.WeaponFlash)));
+        fields.Add(("damageFlash", value.Bool(_gameplay.DamageFlash)));
         fields.Add(("materialCount", value.Number(_materials.Count)));
-        foreach (string key in new[] { "complete", "exitVisibility", "effectsMuted", "voxelPresentationRealized" })
+        foreach (string key in new[] { "exitVisibility", "effectsMuted", "voxelPresentationRealized" })
             fields.Add((key, value.Bool(false)));
         foreach (string key in new[] { "animationCue", "catalogHash" }) fields.Add((key, value.String("")));
         fields.Add(("skyResourceRealized", value.Bool(_sky.ResourceRealized)));
@@ -170,29 +220,37 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
         fields.Add(("skyPath", value.String(_sky.SourcePath)));
         fields.Add(("skyHash", value.String(_sky.SourceHash.ToString())));
         fields.Add(("content", value.String("doom-room-study")));
-        fields.Add(("updateMode", value.String("Construction study")));
+        fields.Add(("updateMode", value.String("Recipe gameplay")));
         fields.Add(("lifecycle", value.String("Ready")));
         fields.Add(("facts", value.Array([])));
         _engine.Ui.PublishProjection(new UiProjection(_hud, ++_hudSequence, value.Build(value.Object(fields.ToArray()))));
+        _publishedRevision = _gameplay.Revision;
+        _diagnosticElapsed = 0;
     }
-    private void PublishGeometry() => _engine.Graphics.PublishSnapshot(_appearances.Select((appearance, i) => new AppearanceFact(
-        (ulong)i + 10000, false, 0, _placements[i], appearance, true, RenderLayer.Scene)).ToArray());
+    private void PublishGeometry()
+    {
+        _engine.Graphics.PublishSnapshot(_appearances.Select((appearance, i) => new AppearanceFact(
+        (ulong)i + 10000, false, 0, _placements[i], appearance, true, RenderLayer.Scene)).Concat(_gameplay.Appearances()).ToArray());
+        _gameplay.GeometryDirty = false;
+    }
 
     public LoadingBayEngineServiceReadout EngineReadout() => LoadingBayEngineServiceReadout.Empty with { Sky = _sky };
-    public LoadingBayReadout Readout() => new(new EntityId(1), _facts, 100, 0, LoadingBayArmorProtection.None,
-        0, 0, [], null, [], _player.Capture(), [], [], false, 0, _tuning, [], 0);
+    public LoadingBayReadout Readout() => new(new EntityId(1), _facts, _gameplay.Health, _gameplay.Armor, LoadingBayArmorProtection.None,
+        (ulong)_gameplay.Bullets, (ulong)_gameplay.Shells, [], null, [], _player.Capture(), [], [], _gameplay.Complete, 0, _tuning, [], 0);
     public LoadingBayReceipt DeveloperSetTrack(ulong generation, string track, int value, string correlation)
-        => new(false, "room-study.no-combat-tracks", correlation);
+        => new(_gameplay.SetTrack(track, value), "recipe.track", correlation);
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        if (_active) { _engine.Graphics.PublishSnapshot([]); _active = false; }
         List<Exception> errors = [];
         void Release(IDisposable? resource) { try { resource?.Dispose(); } catch (Exception error) { errors.Add(error); } }
         Release(_studyAudit);
         _studyAudit = null;
         Release(_hud);
+        Release(_gameplay);
         Release(_player);
         foreach (Appearance appearance in _appearances) Release(appearance);
         foreach (MeshResource mesh in _meshes) Release(mesh);

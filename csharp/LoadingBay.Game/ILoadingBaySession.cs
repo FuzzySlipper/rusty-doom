@@ -9,6 +9,8 @@ internal interface ILoadingBaySession : IDisposable
 
     void Publish();
 
+    string Diagnostics(bool enabled) => "Diagnostics unavailable";
+
     /// <summary>Republishes retained Engine realizations for a fresh renderer attachment.</summary>
     void Attach() => Publish();
 
