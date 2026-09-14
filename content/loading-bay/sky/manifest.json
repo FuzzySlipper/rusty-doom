@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "asset": "loading-bay/sky/mountain-panorama.png",
+  "sha256": "e964e788aea7d984f4c7f9725fd5d92dfa37362d67e14cd2e01599ff13719a94",
+  "byteLength": 2540675,
+  "width": 1774,
+  "height": 887,
+  "origin": "Built-in image generation, reference-guided reinterpretation followed by horizontal-wrap edit. Not an original Doom asset.",
+  "reference": "doom-e1m1/textures/sky/SKY1.png",
+  "referenceSha256": "2834a39fac8f538bbc340ab8a7d780251669f81d43ef1e94a0db551fe8c66429",
+  "generationRecord": "docs/experiments/sky-candidate/README.md",
+  "encoding": "8-bit RGBA PNG; RGB pixels identical to image-tool output, alpha=255"
+}

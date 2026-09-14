@@ -32,4 +32,4 @@ The authoritative shipped content is the committed E1M1 closure under `content/`
 
 The HUD projection carries product readouts such as health, armor, ammunition, generation, admitted step, facts/drop telemetry, traversal tuning, and bounded exit-visibility state. These make the demo inspectable without moving authority into TypeScript.
 
-Current visible evidence retains a black horizontal band, and repeated pointer-locked fire may be ignored after the initial shot. The lifecycle exercise covers named state/save/fact receipts; it does not claim complete player traversal or every authored interaction. `pnpm run certify:e1m1` remains manual/release work and currently stalls at `[127,121]`.
+The dark upper region near spawn is low ceiling geometry; level/player scale still needs calibration. Focused input checks now cover release/repress and discrete firing, but do not certify sustained combat. The lifecycle exercise covers named state/save/fact receipts; it does not claim complete player traversal or every authored interaction. `pnpm run certify:e1m1` remains manual/release work and currently stalls at `[127,121]`.

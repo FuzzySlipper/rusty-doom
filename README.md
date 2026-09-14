@@ -16,6 +16,18 @@ The launcher stages `LoadingBay.Game` through the SDK and starts its CoreCLR bun
 
 Engine contributors may explicitly select a source override with `./scripts/run-csharp-product.sh --engine-source /absolute/rusty-engine`. Ordinary product work must use the package and matching runtime pack instead.
 
+## Controls
+
+Click the canvas to capture the mouse; Escape releases it. WASD moves, mouse movement looks, Space jumps, E uses, and a primary click fires.
+
+Standard gamepads (including the Wolf tester) use the left stick to move, right stick to look, A to jump, X to use, and a right-trigger press to fire. Sticks have a 15% radial dead zone and proportional movement; right-stick look reaches 108 degrees per second. Release controls to stop, then press again to resume. Gameplay input state clears on focus loss and restore.
+
+## Debugging
+
+Press Escape to release the mouse, then expand **Debug** in the upper-left corner. It contains the runtime and content readouts, **Show metrics** for Engine renderer/performance diagnostics, and **Open live debug** for the Engine command console. Collapsing the block disposes its diagnostic widgets and stops their polling. Player vitals remain visible.
+
+The Den launcher enables live debug. For a direct local launch, use `LOADING_BAY_LIVE_DEBUG=1 ./scripts/run-csharp-product.sh` to enable the command console and renderer metrics.
+
 ## Architecture
 
 - `csharp/LoadingBay.Game` owns typed E1M1 policy, product state, validation, facts, snapshots, saves, and the `loading-bay.hud.snapshot.v1` projection.
@@ -42,3 +54,9 @@ Browser-facing work still needs focused visible evidence of the affected canvas/
 - [E1M1 gameplay ledger](docs/doom-e1m1-gameplay-ledger.md)
 - [Presentation frame](docs/presentation-frame.md)
 - [Source provenance](docs/source-provenance.md)
+
+## Optional spawn-room construction study
+
+`bash scripts/run-room-study.sh` launches a Doom-inspired implicit/DC room on port 4395 using the existing FPS controls and textured mesh collision. It is separate from the normal E1M1 port. See [the room study](docs/room-study.md) for the recipe, controls, and initial evidence.
+
+For offline geometry-assisted authoring, run `pnpm run scan:e1m1-recipes`. The [recipe-scanner guide](docs/e1m1-recipe-scanner.md) explains the measured SVG plan, candidate features and protected editable draft.

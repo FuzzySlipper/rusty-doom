@@ -948,6 +948,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         public IWorldOriginService WorldOrigin => throw new NotSupportedException();
         public IVoxelService Voxel => throw new NotSupportedException();
         public IVoxelContentService VoxelContent => throw new NotSupportedException();
+        public IImplicitSurfacesService ImplicitSurfaces => throw new NotSupportedException();
         public IContentService Content => throw new NotSupportedException();
         public IAuthoredContentService AuthoredContent => throw new NotSupportedException();
         public IGraphicsService Graphics => throw new NotSupportedException();

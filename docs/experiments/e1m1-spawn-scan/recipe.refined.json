@@ -1,0 +1,899 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Human-owned interpretation; scanner never overwrites this file. Coordinates remain Doom units until explicitly converted.",
+  "source": {
+    "wadPath": "/home/research/doom.ts/public/doom1.wad",
+    "wadSha256": "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771",
+    "wadByteLength": 4196020,
+    "wadIdentification": "IWAD",
+    "entryCount": 1264,
+    "e1m1LumpIndex": 6,
+    "intermediateSha256": "cd0b95451b021b118e6ec1437a74a85e5f94f4b58829ad1f818794ed29115eb6"
+  },
+  "decisions": [
+    {
+      "name": "spawn chamber shell",
+      "sourceSectorIds": [
+        38,
+        40
+      ],
+      "intent": "Use the measured outer contour as a guide; simplify only after preserving connections and corner shape. Sector 40 remains a small separate recess candidate."
+    },
+    {
+      "name": "blue floor inset and transition",
+      "sourceSectorIds": [
+        37,
+        39
+      ],
+      "intent": "Floor levels -8 and -16 relative to chamber floor 0. Treat as a lowered region with a transition, not an assumed raised platform. Sector 37 boundary must be resolved before constructing its slab."
+    },
+    {
+      "name": "paired narrow openings",
+      "sourceSectorIds": [
+        14,
+        15
+      ],
+      "intent": "Matching narrow regions on one side; inspect as possible window/reveal features. Keep adjacent sector 5 as external context rather than filling its entire bounds."
+    },
+    {
+      "name": "side alcove connection",
+      "sourceSectorIds": [
+        41
+      ],
+      "intent": "Preserve the angled footprint and connection to the main chamber. Architectural naming remains provisional."
+    }
+  ],
+  "features": [
+    {
+      "id": "region-14",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        14
+      ],
+      "sourceLineIds": [
+        26,
+        31,
+        32,
+        33
+      ],
+      "parameters": {
+        "footprintLoops": [
+          [
+            {
+              "x": 1344,
+              "y": -3264
+            },
+            {
+              "x": 1344,
+              "y": -3360
+            },
+            {
+              "x": 1376,
+              "y": -3360
+            },
+            {
+              "x": 1376,
+              "y": -3264
+            }
+          ]
+        ],
+        "floor": 8,
+        "ceiling": 192,
+        "floorTexture": "FLAT5_5",
+        "ceilingTexture": "FLAT5_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "region-15",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        15
+      ],
+      "sourceLineIds": [
+        29,
+        30,
+        34,
+        35
+      ],
+      "parameters": {
+        "footprintLoops": [
+          [
+            {
+              "x": 1344,
+              "y": -3104
+            },
+            {
+              "x": 1344,
+              "y": -3200
+            },
+            {
+              "x": 1376,
+              "y": -3200
+            },
+            {
+              "x": 1376,
+              "y": -3104
+            }
+          ]
+        ],
+        "floor": 8,
+        "ceiling": 192,
+        "floorTexture": "FLAT5_5",
+        "ceilingTexture": "FLAT5_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "region-37",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        37
+      ],
+      "sourceLineIds": [
+        10,
+        11,
+        16,
+        18,
+        19,
+        22,
+        39,
+        50,
+        51,
+        52,
+        53,
+        54
+      ],
+      "parameters": {
+        "footprintLoops": [],
+        "floor": -8,
+        "ceiling": 120,
+        "floorTexture": "FLAT14",
+        "ceilingTexture": "CEIL3_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "region-38",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        38
+      ],
+      "sourceLineIds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        12,
+        13,
+        17,
+        20,
+        21,
+        25,
+        28,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        49,
+        53,
+        54,
+        55,
+        56,
+        57,
+        149
+      ],
+      "parameters": {
+        "footprintLoops": [
+          [
+            {
+              "x": 1152,
+              "y": -3648
+            },
+            {
+              "x": 1088,
+              "y": -3648
+            },
+            {
+              "x": 1024,
+              "y": -3648
+            },
+            {
+              "x": 960,
+              "y": -3648
+            },
+            {
+              "x": 832,
+              "y": -3552
+            },
+            {
+              "x": 704,
+              "y": -3552
+            },
+            {
+              "x": 704,
+              "y": -3360
+            },
+            {
+              "x": 704,
+              "y": -3104
+            },
+            {
+              "x": 704,
+              "y": -2944
+            },
+            {
+              "x": 832,
+              "y": -2944
+            },
+            {
+              "x": 968,
+              "y": -2880
+            },
+            {
+              "x": 1216,
+              "y": -2880
+            },
+            {
+              "x": 1344,
+              "y": -2880
+            },
+            {
+              "x": 1344,
+              "y": -3104
+            },
+            {
+              "x": 1216,
+              "y": -3072
+            },
+            {
+              "x": 1184,
+              "y": -3072
+            },
+            {
+              "x": 928,
+              "y": -3072
+            },
+            {
+              "x": 896,
+              "y": -3072
+            },
+            {
+              "x": 896,
+              "y": -3104
+            },
+            {
+              "x": 896,
+              "y": -3360
+            },
+            {
+              "x": 896,
+              "y": -3392
+            },
+            {
+              "x": 928,
+              "y": -3392
+            },
+            {
+              "x": 1184,
+              "y": -3392
+            },
+            {
+              "x": 1216,
+              "y": -3392
+            },
+            {
+              "x": 1344,
+              "y": -3360
+            },
+            {
+              "x": 1344,
+              "y": -3552
+            },
+            {
+              "x": 1280,
+              "y": -3552
+            }
+          ]
+        ],
+        "floor": 0,
+        "ceiling": 72,
+        "floorTexture": "FLOOR4_8",
+        "ceilingTexture": "CEIL3_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "region-39",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        39
+      ],
+      "sourceLineIds": [
+        14,
+        15,
+        23,
+        24,
+        26,
+        27,
+        29,
+        40,
+        41,
+        50,
+        51,
+        52
+      ],
+      "parameters": {
+        "footprintLoops": [
+          [
+            {
+              "x": 1216,
+              "y": -3392
+            },
+            {
+              "x": 1216,
+              "y": -3360
+            },
+            {
+              "x": 1184,
+              "y": -3360
+            },
+            {
+              "x": 928,
+              "y": -3360
+            },
+            {
+              "x": 928,
+              "y": -3104
+            },
+            {
+              "x": 1184,
+              "y": -3104
+            },
+            {
+              "x": 1216,
+              "y": -3104
+            },
+            {
+              "x": 1216,
+              "y": -3072
+            },
+            {
+              "x": 1344,
+              "y": -3104
+            },
+            {
+              "x": 1344,
+              "y": -3200
+            },
+            {
+              "x": 1344,
+              "y": -3264
+            },
+            {
+              "x": 1344,
+              "y": -3360
+            }
+          ]
+        ],
+        "floor": -16,
+        "ceiling": 200,
+        "floorTexture": "FLAT14",
+        "ceilingTexture": "CEIL3_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "region-40",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        40
+      ],
+      "sourceLineIds": [
+        0,
+        1,
+        2,
+        49
+      ],
+      "parameters": {
+        "footprintLoops": [
+          [
+            {
+              "x": 1088,
+              "y": -3680
+            },
+            {
+              "x": 1024,
+              "y": -3680
+            },
+            {
+              "x": 1024,
+              "y": -3648
+            },
+            {
+              "x": 1088,
+              "y": -3648
+            }
+          ]
+        ],
+        "floor": 0,
+        "ceiling": 72,
+        "floorTexture": "FLOOR4_8",
+        "ceilingTexture": "CEIL3_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "region-41",
+      "kind": "floor-and-ceiling-region",
+      "confidence": "measured footprint; architectural role unresolved",
+      "sourceSectorIds": [
+        41
+      ],
+      "sourceLineIds": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66
+      ],
+      "parameters": {
+        "footprintLoops": [
+          [
+            {
+              "x": 704,
+              "y": -3104
+            },
+            {
+              "x": 704,
+              "y": -3360
+            },
+            {
+              "x": 680,
+              "y": -3360
+            },
+            {
+              "x": 512,
+              "y": -3328
+            },
+            {
+              "x": 512,
+              "y": -3304
+            },
+            {
+              "x": 496,
+              "y": -3304
+            },
+            {
+              "x": 496,
+              "y": -3160
+            },
+            {
+              "x": 512,
+              "y": -3160
+            },
+            {
+              "x": 512,
+              "y": -3136
+            },
+            {
+              "x": 680,
+              "y": -3104
+            }
+          ]
+        ],
+        "floor": -8,
+        "ceiling": 120,
+        "floorTexture": "FLOOR4_8",
+        "ceilingTexture": "CEIL3_5"
+      },
+      "refinement": "Name/group this region. Preserve polygon and holes until choosing boxes, slabs or subtractive shapes. Bounds are not a fitted solid."
+    },
+    {
+      "id": "boundary-26",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        14
+      ],
+      "sourceLineIds": [
+        26
+      ],
+      "parameters": {
+        "lineId": 26,
+        "sectors": [
+          39,
+          14
+        ],
+        "width": 96,
+        "floorDelta": 24,
+        "openHeight": 184,
+        "movementBlocking": true,
+        "lineType": 0,
+        "interpretation": "height opening with blocking flag"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-29",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        15
+      ],
+      "sourceLineIds": [
+        29
+      ],
+      "parameters": {
+        "lineId": 29,
+        "sectors": [
+          39,
+          15
+        ],
+        "width": 96,
+        "floorDelta": 24,
+        "openHeight": 184,
+        "movementBlocking": true,
+        "lineType": 0,
+        "interpretation": "height opening with blocking flag"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-30",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        5,
+        15
+      ],
+      "sourceLineIds": [
+        30
+      ],
+      "parameters": {
+        "lineId": 30,
+        "sectors": [
+          5,
+          15
+        ],
+        "width": 96,
+        "floorDelta": 64,
+        "openHeight": 184,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-31",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        5,
+        14
+      ],
+      "sourceLineIds": [
+        31
+      ],
+      "parameters": {
+        "lineId": 31,
+        "sectors": [
+          5,
+          14
+        ],
+        "width": 96,
+        "floorDelta": 64,
+        "openHeight": 184,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-39",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        37,
+        38
+      ],
+      "sourceLineIds": [
+        39
+      ],
+      "parameters": {
+        "lineId": 39,
+        "sectors": [
+          37,
+          38
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-40",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        38
+      ],
+      "sourceLineIds": [
+        40
+      ],
+      "parameters": {
+        "lineId": 40,
+        "sectors": [
+          39,
+          38
+        ],
+        "width": 131.93938001976514,
+        "floorDelta": 16,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-41",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        38
+      ],
+      "sourceLineIds": [
+        41
+      ],
+      "parameters": {
+        "lineId": 41,
+        "sectors": [
+          39,
+          38
+        ],
+        "width": 131.93938001976514,
+        "floorDelta": 16,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-49",
+      "kind": "opening-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        38,
+        40
+      ],
+      "sourceLineIds": [
+        49
+      ],
+      "parameters": {
+        "lineId": 49,
+        "sectors": [
+          38,
+          40
+        ],
+        "width": 64,
+        "floorDelta": 0,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "open connection; may only divide lighting/materials"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-50",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        37
+      ],
+      "sourceLineIds": [
+        50
+      ],
+      "parameters": {
+        "lineId": 50,
+        "sectors": [
+          39,
+          37
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 128,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-51",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        37
+      ],
+      "sourceLineIds": [
+        51
+      ],
+      "parameters": {
+        "lineId": 51,
+        "sectors": [
+          39,
+          37
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 128,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-52",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        39,
+        37
+      ],
+      "sourceLineIds": [
+        52
+      ],
+      "parameters": {
+        "lineId": 52,
+        "sectors": [
+          39,
+          37
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 128,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-53",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        37,
+        38
+      ],
+      "sourceLineIds": [
+        53
+      ],
+      "parameters": {
+        "lineId": 53,
+        "sectors": [
+          37,
+          38
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-54",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        37,
+        38
+      ],
+      "sourceLineIds": [
+        54
+      ],
+      "parameters": {
+        "lineId": 54,
+        "sectors": [
+          37,
+          38
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-57",
+      "kind": "step-or-ledge-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        41,
+        38
+      ],
+      "sourceLineIds": [
+        57
+      ],
+      "parameters": {
+        "lineId": 57,
+        "sectors": [
+          41,
+          38
+        ],
+        "width": 256,
+        "floorDelta": 8,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "height transition; possible step or ledge"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    },
+    {
+      "id": "boundary-149",
+      "kind": "opening-candidate",
+      "confidence": "tentative",
+      "sourceSectorIds": [
+        2,
+        38
+      ],
+      "sourceLineIds": [
+        149
+      ],
+      "parameters": {
+        "lineId": 149,
+        "sectors": [
+          2,
+          38
+        ],
+        "width": 128,
+        "floorDelta": 0,
+        "openHeight": 72,
+        "movementBlocking": false,
+        "lineType": 0,
+        "interpretation": "open connection; may only divide lighting/materials"
+      },
+      "refinement": "Check neighboring boundaries and first-person view; dimensions alone do not establish stairs, windows or doors."
+    }
+  ]
+}

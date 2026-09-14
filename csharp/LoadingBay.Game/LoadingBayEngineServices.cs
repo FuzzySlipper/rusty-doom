@@ -324,10 +324,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     private LookState _lookState;
     private Vector3 _forward;
     private Vector2 _planarIntent;
-    private bool _forwardHeld;
-    private bool _backwardHeld;
-    private bool _leftHeld;
-    private bool _rightHeld;
+    private readonly LoadingBayPlayerInput _input;
     private bool _jumpHeld;
     private bool _jumpPressed;
     private bool _voxelPublished;
@@ -339,6 +336,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         _spatial = engine.Spatial;
         _cameraView = engine.CameraView;
         _initialTuning = tuning;
+        _input = new LoadingBayPlayerInput(tuning);
         SpatialSession? session = null;
         try
         {
@@ -348,7 +346,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
             LookReceipt initialLook = Look.Integrate(new LookRequest(
                 new LookState(-DegreesToRadians(tuning.InitialYawDegrees), DegreesToRadians(tuning.InitialPitchDegrees)),
                 Vector2.Zero,
-                LookConfig(tuning)));
+                tuning.PointerLook));
             _lookState = initialLook.After;
             _forward = initialLook.Forward;
             _session = session;
@@ -379,6 +377,15 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         }
     }
 
+    /// <summary>Admits generated room geometry through Engine's ordinary mesh collision lane.</summary>
+    internal void PublishRoomMeshes(StaticMeshAsset[] assets, StaticMeshInstance[] instances)
+    {
+        if (_voxelPublished) throw new InvalidOperationException("Scene geometry is already staged.");
+        _spatial.ReplaceCollision(new CollisionReplaceRequest(_session, assets,
+            ReadOnlyMemory<Vector3>.Empty, ReadOnlyMemory<Triangle>.Empty, instances));
+        _voxelPublished = true;
+    }
+
     internal SpatialSession Session => _session;
 
     internal Vector3 Position => _position;
@@ -398,7 +405,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         ThrowIfDisposed();
         if (!Finite(snapshot.Position) || !float.IsFinite(snapshot.Look.YawRadians) || !float.IsFinite(snapshot.Look.PitchRadians))
             throw new InvalidOperationException("Snapshot supplied a non-finite E1M1 player pose or look state.");
-        LookReceipt look = Look.Integrate(new LookRequest(snapshot.Look, Vector2.Zero, LookConfig(tuning)));
+        LookReceipt look = Look.Integrate(new LookRequest(snapshot.Look, Vector2.Zero, tuning.PointerLook));
         if (look.After != snapshot.Look)
             throw new InvalidOperationException("Snapshot supplied an out-of-policy E1M1 player look state.");
         _position = snapshot.Position;
@@ -423,7 +430,8 @@ internal sealed class LoadingBayPlayerScene : IDisposable
             _continuation = snapshot.Continuation;
         }
         _planarIntent = Vector2.Zero;
-        _forwardHeld = _backwardHeld = _leftHeld = _rightHeld = _jumpHeld = _jumpPressed = false;
+        _input.Clear();
+        _jumpHeld = _jumpPressed = false;
         if (_camera is not null) _cameraView.UpdateCamera(new CameraUpdateRequest(_camera, CameraDescriptor(tuning)));
     }
 
@@ -463,7 +471,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         ThrowIfDisposed();
         if (_camera is null) throw new InvalidOperationException("Loading Bay's E1M1 camera is not active.");
         if (!_voxelPublished) throw new InvalidOperationException("Loading Bay's E1M1 voxel scene is not staged.");
-        LoadingBaySemanticInput input = ApplyInput(update.Input, tuning);
+        LoadingBaySemanticInput input = ApplyInput(update);
         if (update.Facts.AdmittedStepCount > 0 && double.IsFinite(update.Facts.FixedDeltaSeconds) && update.Facts.FixedDeltaSeconds > 0d && update.Facts.FixedDeltaSeconds <= float.MaxValue)
         {
             float delta = (float)update.Facts.FixedDeltaSeconds;
@@ -503,42 +511,17 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    private LoadingBaySemanticInput ApplyInput(ReadOnlySpan<ProductInputEvent> inputs, LoadingBayTuning tuning)
+    private LoadingBaySemanticInput ApplyInput(ProductUpdate update)
     {
-        bool use = false;
-        bool fire = false;
-        foreach (ProductInputEvent input in inputs)
-        {
-            if (input.Kind == InputEventKind.Clear)
-            {
-                _forwardHeld = _backwardHeld = _leftHeld = _rightHeld = false;
-                _jumpHeld = _jumpPressed = false;
-                _planarIntent = Vector2.Zero;
-                continue;
-            }
-            if (input.Kind == InputEventKind.PointerDelta)
-            {
-                LookReceipt integrated = Look.Integrate(new LookRequest(_lookState, new Vector2(input.X, input.Y), LookConfig(tuning)));
-                _lookState = integrated.After;
-                _forward = integrated.Forward;
-                continue;
-            }
-            if (input.Kind is not (InputEventKind.DirectDigital or InputEventKind.MappedDigital or InputEventKind.DirectAxis or InputEventKind.MappedAxis)) continue;
-            bool active = input.Edge != InputEdge.Released && input.X > 0f;
-            if (input.Intent.Span.SequenceEqual("player.move.forward"u8)) _forwardHeld = active;
-            else if (input.Intent.Span.SequenceEqual("player.move.backward"u8)) _backwardHeld = active;
-            else if (input.Intent.Span.SequenceEqual("player.move.left"u8)) _leftHeld = active;
-            else if (input.Intent.Span.SequenceEqual("player.move.right"u8)) _rightHeld = active;
-            else if (input.Intent.Span.SequenceEqual("player.jump"u8))
-            {
-                _jumpPressed |= input.Edge == InputEdge.Pressed;
-                _jumpHeld = active;
-            }
-            else if (active && input.Intent.Span.SequenceEqual("player.use"u8)) use = true;
-            else if (active && input.Intent.Span.SequenceEqual("player.fire"u8)) fire = true;
-        }
-        _planarIntent = new Vector2((_rightHeld ? 1f : 0f) - (_leftHeld ? 1f : 0f), (_forwardHeld ? 1f : 0f) - (_backwardHeld ? 1f : 0f));
-        return new LoadingBaySemanticInput(use, fire);
+        float simulationSeconds = (float)(update.Facts.AdmittedStepCount * update.Facts.FixedDeltaSeconds);
+        LoadingBayPlayerInputFrame frame = _input.Consume(update.Input, simulationSeconds, _lookState);
+        if (frame.Cleared) _jumpPressed = false;
+        _lookState = frame.Look.After;
+        _forward = frame.Look.Forward;
+        _planarIntent = frame.Controls.Movement;
+        _jumpPressed |= frame.Controls.JumpPressed;
+        _jumpHeld = frame.Controls.JumpHeld;
+        return new LoadingBaySemanticInput(frame.Controls.UsePressed, frame.FireRequested);
     }
 
     private CameraDescriptor CameraDescriptor(LoadingBayTuning tuning) => new(
@@ -554,16 +537,15 @@ internal sealed class LoadingBayPlayerScene : IDisposable
             CrouchedHeight = tuning.CrouchedCharacterHeight,
             Radius = tuning.CharacterRadius,
         },
-        Ground = configuration.Ground with { ForwardSpeed = tuning.MovementSpeed, BackwardSpeed = tuning.MovementSpeed, StrafeSpeed = tuning.MovementSpeed },
+        Ground = configuration.Ground with
+        {
+            ForwardSpeed = tuning.MovementSpeed, BackwardSpeed = tuning.MovementSpeed, StrafeSpeed = tuning.MovementSpeed,
+            Acceleration = tuning.GroundAcceleration, Braking = tuning.GroundBraking, Friction = tuning.GroundFriction,
+        },
+        Air = configuration.Air with { MaximumSpeed = tuning.MovementSpeed, WishSpeedCap = tuning.MovementSpeed, Acceleration = tuning.AirAcceleration },
         Vertical = configuration.Vertical with { Gravity = tuning.Gravity, JumpSpeed = tuning.JumpSpeed },
         Surface = configuration.Surface with { MaximumStepHeight = tuning.MaximumStepHeight },
     };
-
-    private static LookConfig LookConfig(LoadingBayTuning tuning)
-    {
-        float radiansPerUnit = DegreesToRadians(tuning.LookDegreesPerUnit);
-        return new LookConfig(radiansPerUnit, radiansPerUnit, -1.5f, 1.5f, 1f, false, false, true);
-    }
 
     private static float DegreesToRadians(float degrees) => degrees * (MathF.PI / 180f);
     private static bool Finite(Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);

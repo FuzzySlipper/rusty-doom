@@ -21,4 +21,4 @@ The offline E1M1 forge may regenerate deterministic derived assets and manifests
 
 The HUD makes health/armor, ammunition, generation, admitted-step, facts/drop telemetry, world schedules, and named tuning visible. `./scripts/verify-csharp-spine.sh` is the focused C# proof: semantic catalog, Angular staging when necessary, managed build, lifecycle exercise, and the package-generated NativeAOT check. It does not replace a focused browser observation when UI behavior changes.
 
-The visible browser capture retains a black horizontal band, and repeated pointer-locked fire may be ignored after the initial shot. The manual E1M1 certifier stalls at waypoint `[127,121]`; it is release/manual work and not a verification gate.
+The dark upper region near spawn is low ceiling geometry; level/player scale still needs calibration. Focused input checks cover release/repress and discrete firing, not sustained combat. The manual E1M1 certifier stalls at waypoint `[127,121]`; it is release/manual work and not a verification gate.

@@ -12,8 +12,9 @@ The runtime validates and admits the committed project, voxel, and asset-catalog
 
 Focused evidence currently supports Engine-hosted E1M1 rendering, the
 one-canvas browser shell, structured HUD projection, and realtime movement
-continuation. The observed frame retains a black horizontal band, and repeated
-fire while pointer-locked may be ignored after the initial shot. It does not
+continuation. The dark upper region near spawn is low ceiling geometry;
+level/player scale still needs calibration. Focused input checks cover
+release/repress and discrete firing, not sustained combat. This evidence does not
 establish every authored combat, encounter, pickup, door, secret, exit, or full
 traversal behavior. Keep future claims tied to direct, current observations.
 

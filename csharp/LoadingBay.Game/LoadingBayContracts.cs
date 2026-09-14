@@ -74,7 +74,7 @@ internal sealed record LoadingBayVoxelSceneReadout(
     internal static LoadingBayVoxelSceneReadout Empty => new(
         string.Empty, string.Empty, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, []);
 }
-/// <summary>Retained authored SKY1 identity and camera-view realization state.</summary>
+/// <summary>Selected sky asset identity and camera-view realization state.</summary>
 internal readonly record struct LoadingBaySkyReadout(
     string SourcePath,
     ContentSha256 SourceHash,

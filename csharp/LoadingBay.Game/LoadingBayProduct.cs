@@ -36,7 +36,27 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(context);
         _entityWorldDebug = CreateEntityWorldDebugModule();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack);
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.");
+
+        if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") == "room-study")
+        {
+            _skyBackground = new LoadingBaySkyBackground(context.Engine.Content, context.Content,
+                context.Engine.Graphics, context.Engine.CameraView);
+            try
+            {
+                _sessionFactory = () => new LoadingBayRoomStudy(context.Engine, _skyBackground.Readout);
+                _session = _sessionFactory();
+                _session.ActivateSharedRealizations();
+                _session.Publish();
+            }
+            catch
+            {
+                _session?.Dispose();
+                _skyBackground.Dispose();
+                throw;
+            }
+            return;
+        }
 
         LoadingBayExitButtonAnimation? animation = null;
         LoadingBayExitPresentation? presentation = null;
@@ -94,7 +114,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
         _entityWorldDebug = CreateEntityWorldDebugModule();
         _session = _sessionFactory();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack);
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.");
         AdoptDebugWorld(_session);
     }
 

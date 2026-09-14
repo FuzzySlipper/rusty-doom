@@ -14,7 +14,8 @@
         "outputPath": "dist/apps/loading-bay",
         "browser": "apps/loading-bay/src/main.ts",
         "index": "apps/loading-bay/src/index.html",
-        "tsConfig": "apps/loading-bay/tsconfig.app.json"
+        "tsConfig": "apps/loading-bay/tsconfig.app.json",
+        "externalDependencies": ["@rusty-engine/live-debug"]
       },
       "configurations": {
         "production": {
@@ -25,7 +26,7 @@
               "maximumError": "14kb"
             }
           ],
-        "outputHashing": "none"
+          "outputHashing": "none"
         },
         "development": {
           "optimization": false,

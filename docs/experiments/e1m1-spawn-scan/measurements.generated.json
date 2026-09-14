@@ -1,0 +1,3467 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "wadPath": "/home/research/doom.ts/public/doom1.wad",
+    "wadSha256": "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771",
+    "wadByteLength": 4196020,
+    "wadIdentification": "IWAD",
+    "entryCount": 1264,
+    "e1m1LumpIndex": 6,
+    "intermediateSha256": "cd0b95451b021b118e6ec1437a74a85e5f94f4b58829ad1f818794ed29115eb6"
+  },
+  "selection": {
+    "bounds": [
+      480,
+      -3700,
+      1400,
+      -2860
+    ],
+    "rule": "Complete sector boundaries inside bounds; adjacent sectors retained as context only"
+  },
+  "coordinates": {
+    "units": "Doom map units",
+    "unitsPerEngineUnit": 16,
+    "conversion": "Engine X = map x / scale; Engine Z = -map y / scale; Engine Y = height / scale. No origin shift."
+  },
+  "sectors": [
+    {
+      "id": 2,
+      "floorHeight": 0,
+      "ceilingHeight": 144,
+      "floorTexture": "FLOOR4_8",
+      "ceilingTexture": "CEIL3_5",
+      "lightLevel": 144,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        1216,
+        -2880,
+        1472,
+        -2432
+      ],
+      "lineIds": [
+        145,
+        146,
+        147,
+        148,
+        149,
+        150
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            145,
+            148,
+            150,
+            147,
+            146,
+            149
+          ],
+          "points": [
+            {
+              "x": 1216,
+              "y": -2880
+            },
+            {
+              "x": 1248,
+              "y": -2528
+            },
+            {
+              "x": 1472,
+              "y": -2432
+            },
+            {
+              "x": 1472,
+              "y": -2560
+            },
+            {
+              "x": 1384,
+              "y": -2592
+            },
+            {
+              "x": 1344,
+              "y": -2880
+            }
+          ],
+          "bounds": [
+            1216,
+            -2880,
+            1472,
+            -2432
+          ],
+          "signedArea": -62720
+        }
+      ],
+      "warnings": [],
+      "selected": false
+    },
+    {
+      "id": 5,
+      "floorHeight": -56,
+      "ceilingHeight": 216,
+      "floorTexture": "FLOOR7_1",
+      "ceilingTexture": "F_SKY1",
+      "lightLevel": 255,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        1376,
+        -3648,
+        2736,
+        -2880
+      ],
+      "lineIds": [
+        30,
+        31,
+        36,
+        37,
+        38,
+        45,
+        46,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        179,
+        250,
+        251,
+        252,
+        271,
+        272,
+        273,
+        276
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            30,
+            38,
+            45,
+            46,
+            162,
+            163,
+            271,
+            272,
+            273,
+            276,
+            179,
+            250,
+            251,
+            252,
+            37,
+            31,
+            36
+          ],
+          "points": [
+            {
+              "x": 1376,
+              "y": -3200
+            },
+            {
+              "x": 1376,
+              "y": -3104
+            },
+            {
+              "x": 1376,
+              "y": -2944
+            },
+            {
+              "x": 1472,
+              "y": -2880
+            },
+            {
+              "x": 1856,
+              "y": -2880
+            },
+            {
+              "x": 1920,
+              "y": -2920
+            },
+            {
+              "x": 2240,
+              "y": -2920
+            },
+            {
+              "x": 2272,
+              "y": -3008
+            },
+            {
+              "x": 2432,
+              "y": -3112
+            },
+            {
+              "x": 2736,
+              "y": -3112
+            },
+            {
+              "x": 2736,
+              "y": -3360
+            },
+            {
+              "x": 2736,
+              "y": -3648
+            },
+            {
+              "x": 2240,
+              "y": -3648
+            },
+            {
+              "x": 1984,
+              "y": -3648
+            },
+            {
+              "x": 1376,
+              "y": -3648
+            },
+            {
+              "x": 1376,
+              "y": -3360
+            },
+            {
+              "x": 1376,
+              "y": -3264
+            }
+          ],
+          "bounds": [
+            1376,
+            -3648,
+            2736,
+            -2880
+          ],
+          "signedArea": -925312
+        },
+        {
+          "lineIds": [
+            164,
+            171,
+            170,
+            169,
+            168,
+            167,
+            166,
+            165
+          ],
+          "points": [
+            {
+              "x": 1672,
+              "y": -3104
+            },
+            {
+              "x": 1520,
+              "y": -3168
+            },
+            {
+              "x": 1544,
+              "y": -3384
+            },
+            {
+              "x": 1784,
+              "y": -3448
+            },
+            {
+              "x": 2064,
+              "y": -3408
+            },
+            {
+              "x": 2128,
+              "y": -3272
+            },
+            {
+              "x": 2040,
+              "y": -3144
+            },
+            {
+              "x": 1896,
+              "y": -3104
+            }
+          ],
+          "bounds": [
+            1520,
+            -3448,
+            2128,
+            -3104
+          ],
+          "signedArea": 167936
+        }
+      ],
+      "warnings": [],
+      "selected": false
+    },
+    {
+      "id": 14,
+      "floorHeight": 8,
+      "ceilingHeight": 192,
+      "floorTexture": "FLAT5_5",
+      "ceilingTexture": "FLAT5_5",
+      "lightLevel": 255,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        1344,
+        -3360,
+        1376,
+        -3264
+      ],
+      "lineIds": [
+        26,
+        31,
+        32,
+        33
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            26,
+            32,
+            31,
+            33
+          ],
+          "points": [
+            {
+              "x": 1344,
+              "y": -3360
+            },
+            {
+              "x": 1344,
+              "y": -3264
+            },
+            {
+              "x": 1376,
+              "y": -3264
+            },
+            {
+              "x": 1376,
+              "y": -3360
+            }
+          ],
+          "bounds": [
+            1344,
+            -3360,
+            1376,
+            -3264
+          ],
+          "signedArea": -3072
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    },
+    {
+      "id": 15,
+      "floorHeight": 8,
+      "ceilingHeight": 192,
+      "floorTexture": "FLAT5_5",
+      "ceilingTexture": "FLAT5_5",
+      "lightLevel": 255,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        1344,
+        -3200,
+        1376,
+        -3104
+      ],
+      "lineIds": [
+        29,
+        30,
+        34,
+        35
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            29,
+            35,
+            30,
+            34
+          ],
+          "points": [
+            {
+              "x": 1344,
+              "y": -3200
+            },
+            {
+              "x": 1344,
+              "y": -3104
+            },
+            {
+              "x": 1376,
+              "y": -3104
+            },
+            {
+              "x": 1376,
+              "y": -3200
+            }
+          ],
+          "bounds": [
+            1344,
+            -3200,
+            1376,
+            -3104
+          ],
+          "signedArea": -3072
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    },
+    {
+      "id": 24,
+      "floorHeight": -8,
+      "ceilingHeight": 224,
+      "floorTexture": "FLOOR4_8",
+      "ceilingTexture": "FLOOR7_2",
+      "lightLevel": 128,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        64,
+        -3456,
+        496,
+        -3008
+      ],
+      "lineIds": [
+        64,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        92,
+        93,
+        94,
+        95,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            64,
+            67,
+            68,
+            69,
+            94,
+            95,
+            73,
+            74,
+            75,
+            76,
+            77,
+            78,
+            79,
+            80,
+            81,
+            82,
+            83,
+            84,
+            85,
+            92,
+            93,
+            70,
+            72,
+            71
+          ],
+          "points": [
+            {
+              "x": 496,
+              "y": -3160
+            },
+            {
+              "x": 496,
+              "y": -3304
+            },
+            {
+              "x": 496,
+              "y": -3328
+            },
+            {
+              "x": 448,
+              "y": -3456
+            },
+            {
+              "x": 128,
+              "y": -3456
+            },
+            {
+              "x": 64,
+              "y": -3392
+            },
+            {
+              "x": 128,
+              "y": -3264
+            },
+            {
+              "x": 160,
+              "y": -3264
+            },
+            {
+              "x": 192,
+              "y": -3264
+            },
+            {
+              "x": 224,
+              "y": -3264
+            },
+            {
+              "x": 256,
+              "y": -3264
+            },
+            {
+              "x": 288,
+              "y": -3264
+            },
+            {
+              "x": 320,
+              "y": -3264
+            },
+            {
+              "x": 320,
+              "y": -3200
+            },
+            {
+              "x": 288,
+              "y": -3200
+            },
+            {
+              "x": 256,
+              "y": -3200
+            },
+            {
+              "x": 224,
+              "y": -3200
+            },
+            {
+              "x": 192,
+              "y": -3200
+            },
+            {
+              "x": 160,
+              "y": -3200
+            },
+            {
+              "x": 128,
+              "y": -3200
+            },
+            {
+              "x": 64,
+              "y": -3072
+            },
+            {
+              "x": 128,
+              "y": -3008
+            },
+            {
+              "x": 448,
+              "y": -3008
+            },
+            {
+              "x": 496,
+              "y": -3136
+            }
+          ],
+          "bounds": [
+            64,
+            -3456,
+            496,
+            -3008
+          ],
+          "signedArea": -158720
+        },
+        {
+          "lineIds": [
+            137,
+            138,
+            139,
+            140
+          ],
+          "points": [
+            {
+              "x": 256,
+              "y": -3136
+            },
+            {
+              "x": 320,
+              "y": -3136
+            },
+            {
+              "x": 320,
+              "y": -3072
+            },
+            {
+              "x": 256,
+              "y": -3072
+            }
+          ],
+          "bounds": [
+            256,
+            -3136,
+            320,
+            -3072
+          ],
+          "signedArea": 4096
+        },
+        {
+          "lineIds": [
+            141,
+            142,
+            143,
+            144
+          ],
+          "points": [
+            {
+              "x": 256,
+              "y": -3392
+            },
+            {
+              "x": 320,
+              "y": -3392
+            },
+            {
+              "x": 320,
+              "y": -3328
+            },
+            {
+              "x": 256,
+              "y": -3328
+            }
+          ],
+          "bounds": [
+            256,
+            -3392,
+            320,
+            -3328
+          ],
+          "signedArea": 4096
+        }
+      ],
+      "warnings": [],
+      "selected": false
+    },
+    {
+      "id": 37,
+      "floorHeight": -8,
+      "ceilingHeight": 120,
+      "floorTexture": "FLAT14",
+      "ceilingTexture": "CEIL3_5",
+      "lightLevel": 192,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        896,
+        -3392,
+        1184,
+        -3072
+      ],
+      "lineIds": [
+        10,
+        11,
+        16,
+        18,
+        19,
+        22,
+        39,
+        50,
+        51,
+        52,
+        53,
+        54
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            10,
+            51,
+            16,
+            39
+          ],
+          "points": [
+            {
+              "x": 928,
+              "y": -3392
+            },
+            {
+              "x": 928,
+              "y": -3360
+            },
+            {
+              "x": 1184,
+              "y": -3360
+            },
+            {
+              "x": 1184,
+              "y": -3392
+            }
+          ],
+          "bounds": [
+            928,
+            -3392,
+            1184,
+            -3360
+          ],
+          "signedArea": -8192
+        },
+        {
+          "lineIds": [
+            11,
+            53,
+            18,
+            52
+          ],
+          "points": [
+            {
+              "x": 928,
+              "y": -3360
+            },
+            {
+              "x": 896,
+              "y": -3360
+            },
+            {
+              "x": 896,
+              "y": -3104
+            },
+            {
+              "x": 928,
+              "y": -3104
+            }
+          ],
+          "bounds": [
+            896,
+            -3360,
+            928,
+            -3104
+          ],
+          "signedArea": -8192
+        },
+        {
+          "lineIds": [
+            19,
+            54,
+            22,
+            50
+          ],
+          "points": [
+            {
+              "x": 928,
+              "y": -3104
+            },
+            {
+              "x": 928,
+              "y": -3072
+            },
+            {
+              "x": 1184,
+              "y": -3072
+            },
+            {
+              "x": 1184,
+              "y": -3104
+            }
+          ],
+          "bounds": [
+            928,
+            -3104,
+            1184,
+            -3072
+          ],
+          "signedArea": -8192
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    },
+    {
+      "id": 38,
+      "floorHeight": 0,
+      "ceilingHeight": 72,
+      "floorTexture": "FLOOR4_8",
+      "ceilingTexture": "CEIL3_5",
+      "lightLevel": 144,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        704,
+        -3648,
+        1344,
+        -2880
+      ],
+      "lineIds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        12,
+        13,
+        17,
+        20,
+        21,
+        25,
+        28,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        49,
+        53,
+        54,
+        55,
+        56,
+        57,
+        149
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            3,
+            49,
+            4,
+            6,
+            8,
+            55,
+            57,
+            56,
+            42,
+            43,
+            44,
+            149,
+            28,
+            41,
+            21,
+            54,
+            20,
+            17,
+            53,
+            12,
+            9,
+            39,
+            13,
+            40,
+            25,
+            7,
+            5
+          ],
+          "points": [
+            {
+              "x": 1152,
+              "y": -3648
+            },
+            {
+              "x": 1088,
+              "y": -3648
+            },
+            {
+              "x": 1024,
+              "y": -3648
+            },
+            {
+              "x": 960,
+              "y": -3648
+            },
+            {
+              "x": 832,
+              "y": -3552
+            },
+            {
+              "x": 704,
+              "y": -3552
+            },
+            {
+              "x": 704,
+              "y": -3360
+            },
+            {
+              "x": 704,
+              "y": -3104
+            },
+            {
+              "x": 704,
+              "y": -2944
+            },
+            {
+              "x": 832,
+              "y": -2944
+            },
+            {
+              "x": 968,
+              "y": -2880
+            },
+            {
+              "x": 1216,
+              "y": -2880
+            },
+            {
+              "x": 1344,
+              "y": -2880
+            },
+            {
+              "x": 1344,
+              "y": -3104
+            },
+            {
+              "x": 1216,
+              "y": -3072
+            },
+            {
+              "x": 1184,
+              "y": -3072
+            },
+            {
+              "x": 928,
+              "y": -3072
+            },
+            {
+              "x": 896,
+              "y": -3072
+            },
+            {
+              "x": 896,
+              "y": -3104
+            },
+            {
+              "x": 896,
+              "y": -3360
+            },
+            {
+              "x": 896,
+              "y": -3392
+            },
+            {
+              "x": 928,
+              "y": -3392
+            },
+            {
+              "x": 1184,
+              "y": -3392
+            },
+            {
+              "x": 1216,
+              "y": -3392
+            },
+            {
+              "x": 1344,
+              "y": -3360
+            },
+            {
+              "x": 1344,
+              "y": -3552
+            },
+            {
+              "x": 1280,
+              "y": -3552
+            }
+          ],
+          "bounds": [
+            704,
+            -3648,
+            1344,
+            -2880
+          ],
+          "signedArea": -308992
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    },
+    {
+      "id": 39,
+      "floorHeight": -16,
+      "ceilingHeight": 200,
+      "floorTexture": "FLAT14",
+      "ceilingTexture": "CEIL3_5",
+      "lightLevel": 224,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        928,
+        -3392,
+        1344,
+        -3072
+      ],
+      "lineIds": [
+        14,
+        15,
+        23,
+        24,
+        26,
+        27,
+        29,
+        40,
+        41,
+        50,
+        51,
+        52
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            14,
+            15,
+            51,
+            52,
+            50,
+            23,
+            24,
+            41,
+            29,
+            27,
+            26,
+            40
+          ],
+          "points": [
+            {
+              "x": 1216,
+              "y": -3392
+            },
+            {
+              "x": 1216,
+              "y": -3360
+            },
+            {
+              "x": 1184,
+              "y": -3360
+            },
+            {
+              "x": 928,
+              "y": -3360
+            },
+            {
+              "x": 928,
+              "y": -3104
+            },
+            {
+              "x": 1184,
+              "y": -3104
+            },
+            {
+              "x": 1216,
+              "y": -3104
+            },
+            {
+              "x": 1216,
+              "y": -3072
+            },
+            {
+              "x": 1344,
+              "y": -3104
+            },
+            {
+              "x": 1344,
+              "y": -3200
+            },
+            {
+              "x": 1344,
+              "y": -3264
+            },
+            {
+              "x": 1344,
+              "y": -3360
+            }
+          ],
+          "bounds": [
+            928,
+            -3392,
+            1344,
+            -3072
+          ],
+          "signedArea": -110592
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    },
+    {
+      "id": 40,
+      "floorHeight": 0,
+      "ceilingHeight": 72,
+      "floorTexture": "FLOOR4_8",
+      "ceilingTexture": "CEIL3_5",
+      "lightLevel": 255,
+      "special": 1,
+      "tag": 0,
+      "bounds": [
+        1024,
+        -3680,
+        1088,
+        -3648
+      ],
+      "lineIds": [
+        0,
+        1,
+        2,
+        49
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            0,
+            1,
+            49,
+            2
+          ],
+          "points": [
+            {
+              "x": 1088,
+              "y": -3680
+            },
+            {
+              "x": 1024,
+              "y": -3680
+            },
+            {
+              "x": 1024,
+              "y": -3648
+            },
+            {
+              "x": 1088,
+              "y": -3648
+            }
+          ],
+          "bounds": [
+            1024,
+            -3680,
+            1088,
+            -3648
+          ],
+          "signedArea": -2048
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    },
+    {
+      "id": 41,
+      "floorHeight": -8,
+      "ceilingHeight": 120,
+      "floorTexture": "FLOOR4_8",
+      "ceilingTexture": "CEIL3_5",
+      "lightLevel": 128,
+      "special": 0,
+      "tag": 0,
+      "bounds": [
+        496,
+        -3360,
+        704,
+        -3104
+      ],
+      "lineIds": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66
+      ],
+      "loops": [
+        {
+          "lineIds": [
+            57,
+            62,
+            63,
+            58,
+            65,
+            64,
+            66,
+            59,
+            60,
+            61
+          ],
+          "points": [
+            {
+              "x": 704,
+              "y": -3104
+            },
+            {
+              "x": 704,
+              "y": -3360
+            },
+            {
+              "x": 680,
+              "y": -3360
+            },
+            {
+              "x": 512,
+              "y": -3328
+            },
+            {
+              "x": 512,
+              "y": -3304
+            },
+            {
+              "x": 496,
+              "y": -3304
+            },
+            {
+              "x": 496,
+              "y": -3160
+            },
+            {
+              "x": 512,
+              "y": -3160
+            },
+            {
+              "x": 512,
+              "y": -3136
+            },
+            {
+              "x": 680,
+              "y": -3104
+            }
+          ],
+          "bounds": [
+            496,
+            -3360,
+            704,
+            -3104
+          ],
+          "signedArea": -46080
+        }
+      ],
+      "warnings": [],
+      "selected": true
+    }
+  ],
+  "lines": [
+    {
+      "id": 0,
+      "startVertex": 0,
+      "endVertex": 1,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 0,
+      "backSidedef": -1,
+      "frontSector": 40,
+      "backSector": null,
+      "start": {
+        "x": 1088,
+        "y": -3680
+      },
+      "end": {
+        "x": 1024,
+        "y": -3680
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOOR3",
+        "sector": 40
+      },
+      "back": null
+    },
+    {
+      "id": 1,
+      "startVertex": 1,
+      "endVertex": 2,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 1,
+      "backSidedef": -1,
+      "frontSector": 40,
+      "backSector": null,
+      "start": {
+        "x": 1024,
+        "y": -3680
+      },
+      "end": {
+        "x": 1024,
+        "y": -3648
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "LITE3",
+        "sector": 40
+      },
+      "back": null
+    },
+    {
+      "id": 2,
+      "startVertex": 3,
+      "endVertex": 0,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 2,
+      "backSidedef": -1,
+      "frontSector": 40,
+      "backSector": null,
+      "start": {
+        "x": 1088,
+        "y": -3648
+      },
+      "end": {
+        "x": 1088,
+        "y": -3680
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "LITE3",
+        "sector": 40
+      },
+      "back": null
+    },
+    {
+      "id": 3,
+      "startVertex": 4,
+      "endVertex": 3,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 3,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1152,
+        "y": -3648
+      },
+      "end": {
+        "x": 1088,
+        "y": -3648
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 4,
+      "startVertex": 2,
+      "endVertex": 5,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 4,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1024,
+        "y": -3648
+      },
+      "end": {
+        "x": 960,
+        "y": -3648
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 5,
+      "startVertex": 6,
+      "endVertex": 4,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 5,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1280,
+        "y": -3552
+      },
+      "end": {
+        "x": 1152,
+        "y": -3648
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 6,
+      "startVertex": 5,
+      "endVertex": 7,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 6,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 960,
+        "y": -3648
+      },
+      "end": {
+        "x": 832,
+        "y": -3552
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 7,
+      "startVertex": 8,
+      "endVertex": 6,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 7,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1344,
+        "y": -3552
+      },
+      "end": {
+        "x": 1280,
+        "y": -3552
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 8,
+      "startVertex": 7,
+      "endVertex": 9,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 8,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 832,
+        "y": -3552
+      },
+      "end": {
+        "x": 704,
+        "y": -3552
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 9,
+      "startVertex": 10,
+      "endVertex": 11,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 9,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 896,
+        "y": -3392
+      },
+      "end": {
+        "x": 928,
+        "y": -3392
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 48,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 10,
+      "startVertex": 11,
+      "endVertex": 12,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 10,
+      "backSidedef": -1,
+      "frontSector": 37,
+      "backSector": null,
+      "start": {
+        "x": 928,
+        "y": -3392
+      },
+      "end": {
+        "x": 928,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 37
+      },
+      "back": null
+    },
+    {
+      "id": 11,
+      "startVertex": 12,
+      "endVertex": 13,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 11,
+      "backSidedef": -1,
+      "frontSector": 37,
+      "backSector": null,
+      "start": {
+        "x": 928,
+        "y": -3360
+      },
+      "end": {
+        "x": 896,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 37
+      },
+      "back": null
+    },
+    {
+      "id": 12,
+      "startVertex": 13,
+      "endVertex": 10,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 12,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 896,
+        "y": -3360
+      },
+      "end": {
+        "x": 896,
+        "y": -3392
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 48,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 13,
+      "startVertex": 14,
+      "endVertex": 15,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 13,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1184,
+        "y": -3392
+      },
+      "end": {
+        "x": 1216,
+        "y": -3392
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 14,
+      "startVertex": 15,
+      "endVertex": 16,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 14,
+      "backSidedef": -1,
+      "frontSector": 39,
+      "backSector": null,
+      "start": {
+        "x": 1216,
+        "y": -3392
+      },
+      "end": {
+        "x": 1216,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 39
+      },
+      "back": null
+    },
+    {
+      "id": 15,
+      "startVertex": 16,
+      "endVertex": 17,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 15,
+      "backSidedef": -1,
+      "frontSector": 39,
+      "backSector": null,
+      "start": {
+        "x": 1216,
+        "y": -3360
+      },
+      "end": {
+        "x": 1184,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 39
+      },
+      "back": null
+    },
+    {
+      "id": 16,
+      "startVertex": 17,
+      "endVertex": 14,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 16,
+      "backSidedef": -1,
+      "frontSector": 37,
+      "backSector": null,
+      "start": {
+        "x": 1184,
+        "y": -3360
+      },
+      "end": {
+        "x": 1184,
+        "y": -3392
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 80,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 37
+      },
+      "back": null
+    },
+    {
+      "id": 17,
+      "startVertex": 18,
+      "endVertex": 19,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 17,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 896,
+        "y": -3072
+      },
+      "end": {
+        "x": 896,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 48,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 18,
+      "startVertex": 19,
+      "endVertex": 20,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 18,
+      "backSidedef": -1,
+      "frontSector": 37,
+      "backSector": null,
+      "start": {
+        "x": 896,
+        "y": -3104
+      },
+      "end": {
+        "x": 928,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 37
+      },
+      "back": null
+    },
+    {
+      "id": 19,
+      "startVertex": 20,
+      "endVertex": 21,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 19,
+      "backSidedef": -1,
+      "frontSector": 37,
+      "backSector": null,
+      "start": {
+        "x": 928,
+        "y": -3104
+      },
+      "end": {
+        "x": 928,
+        "y": -3072
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 37
+      },
+      "back": null
+    },
+    {
+      "id": 20,
+      "startVertex": 21,
+      "endVertex": 18,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 20,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 928,
+        "y": -3072
+      },
+      "end": {
+        "x": 896,
+        "y": -3072
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 48,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 21,
+      "startVertex": 22,
+      "endVertex": 23,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 21,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1216,
+        "y": -3072
+      },
+      "end": {
+        "x": 1184,
+        "y": -3072
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 22,
+      "startVertex": 23,
+      "endVertex": 24,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 22,
+      "backSidedef": -1,
+      "frontSector": 37,
+      "backSector": null,
+      "start": {
+        "x": 1184,
+        "y": -3072
+      },
+      "end": {
+        "x": 1184,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 80,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 37
+      },
+      "back": null
+    },
+    {
+      "id": 23,
+      "startVertex": 24,
+      "endVertex": 25,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 23,
+      "backSidedef": -1,
+      "frontSector": 39,
+      "backSector": null,
+      "start": {
+        "x": 1184,
+        "y": -3104
+      },
+      "end": {
+        "x": 1216,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 39
+      },
+      "back": null
+    },
+    {
+      "id": 24,
+      "startVertex": 25,
+      "endVertex": 22,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 24,
+      "backSidedef": -1,
+      "frontSector": 39,
+      "backSector": null,
+      "start": {
+        "x": 1216,
+        "y": -3104
+      },
+      "end": {
+        "x": 1216,
+        "y": -3072
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "BROWN1",
+        "sector": 39
+      },
+      "back": null
+    },
+    {
+      "id": 25,
+      "startVertex": 26,
+      "endVertex": 8,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 25,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1344,
+        "y": -3360
+      },
+      "end": {
+        "x": 1344,
+        "y": -3552
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 26,
+      "startVertex": 27,
+      "endVertex": 26,
+      "flags": 29,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 26,
+      "backSidedef": 27,
+      "frontSector": 39,
+      "backSector": 14,
+      "start": {
+        "x": 1344,
+        "y": -3264
+      },
+      "end": {
+        "x": 1344,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STARTAN3",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 14
+      }
+    },
+    {
+      "id": 27,
+      "startVertex": 28,
+      "endVertex": 27,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 28,
+      "backSidedef": -1,
+      "frontSector": 39,
+      "backSector": null,
+      "start": {
+        "x": 1344,
+        "y": -3200
+      },
+      "end": {
+        "x": 1344,
+        "y": -3264
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 39
+      },
+      "back": null
+    },
+    {
+      "id": 28,
+      "startVertex": 29,
+      "endVertex": 30,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 29,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 1344,
+        "y": -2880
+      },
+      "end": {
+        "x": 1344,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 29,
+      "startVertex": 30,
+      "endVertex": 28,
+      "flags": 29,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 30,
+      "backSidedef": 31,
+      "frontSector": 39,
+      "backSector": 15,
+      "start": {
+        "x": 1344,
+        "y": -3104
+      },
+      "end": {
+        "x": 1344,
+        "y": -3200
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STARTAN3",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 15
+      }
+    },
+    {
+      "id": 30,
+      "startVertex": 31,
+      "endVertex": 32,
+      "flags": 28,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 32,
+      "backSidedef": 33,
+      "frontSector": 5,
+      "backSector": 15,
+      "start": {
+        "x": 1376,
+        "y": -3200
+      },
+      "end": {
+        "x": 1376,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STARTAN3",
+        "middleTexture": "-",
+        "sector": 5
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 15
+      }
+    },
+    {
+      "id": 31,
+      "startVertex": 33,
+      "endVertex": 34,
+      "flags": 28,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 34,
+      "backSidedef": 35,
+      "frontSector": 5,
+      "backSector": 14,
+      "start": {
+        "x": 1376,
+        "y": -3360
+      },
+      "end": {
+        "x": 1376,
+        "y": -3264
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STARTAN3",
+        "middleTexture": "-",
+        "sector": 5
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 14
+      }
+    },
+    {
+      "id": 32,
+      "startVertex": 27,
+      "endVertex": 34,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 36,
+      "backSidedef": -1,
+      "frontSector": 14,
+      "backSector": null,
+      "start": {
+        "x": 1344,
+        "y": -3264
+      },
+      "end": {
+        "x": 1376,
+        "y": -3264
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOORSTOP",
+        "sector": 14
+      },
+      "back": null
+    },
+    {
+      "id": 33,
+      "startVertex": 33,
+      "endVertex": 26,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 37,
+      "backSidedef": -1,
+      "frontSector": 14,
+      "backSector": null,
+      "start": {
+        "x": 1376,
+        "y": -3360
+      },
+      "end": {
+        "x": 1344,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOORSTOP",
+        "sector": 14
+      },
+      "back": null
+    },
+    {
+      "id": 34,
+      "startVertex": 31,
+      "endVertex": 28,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 38,
+      "backSidedef": -1,
+      "frontSector": 15,
+      "backSector": null,
+      "start": {
+        "x": 1376,
+        "y": -3200
+      },
+      "end": {
+        "x": 1344,
+        "y": -3200
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOORSTOP",
+        "sector": 15
+      },
+      "back": null
+    },
+    {
+      "id": 35,
+      "startVertex": 30,
+      "endVertex": 32,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 39,
+      "backSidedef": -1,
+      "frontSector": 15,
+      "backSector": null,
+      "start": {
+        "x": 1344,
+        "y": -3104
+      },
+      "end": {
+        "x": 1376,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOORSTOP",
+        "sector": 15
+      },
+      "back": null
+    },
+    {
+      "id": 39,
+      "startVertex": 14,
+      "endVertex": 11,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 43,
+      "backSidedef": 44,
+      "frontSector": 37,
+      "backSector": 38,
+      "start": {
+        "x": 1184,
+        "y": -3392
+      },
+      "end": {
+        "x": 928,
+        "y": -3392
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "COMPUTE2",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 37
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    },
+    {
+      "id": 40,
+      "startVertex": 26,
+      "endVertex": 15,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 45,
+      "backSidedef": 46,
+      "frontSector": 39,
+      "backSector": 38,
+      "start": {
+        "x": 1344,
+        "y": -3360
+      },
+      "end": {
+        "x": 1216,
+        "y": -3392
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    },
+    {
+      "id": 41,
+      "startVertex": 22,
+      "endVertex": 30,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 47,
+      "backSidedef": 48,
+      "frontSector": 39,
+      "backSector": 38,
+      "start": {
+        "x": 1216,
+        "y": -3072
+      },
+      "end": {
+        "x": 1344,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    },
+    {
+      "id": 42,
+      "startVertex": 37,
+      "endVertex": 38,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 49,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 704,
+        "y": -2944
+      },
+      "end": {
+        "x": 832,
+        "y": -2944
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 43,
+      "startVertex": 38,
+      "endVertex": 39,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 50,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 832,
+        "y": -2944
+      },
+      "end": {
+        "x": 968,
+        "y": -2880
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 44,
+      "startVertex": 39,
+      "endVertex": 40,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 51,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 968,
+        "y": -2880
+      },
+      "end": {
+        "x": 1216,
+        "y": -2880
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 49,
+      "startVertex": 3,
+      "endVertex": 2,
+      "flags": 28,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 56,
+      "backSidedef": 57,
+      "frontSector": 38,
+      "backSector": 40,
+      "start": {
+        "x": 1088,
+        "y": -3648
+      },
+      "end": {
+        "x": 1024,
+        "y": -3648
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STARTAN3",
+        "middleTexture": "-",
+        "sector": 38
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 40
+      }
+    },
+    {
+      "id": 50,
+      "startVertex": 20,
+      "endVertex": 24,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 58,
+      "backSidedef": 59,
+      "frontSector": 39,
+      "backSector": 37,
+      "start": {
+        "x": 928,
+        "y": -3104
+      },
+      "end": {
+        "x": 1184,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 37
+      }
+    },
+    {
+      "id": 51,
+      "startVertex": 17,
+      "endVertex": 12,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 60,
+      "backSidedef": 61,
+      "frontSector": 39,
+      "backSector": 37,
+      "start": {
+        "x": 1184,
+        "y": -3360
+      },
+      "end": {
+        "x": 928,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 37
+      }
+    },
+    {
+      "id": 52,
+      "startVertex": 12,
+      "endVertex": 20,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 62,
+      "backSidedef": 63,
+      "frontSector": 39,
+      "backSector": 37,
+      "start": {
+        "x": 928,
+        "y": -3360
+      },
+      "end": {
+        "x": 928,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 39
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 37
+      }
+    },
+    {
+      "id": 53,
+      "startVertex": 13,
+      "endVertex": 19,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 64,
+      "backSidedef": 65,
+      "frontSector": 37,
+      "backSector": 38,
+      "start": {
+        "x": 896,
+        "y": -3360
+      },
+      "end": {
+        "x": 896,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "COMPUTE2",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 37
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    },
+    {
+      "id": 54,
+      "startVertex": 21,
+      "endVertex": 23,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 66,
+      "backSidedef": 67,
+      "frontSector": 37,
+      "backSector": 38,
+      "start": {
+        "x": 928,
+        "y": -3072
+      },
+      "end": {
+        "x": 1184,
+        "y": -3072
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "COMPUTE2",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 37
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    },
+    {
+      "id": 55,
+      "startVertex": 9,
+      "endVertex": 45,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 68,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 704,
+        "y": -3552
+      },
+      "end": {
+        "x": 704,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 56,
+      "startVertex": 46,
+      "endVertex": 37,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 69,
+      "backSidedef": -1,
+      "frontSector": 38,
+      "backSector": null,
+      "start": {
+        "x": 704,
+        "y": -3104
+      },
+      "end": {
+        "x": 704,
+        "y": -2944
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 38
+      },
+      "back": null
+    },
+    {
+      "id": 57,
+      "startVertex": 46,
+      "endVertex": 45,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 70,
+      "backSidedef": 71,
+      "frontSector": 41,
+      "backSector": 38,
+      "start": {
+        "x": 704,
+        "y": -3104
+      },
+      "end": {
+        "x": 704,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 41
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    },
+    {
+      "id": 58,
+      "startVertex": 47,
+      "endVertex": 48,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 72,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 512,
+        "y": -3328
+      },
+      "end": {
+        "x": 512,
+        "y": -3304
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 59,
+      "startVertex": 49,
+      "endVertex": 50,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 73,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 512,
+        "y": -3160
+      },
+      "end": {
+        "x": 512,
+        "y": -3136
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 60,
+      "startVertex": 50,
+      "endVertex": 51,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 74,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 512,
+        "y": -3136
+      },
+      "end": {
+        "x": 680,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 61,
+      "startVertex": 51,
+      "endVertex": 46,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 75,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 680,
+        "y": -3104
+      },
+      "end": {
+        "x": 704,
+        "y": -3104
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "SUPPORT2",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 62,
+      "startVertex": 45,
+      "endVertex": 52,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 76,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 704,
+        "y": -3360
+      },
+      "end": {
+        "x": 680,
+        "y": -3360
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "SUPPORT2",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 63,
+      "startVertex": 52,
+      "endVertex": 47,
+      "flags": 1,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 77,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 680,
+        "y": -3360
+      },
+      "end": {
+        "x": 512,
+        "y": -3328
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "STARTAN3",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 64,
+      "startVertex": 53,
+      "endVertex": 54,
+      "flags": 4,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 78,
+      "backSidedef": 79,
+      "frontSector": 24,
+      "backSector": 41,
+      "start": {
+        "x": 496,
+        "y": -3160
+      },
+      "end": {
+        "x": 496,
+        "y": -3304
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 104,
+        "upperTexture": "STARG3",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 24
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 41
+      }
+    },
+    {
+      "id": 65,
+      "startVertex": 48,
+      "endVertex": 54,
+      "flags": 17,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 80,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 512,
+        "y": -3304
+      },
+      "end": {
+        "x": 496,
+        "y": -3304
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOORTRAK",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 66,
+      "startVertex": 53,
+      "endVertex": 49,
+      "flags": 17,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 81,
+      "backSidedef": -1,
+      "frontSector": 41,
+      "backSector": null,
+      "start": {
+        "x": 496,
+        "y": -3160
+      },
+      "end": {
+        "x": 512,
+        "y": -3160
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "DOORTRAK",
+        "sector": 41
+      },
+      "back": null
+    },
+    {
+      "id": 149,
+      "startVertex": 29,
+      "endVertex": 40,
+      "flags": 12,
+      "lineType": 0,
+      "sectorTag": 0,
+      "frontSidedef": 203,
+      "backSidedef": 204,
+      "frontSector": 2,
+      "backSector": 38,
+      "start": {
+        "x": 1344,
+        "y": -2880
+      },
+      "end": {
+        "x": 1216,
+        "y": -2880
+      },
+      "front": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "STARTAN3",
+        "lowerTexture": "STEP6",
+        "middleTexture": "-",
+        "sector": 2
+      },
+      "back": {
+        "xOffset": 0,
+        "yOffset": 0,
+        "upperTexture": "-",
+        "lowerTexture": "-",
+        "middleTexture": "-",
+        "sector": 38
+      }
+    }
+  ],
+  "things": [
+    {
+      "x": 1056,
+      "y": -3616,
+      "angle": 90,
+      "type": 1,
+      "options": 7
+    },
+    {
+      "x": 1008,
+      "y": -3600,
+      "angle": 90,
+      "type": 2,
+      "options": 7
+    },
+    {
+      "x": 1104,
+      "y": -3600,
+      "angle": 90,
+      "type": 3,
+      "options": 7
+    },
+    {
+      "x": 960,
+      "y": -3600,
+      "angle": 90,
+      "type": 4,
+      "options": 7
+    },
+    {
+      "x": 528,
+      "y": -3312,
+      "angle": 90,
+      "type": 2028,
+      "options": 7
+    },
+    {
+      "x": 528,
+      "y": -3152,
+      "angle": 90,
+      "type": 2028,
+      "options": 7
+    },
+    {
+      "x": 1312,
+      "y": -3520,
+      "angle": 90,
+      "type": 2014,
+      "options": 7
+    },
+    {
+      "x": 736,
+      "y": -3520,
+      "angle": 90,
+      "type": 2014,
+      "options": 7
+    },
+    {
+      "x": 736,
+      "y": -2976,
+      "angle": 90,
+      "type": 2015,
+      "options": 7
+    },
+    {
+      "x": 976,
+      "y": -2912,
+      "angle": 90,
+      "type": 2015,
+      "options": 7
+    },
+    {
+      "x": 1312,
+      "y": -3264,
+      "angle": 90,
+      "type": 2035,
+      "options": 7
+    },
+    {
+      "x": 1152,
+      "y": -2912,
+      "angle": 90,
+      "type": 2035,
+      "options": 7
+    },
+    {
+      "x": 864,
+      "y": -3328,
+      "angle": 90,
+      "type": 2035,
+      "options": 7
+    },
+    {
+      "x": 1056,
+      "y": -3552,
+      "angle": 90,
+      "type": 11,
+      "options": 7
+    },
+    {
+      "x": 1024,
+      "y": -3264,
+      "angle": 270,
+      "type": 10,
+      "options": 7
+    },
+    {
+      "x": 1088,
+      "y": -2944,
+      "angle": 270,
+      "type": 15,
+      "options": 7
+    }
+  ],
+  "transitions": [
+    {
+      "lineId": 26,
+      "sectors": [
+        39,
+        14
+      ],
+      "width": 96,
+      "floorDelta": 24,
+      "openHeight": 184,
+      "movementBlocking": true,
+      "lineType": 0,
+      "interpretation": "height opening with blocking flag"
+    },
+    {
+      "lineId": 29,
+      "sectors": [
+        39,
+        15
+      ],
+      "width": 96,
+      "floorDelta": 24,
+      "openHeight": 184,
+      "movementBlocking": true,
+      "lineType": 0,
+      "interpretation": "height opening with blocking flag"
+    },
+    {
+      "lineId": 30,
+      "sectors": [
+        5,
+        15
+      ],
+      "width": 96,
+      "floorDelta": 64,
+      "openHeight": 184,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 31,
+      "sectors": [
+        5,
+        14
+      ],
+      "width": 96,
+      "floorDelta": 64,
+      "openHeight": 184,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 39,
+      "sectors": [
+        37,
+        38
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 40,
+      "sectors": [
+        39,
+        38
+      ],
+      "width": 131.93938001976514,
+      "floorDelta": 16,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 41,
+      "sectors": [
+        39,
+        38
+      ],
+      "width": 131.93938001976514,
+      "floorDelta": 16,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 49,
+      "sectors": [
+        38,
+        40
+      ],
+      "width": 64,
+      "floorDelta": 0,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "open connection; may only divide lighting/materials"
+    },
+    {
+      "lineId": 50,
+      "sectors": [
+        39,
+        37
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 128,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 51,
+      "sectors": [
+        39,
+        37
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 128,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 52,
+      "sectors": [
+        39,
+        37
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 128,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 53,
+      "sectors": [
+        37,
+        38
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 54,
+      "sectors": [
+        37,
+        38
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 57,
+      "sectors": [
+        41,
+        38
+      ],
+      "width": 256,
+      "floorDelta": 8,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "height transition; possible step or ledge"
+    },
+    {
+      "lineId": 64,
+      "sectors": [
+        24,
+        41
+      ],
+      "width": 144,
+      "floorDelta": 0,
+      "openHeight": 128,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "open connection; may only divide lighting/materials"
+    },
+    {
+      "lineId": 149,
+      "sectors": [
+        2,
+        38
+      ],
+      "width": 128,
+      "floorDelta": 0,
+      "openHeight": 72,
+      "movementBlocking": false,
+      "lineType": 0,
+      "interpretation": "open connection; may only divide lighting/materials"
+    }
+  ],
+  "warnings": []
+}

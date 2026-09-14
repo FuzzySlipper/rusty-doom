@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Rusty.Engine" Version="0.1.0-dev.cbf35130d06c" ExcludeAssets="$(RustyEnginePackageExcludeAssets)" />
+    <PackageReference Include="Rusty.Engine" Version="0.1.0-dev.e4b95f4207dc" ExcludeAssets="$(RustyEnginePackageExcludeAssets)" />
     <RustyEngineProductInputIntent Include="player.move.forward" Value="digital" />
     <RustyEngineProductInputIntent Include="player.move.left" Value="digital" />
     <RustyEngineProductInputIntent Include="player.move.backward" Value="digital" />
@@ -40,5 +40,14 @@
     <RustyEngineProductInputMapping Include="player.fire" Intent="player.fire" Trigger="pointer-button:primary:pressed" />
     <RustyEngineProductInputMapping Include="player.look.x" Intent="player.look.x" Trigger="pointer-axis:x" />
     <RustyEngineProductInputMapping Include="player.look.y" Intent="player.look.y" Trigger="pointer-axis:y" />
+    <RustyEngineProductInputIntent Include="player.move.analog-x" Value="axis" />
+    <RustyEngineProductInputIntent Include="player.move.analog-y" Value="axis" />
+    <RustyEngineProductInputMapping Include="player.move.left-stick-x" Intent="player.move.analog-x" Trigger="controller-axis:axis-0" />
+    <RustyEngineProductInputMapping Include="player.move.left-stick-y" Intent="player.move.analog-y" Trigger="controller-axis:axis-1" />
+    <RustyEngineProductInputMapping Include="player.look.right-stick-x" Intent="player.look.x" Trigger="controller-axis:axis-2" />
+    <RustyEngineProductInputMapping Include="player.look.right-stick-y" Intent="player.look.y" Trigger="controller-axis:axis-3" />
+    <RustyEngineProductInputMapping Include="player.jump.controller-a" Intent="player.jump" Trigger="controller-button:button-0:held" />
+    <RustyEngineProductInputMapping Include="player.use.controller-x" Intent="player.use" Trigger="controller-button:button-2:pressed" />
+    <RustyEngineProductInputMapping Include="player.fire.controller-rt" Intent="player.fire" Trigger="controller-button:button-7:pressed" />
   </ItemGroup>
 </Project>

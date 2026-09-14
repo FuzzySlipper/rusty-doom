@@ -1,5 +1,6 @@
 using System.Numerics;
 using Rusty.Engine;
+using Rusty.Engine.Input;
 
 namespace LoadingBay.Game;
 
@@ -44,6 +45,27 @@ internal sealed record LoadingBayTuning(
     float EffectsVolume,
     bool EffectsMuted)
 {
+    internal float GroundAcceleration { get; init; } = 48f;
+    internal float GroundBraking { get; init; } = 58f;
+    internal float GroundFriction { get; init; } = 9f;
+    internal float AirAcceleration { get; init; } = 10f;
+    internal float ControllerStickDeadzone { get; init; } = .15f;
+    internal float ControllerLookDegreesPerSecond { get; init; } = 108f;
+    internal const ControllerButton FireControllerButton = ControllerButton.Button7;
+
+    internal LookConfig PointerLook => new(
+        LookDegreesPerUnit * MathF.PI / 180f, LookDegreesPerUnit * MathF.PI / 180f,
+        -1.5f, 1.5f, MathF.PI, InvertHorizontal: false, InvertVertical: true, WrapYaw: true);
+
+    internal FpsInputConfig PlayerInput => new(
+        FpsInputBindings.Standard,
+        new RadialDeadzone(ControllerStickDeadzone, 1f, 1f),
+        new RadialDeadzone(ControllerStickDeadzone, 1f, 1f),
+        PointerLook,
+        ControllerLookDegreesPerSecond * MathF.PI / 180f,
+        ControllerLookDegreesPerSecond * MathF.PI / 180f,
+        InvertControllerHorizontal: false, InvertControllerVertical: true);
+
     /// <summary>Engine character center lift required to preserve the authored E1M1 base-position convention.</summary>
     internal float EngineCenterLift => (StandingCharacterHeight * .5f) - AuthoredPlayerKinematicHalfHeight;
 

@@ -4,6 +4,9 @@ using Rusty.Engine;
 using Rusty.Engine.Entities;
 using Rusty.Engine.Persistence;
 
+PlayerInputExercise.Run();
+StudyDoorExercise.Run();
+
 var created = new List<RecordingSession>(); int attempts = 0;
 Require(new[]
     {

@@ -122,6 +122,7 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
     private readonly LoadingBayE1M1AnimationCue _cue;
     private readonly Appearance _appearance;
     private readonly AnimationInstance _instance;
+    private readonly RenderResource _mesh;
     private LoadingBayAnimationReadout _readout;
     private bool _completionObserved;
     private bool _disposed;
@@ -135,13 +136,15 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
 
         Appearance? appearance = null;
         AnimationInstance? instance = null;
+        RenderResource? mesh = null;
         try
         {
-            RenderResourceHandle mesh = _animation.OpenAnimatedMesh(new AnimatedMeshResourceRequest(cue.SourcePath));
-            if (mesh.Value == 0) throw new InvalidOperationException("Engine Animation returned an invalid E1M1 exit-button mesh handle.");
+            mesh = _animation.OpenAnimatedMesh(new AnimatedMeshResourceRequest(cue.SourcePath));
+            _mesh = mesh;
+            if (mesh.Handle.Value == 0) throw new InvalidOperationException("Engine Animation returned an invalid E1M1 exit-button mesh handle.");
             Appearance createdAppearance = _animation.CreateAnimatedMeshAppearance(new AnimatedMeshAppearanceRequest(mesh));
-            AnimationInstance createdInstance = _animation.CreateInstance(new AnimationInstanceRequest(createdAppearance, cue.ObjectId));
             appearance = createdAppearance;
+            AnimationInstance createdInstance = _animation.CreateInstance(new AnimationInstanceRequest(createdAppearance, cue.ObjectId));
             instance = createdInstance;
             _appearance = createdAppearance;
             _instance = createdInstance;
@@ -154,6 +157,7 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
         {
             instance?.Dispose();
             appearance?.Dispose();
+            mesh?.Dispose();
             throw;
         }
     }
@@ -214,6 +218,8 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
         try { _appearanceService.PublishSnapshot(ReadOnlySpan<AppearanceFact>.Empty); }
         catch (Exception exception) { (failures ??= []).Add(exception); }
         try { _appearance.Dispose(); }
+        catch (Exception exception) { (failures ??= []).Add(exception); }
+        try { _mesh.Dispose(); }
         catch (Exception exception) { (failures ??= []).Add(exception); }
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }

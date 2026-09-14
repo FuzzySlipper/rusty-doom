@@ -1,7 +1,10 @@
 import {
+  type AfterViewInit,
+  type ElementRef,
+  ViewChild,
   ChangeDetectionStrategy,
   Component,
-  OnDestroy,
+  type OnDestroy,
   inject,
   signal,
 } from "@angular/core";
@@ -10,7 +13,10 @@ import {
   type LoadingBayHudProjectionEnvelope,
 } from "./engine-application";
 
+import { mountLoadingBayDebug } from "./loading-bay-debug";
+
 interface LoadingBayHudSnapshot {
+  readonly content: string;
   readonly health: number;
   readonly armor: number;
   readonly bullets: number;
@@ -46,6 +52,7 @@ interface LoadingBayHudFact {
 }
 
 const EMPTY_READOUT: LoadingBayHudSnapshot = {
+  content: "doom-e1m1",
   health: 0,
   armor: 0,
   bullets: 0,
@@ -110,10 +117,39 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
         position: absolute;
         text-transform: uppercase;
       }
-      .identity {
+      .debug {
+        display: block;
         left: 20px;
         top: 18px;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 110px);
+        overflow: auto;
+        pointer-events: auto;
+        text-transform: none;
+        letter-spacing: normal;
       }
+      .debug[open] {
+        width: min(42rem, calc(100vw - 66px));
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 700;
+        padding: 2px;
+      }
+      summary:focus-visible {
+        outline: 2px solid #a8f7d5;
+        outline-offset: 3px;
+      }
+      .identity {
+        display: grid;
+        gap: 4px;
+        margin-top: 12px;
+      }
+      .debug-widgets {
+        margin-top: 12px;
+        text-shadow: none;
+      }
+
       .vitals {
         align-items: baseline;
         bottom: 28px;
@@ -126,10 +162,9 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
         font-size: 24px;
       }
       .status {
-        bottom: 28px;
         color: #aec7c0;
-        left: 20px;
-        max-width: min(42rem, calc(100vw - 40px));
+        margin-top: 12px;
+        overflow-wrap: anywhere;
       }
       .complete {
         color: #a8f7d5;
@@ -141,17 +176,66 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
   ],
   template: `
     <section class="hud" aria-label="Loading Bay game readout">
-      <div class="readout identity">
-        <span>DOOM E1M1 / HANGAR</span>
-        <strong [class.complete]="snapshot().complete">
-          {{ snapshot().complete ? "EXIT SECURED" : "ENGINE RUNTIME ACTIVE" }}
-        </strong>
-        <span
-          >{{ snapshot().updateMode }} · {{ snapshot().lifecycle }} · GEN
-          {{ snapshot().generation }} · STEP {{ snapshot().step }}</span
-        >
-      </div>
+      <details
+        #debugBlock
+        class="readout debug"
+        data-rusty-ui-interactive
+        (toggle)="toggleDebug($event)"
+      >
+        <summary>Debug</summary>
+        <div class="identity">
+          <span>{{ snapshot().content === "doom-room-study" ? "DOOM-INSPIRED / SPAWN ROOM STUDY" : "DOOM E1M1 / HANGAR" }}</span>
+          <strong [class.complete]="snapshot().complete">
+            {{ snapshot().complete ? "EXIT SECURED" : "ENGINE RUNTIME ACTIVE" }}
+          </strong>
+          <span
+            >{{ snapshot().updateMode }} · {{ snapshot().lifecycle }} · GEN
+            {{ snapshot().generation }} · STEP {{ snapshot().step }}</span
+          >
+        </div>
 
+        <div class="status">
+          @if (projectionFault() !== null) {
+            <span class="fault"
+              >HUD projection unavailable: {{ projectionFault() }}</span
+            >
+          } @else if (ready()) {
+            <span>
+              FACTS {{ snapshot().facts.length }} · DROPPED
+              {{ snapshot().droppedFacts }} · SCHEDULES
+              {{ snapshot().pendingSchedules }} · EXIT
+              {{ snapshot().exitVisibility ? "VISIBLE" : "OCCLUDED" }} ({{
+                snapshot().exitVisibilityRevision
+              }}) · BILLBOARDS {{ snapshot().presentationBillboards }} · AUDIO
+              {{ snapshot().effectsMuted ? "MUTED" : snapshot().effectsVolume }}
+              · ADMITTED {{ snapshot().admittedSteps }} · DROPPED STEPS
+              {{ snapshot().droppedSteps }}
+              · MATERIALS {{ snapshot().materialCount }} / MAP
+              {{ snapshot().materialMappingCount }} · SKY
+              {{
+                snapshot().skyResourceRealized &&
+                snapshot().skyBackgroundSelected
+                  ? snapshot().skyPath
+                  : "UNREALIZED"
+              }}
+              @if (snapshot().animationCue) {
+                · CUE {{ snapshot().animationCue }}
+              }
+            </span>
+          } @else {
+            <span>WAITING FOR ENGINE HUD PROJECTION…</span>
+          }
+        </div>
+        <div
+          #debugWidgets
+          class="debug-widgets"
+          aria-label="Engine diagnostics"
+        ></div>
+      </details>
+
+      @if (snapshot().content === "doom-room-study") {
+        <div class="readout vitals">E1M1 CONSTRUCTION STUDY · WASD / MOUSE · E OPEN DOOR · SPACE JUMP</div>
+      } @else {
       <div class="readout vitals" aria-label="Current player vitals">
         <span
           >HEALTH <strong>{{ snapshot().health }}</strong></span
@@ -159,41 +243,55 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
         <span
           >ARMOR <strong>{{ snapshot().armor }}</strong></span
         >
-        <span>BULLETS <strong>{{ snapshot().bullets }}</strong></span>
-        <span>SHELLS <strong>{{ snapshot().shells }}</strong></span>
+        <span
+          >BULLETS <strong>{{ snapshot().bullets }}</strong></span
+        >
+        <span
+          >SHELLS <strong>{{ snapshot().shells }}</strong></span
+        >
       </div>
-
-      <div class="readout status" aria-live="polite">
-        @if (projectionFault() !== null) {
-          <span class="fault"
-            >HUD projection unavailable: {{ projectionFault() }}</span
-          >
-        } @else if (ready()) {
-          <span>
-            FACTS {{ snapshot().facts.length }} · DROPPED
-            {{ snapshot().droppedFacts }} · SCHEDULES
-            {{ snapshot().pendingSchedules }} · EXIT
-            {{ snapshot().exitVisibility ? "VISIBLE" : "OCCLUDED" }} ({{
-              snapshot().exitVisibilityRevision
-            }}) · BILLBOARDS {{ snapshot().presentationBillboards }} · AUDIO
-            {{ snapshot().effectsMuted ? "MUTED" : snapshot().effectsVolume }}
-            · ADMITTED {{ snapshot().admittedSteps }} · DROPPED STEPS
-            {{ snapshot().droppedSteps }}
-            · MATERIALS {{ snapshot().materialCount }} / MAP
-            {{ snapshot().materialMappingCount }} · SKY
-            {{ snapshot().skyResourceRealized && snapshot().skyBackgroundSelected ? snapshot().skyPath : "UNREALIZED" }}
-            @if (snapshot().animationCue) {
-              · CUE {{ snapshot().animationCue }}
-            }
-          </span>
-        } @else {
-          <span>WAITING FOR ENGINE HUD PROJECTION…</span>
-        }
-      </div>
+      }
     </section>
   `,
 })
-export class LoadingBayHudComponent implements OnDestroy {
+export class LoadingBayHudComponent implements AfterViewInit, OnDestroy {
+  @ViewChild("debugBlock", { static: true })
+  private debugBlock!: ElementRef<HTMLDetailsElement>;
+  @ViewChild("debugWidgets", { static: true })
+  private debugWidgets!: ElementRef<HTMLElement>;
+  private debugMount: ReturnType<typeof mountLoadingBayDebug> | null = null;
+  private readonly debugEvents = new AbortController();
+
+  ngAfterViewInit(): void {
+    const stop = (event: Event): void => event.stopPropagation();
+    for (const type of [
+      "pointerdown",
+      "pointermove",
+      "pointerup",
+      "pointercancel",
+      "mousedown",
+      "mousemove",
+      "mouseup",
+      "wheel",
+      "keydown",
+      "keyup",
+      "click",
+    ]) {
+      this.debugBlock.nativeElement.addEventListener(type, stop, {
+        signal: this.debugEvents.signal,
+      });
+    }
+  }
+
+  protected toggleDebug(event: Event): void {
+    if ((event.target as HTMLDetailsElement).open) {
+      this.debugMount ??= mountLoadingBayDebug(this.debugWidgets.nativeElement);
+    } else {
+      this.debugMount?.dispose();
+      this.debugMount = null;
+    }
+  }
+
   protected readonly snapshot = signal<LoadingBayHudSnapshot>(EMPTY_READOUT);
   protected readonly ready = signal(false);
   protected readonly projectionFault = signal<string | null>(null);
@@ -217,11 +315,15 @@ export class LoadingBayHudComponent implements OnDestroy {
   );
 
   ngOnDestroy(): void {
+    this.debugEvents.abort();
+    this.debugMount?.dispose();
     this.unsubscribe?.();
   }
 }
 
-function readHudSnapshot(envelope: LoadingBayHudProjectionEnvelope): LoadingBayHudSnapshot | null {
+function readHudSnapshot(
+  envelope: LoadingBayHudProjectionEnvelope,
+): LoadingBayHudSnapshot | null {
   if (
     envelope.stream !== "loading-bay.hud" ||
     envelope.contract !== "loading-bay.hud.snapshot.v1"
@@ -279,6 +381,7 @@ function readHudSnapshot(envelope: LoadingBayHudProjectionEnvelope): LoadingBayH
     return null;
   }
   return {
+    content: typeof value.content === "string" ? value.content : "doom-e1m1",
     health,
     armor,
     bullets,

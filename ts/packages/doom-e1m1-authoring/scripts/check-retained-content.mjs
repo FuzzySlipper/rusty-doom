@@ -38,6 +38,17 @@ if (sha256(skyBytes) !== textures.sky.pngSha256 || skyBytes.byteLength !== textu
 }
 
 const props = readJson("content/doom-e1m1/props/source-manifest.json");
+// The selected generated sky has separate provenance; retain the WAD sky above.
+const generatedSky = readJson("content/loading-bay/sky/manifest.json");
+const generatedSkyBytes = readFileSync(resolve(repoRoot, "content", generatedSky.asset));
+if (sha256(generatedSkyBytes) !== generatedSky.sha256
+  || generatedSkyBytes.byteLength !== generatedSky.byteLength
+  || generatedSkyBytes.readUInt32BE(16) !== generatedSky.width
+  || generatedSkyBytes.readUInt32BE(20) !== generatedSky.height
+  || !generatedSkyBytes.subarray(24, 29).equals(Buffer.from([8, 6, 0, 0, 0]))
+  || sha256(skyBytes) !== generatedSky.referenceSha256) {
+  throw new Error("Generated mountain sky no longer matches its separate provenance manifest");
+}
 for (const license of props.licenses ?? []) {
   const bytes = readFileSync(resolve(repoRoot, license.path));
   if (sha256(bytes) !== license.sha256) {

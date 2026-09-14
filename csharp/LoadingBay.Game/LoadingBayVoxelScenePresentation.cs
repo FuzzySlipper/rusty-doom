@@ -13,6 +13,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
     private readonly ContentReference _catalogContent;
     private readonly AuthoredCatalog _catalog;
     private readonly List<Material> _materials;
+    private readonly List<RenderResource> _textures = [];
     private readonly IVoxelScenePresentationService _service;
     private readonly VoxelScenePresentation _presentation;
     private readonly Dictionary<uint, ulong> _materialHandlesBySlot;
@@ -93,7 +94,8 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                     throw new InvalidOperationException($"Authored texture '{texture.Id}' lost its retained provenance hash during resolution.");
 
                 RenderResourceInfo resource = engine.Graphics.OpenResource(new RenderResourceRequest(textureEntry.SourcePath));
-                if (resource.Kind != RenderResourceKind.Texture || resource.ByteLength == 0 || resource.Handle.Value == 0)
+                _textures.Add(resource.Handle);
+                if (resource.Kind != RenderResourceKind.Texture || resource.ByteLength == 0 || resource.Handle.Handle.Value == 0)
                     throw new InvalidOperationException($"Engine could not open authored texture '{texture.Id}' as a usable texture resource.");
                 Material appearanceMaterial = engine.Graphics.CreateAuthoredMaterial(
                     new AuthoredMaterialAppearanceRequest(catalog, catalogMaterial.EntryId, resource.Handle));
@@ -158,6 +160,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         {
             presentation?.Dispose();
             for (int index = materials.Count - 1; index >= 0; index--) materials[index].Dispose();
+            foreach (var texture in _textures) texture.Dispose();
             catalog?.Dispose();
             catalogContent?.Dispose();
             throw;
@@ -194,6 +197,11 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         for (int index = _materials.Count - 1; index >= 0; index--)
         {
             try { _materials[index].Dispose(); }
+            catch (Exception exception) { (failures ??= []).Add(exception); }
+        }
+        foreach (var texture in _textures)
+        {
+            try { texture.Dispose(); }
             catch (Exception exception) { (failures ??= []).Add(exception); }
         }
         try { _catalog.Dispose(); }
