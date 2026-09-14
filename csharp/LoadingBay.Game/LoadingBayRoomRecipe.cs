@@ -16,7 +16,7 @@ internal static class LoadingBayRoomRecipe
 
 
     internal static void Compose(IImplicitSurfacesService service, Material wall, Material floor,
-        Material carpet, Material trim, Material ceiling, Material door, Material brown, Action<RecipeSurface> emit)
+        Material carpet, Material trim, Material ceiling, Material door, Material brown, Action<RecipeSurface> emit, Action<RecipeJoin>? join = null)
     {
         RecipeWriter writer = new(service, new(.125f, 0, .25f, ImplicitMaterialBoundaryMode.Interpolated),
             surface => emit(surface.Material.Equals(floor) || surface.Material.Equals(carpet) || surface.Material.Equals(ceiling)
@@ -27,21 +27,17 @@ internal static class LoadingBayRoomRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.3f), max + new Vector3(.3f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.3f), max + new Vector3(.3f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.25f), Vector2.Zero) : null);
         }
         ImplicitNode Outline(ImplicitRecipe f, float bottom, float top, float e = 0)
             => f.Union(f.Union(f.Box(new(-18-e, bottom, -1-e), new(2+e, top, 18+e)),
-                LoadingBayRecipeShapes.Prism(f, South, bottom, top, e)),
-                f.Union(LoadingBayRecipeShapes.Prism(f, North, bottom, top, e),
+                PlanarRecipes.ConvexPrism(f, South, bottom, top, e)),
+                f.Union(PlanarRecipes.ConvexPrism(f, North, bottom, top, e),
                     f.Box(new(-8-e, bottom, -5-e), new(-6+e, top, -4+e))));
         ImplicitNode HighRoom(ImplicitRecipe f, float bottom, float top, float e = 0)
             => f.Union(f.Box(new(-11-e, bottom, 5-e), new(-2+e, top, 13+e)),
-                LoadingBayRecipeShapes.Prism(f, BlueEast, bottom, top, e));
+                PlanarRecipes.ConvexPrism(f, BlueEast, bottom, top, e));
         ImplicitNode Rim(ImplicitRecipe f, float bottom, float top, float e = 0)
             => f.Union(f.Box(new(-12-e, bottom, 4-e), new(-11+e, top, 14+e)),
                 f.Union(f.Box(new(-11-e, bottom, 4-e), new(-3+e, top, 5+e)),
@@ -51,11 +47,11 @@ internal static class LoadingBayRoomRecipe
             // The small source jamb notches are omitted; keep the measured tapered mouth.
             Vector2[] contour = [new(-24.5f, 6.75f), new(-24.5f, 11.25f), new(-24, 12),
                 new(-18.75f, 13), new(-18, 13), new(-18, 5), new(-18.75f, 5), new(-24, 6)];
-            return LoadingBayRecipeShapes.Prism(f, contour, bottom, top, e);
+            return PlanarRecipes.ConvexPrism(f, contour, bottom, top, e);
         }
         using (ImplicitRecipe f = writer.Begin())
         {
-            ImplicitNode slab = f.Subtract(Outline(f, -1, 0, .4f), LoadingBayRecipeShapes.Prism(f, Blue, -1.1f, .1f));
+            ImplicitNode slab = f.Subtract(Outline(f, -1, 0, .4f), PlanarRecipes.ConvexPrism(f, Blue, -1.1f, .1f));
             slab = f.Intersect(slab, f.Box(new(-19, -1, -6), new(4, 0, 20)));
             slab = f.Subtract(slab, f.Box(new(-19, -1.1f, 5), new(-18, .1f, 13)));
             slab = f.Subtract(slab, f.Box(new(2, -1.1f, 5), new(3, .1f, 13)));
@@ -70,7 +66,7 @@ internal static class LoadingBayRoomRecipe
             // extracted diagonal edges between the low walkway, rim and tall central area.
             ImplicitNode roof = Outline(f, 6.25f, 6.65f, .4f);
             roof = f.Union(roof, f.Subtract(Outline(f, 2.25f, 6.65f, .4f),
-                LoadingBayRecipeShapes.Prism(f, Blue, 2.15f, 6.75f)));
+                PlanarRecipes.ConvexPrism(f, Blue, 2.15f, 6.75f)));
             roof = f.Union(roof, Rim(f, 3.75f, 6.65f));
             roof = f.Subtract(roof, f.Box(new(-2.4f, 2, 20), new(3, 7, 21)));
             roof = f.Subtract(roof, f.Box(new(-19, 2, 5), new(-18, 7, 13)));
@@ -123,6 +119,10 @@ internal static class LoadingBayRoomRecipe
         }
         Box("spawn west ceiling transition", new(-18.4f, 2.25f, 5), new(-18, 4.15f, 13), wall, true);
         LoadingBayWestWingRecipe.Compose(service, wall, floor, carpet, trim, ceiling, emit);
-        LoadingBayNorthWingRecipe.Compose(service, wall, floor, carpet, trim, ceiling, door, emit);
+        LoadingBayNorthWingRecipe.Compose(service, wall, floor, carpet, trim, ceiling, door, emit, join);
+        join?.Invoke(new("spawn west wall-ceiling", "spawn stepped ceiling", "spawn outer wall shell",
+            new(-18.2f, 2.25f, 1.5f), new(0, 0, 1.5f), new(.15f, 0, 0)));
+        join?.Invoke(new("spawn west wall-floor", "spawn perimeter floor", "spawn outer wall shell",
+            new(-18.2f, 0, 1.5f), new(0, 0, 1.5f), new(.15f, 0, 0)));
     }
 }

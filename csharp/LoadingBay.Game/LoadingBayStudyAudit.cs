@@ -9,6 +9,8 @@ namespace LoadingBay.Game;
 /// <summary>Product labels and report projection for the opt-in Engine authoring audit.</summary>
 internal sealed class LoadingBayStudyAudit : IDisposable
 {
+    private readonly List<RecipeJoin> _joins = [];
+    internal void Register(RecipeJoin join) => _joins.Add(join.Placed(Matrix4x4.CreateScale(1, 1, -1)));
     private readonly IImplicitSurfacesService _service;
     private readonly ImplicitAudit _audit;
     private readonly Dictionary<ulong, string> _labels = [];
@@ -102,16 +104,12 @@ internal sealed class LoadingBayStudyAudit : IDisposable
             }
             json.WriteEndArray(); json.WriteEndObject();
         }
-        void Join(string name, string a, string b, Vector3 center, Vector3 halfU, Vector3 halfV)
+        void Join(RecipeJoin join)
         {
-            center = LoadingBayStudyCoordinates.World(center);
-            halfU = LoadingBayStudyCoordinates.World(halfU);
-            halfV = LoadingBayStudyCoordinates.World(halfV);
             json.WriteStartObject();
-            json.WriteString("Name", name); json.WriteString("PieceA", a); json.WriteString("PieceB", b);
-            Vector("Center", center); Vector("HalfU", halfU); Vector("HalfV", halfV);
-            Report("Report", _service.ReadExpectedJoin(new(_audit, Id(a), Id(b), center,
-                halfU, halfV, .4f, .05f, .025f, 20_000)));
+            json.WriteString("Name", join.Name); json.WriteString("PieceA", join.SurfaceA); json.WriteString("PieceB", join.SurfaceB);
+            Vector("Center", join.Center); Vector("HalfU", join.HalfU); Vector("HalfV", join.HalfV);
+            Report("Report", _service.ReadExpectedJoin(join.Request(_audit, Id, .4f, .05f, .025f, 20_000)));
             json.WriteEndObject();
         }
         ImplicitAnalysisReportLeaseReceipt Enclosure(Vector3 min, Vector3 max, Vector3 seed,
@@ -127,27 +125,8 @@ internal sealed class LoadingBayStudyAudit : IDisposable
             json.WriteString(label.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), label.Value);
         json.WriteEndObject();
         Report("Integrity", _service.ReadMeshIntegrity(new(_audit, ReadOnlyMemory<ImplicitAuditOpenRegion>.Empty)));
-        // A narrow strip within the wall thickness must meet the slab above/below.
-        // These are authored contact regions, not automatic proximity-based intent.
-        Vector3 along = new(2.5f, 0, 2.5f * 3 / 7);
-        Vector3 across = Vector3.Normalize(new(-3, 0, 7)) * .15f;
-        Vector3 edge = new Vector3(2.5f, 0, 32.5f) + Vector3.Normalize(new(-3, 0, 7)) * .2f;
         json.WriteStartArray("Joins");
-        Join("dogleg north ceiling-wall", "dogleg ceiling", "dogleg wall shell", edge with { Y = 4.5f }, along, across);
-        Join("dogleg north floor-wall", "dogleg floor", "dogleg wall shell", edge, along, across);
-        Join("door approach ceiling transition", "dogleg ceiling", "vestibule approach ceiling",
-            new(6, 4.7f, 32), new(0, .12f, 0), new(0, 0, 1.8f));
-        Vector3 eastAcross = Vector3.Normalize(new Vector3(2, 0, 4));
-        Join("east connector ceiling-wall", "east connector ceiling", "east connector shell",
-            new Vector3(50, 2.25f, 25) + eastAcross * .2f, new(1.6f, 0, -.8f), eastAcross * .15f);
-        Join("spawn west wall-ceiling", "spawn stepped ceiling", "spawn outer wall shell",
-            new(-18.2f, 2.25f, 1.5f), new(0, 0, 1.5f), new(.15f, 0, 0));
-        Join("spawn west wall-floor", "spawn perimeter floor", "spawn outer wall shell",
-            new(-18.2f, 0, 1.5f), new(0, 0, 1.5f), new(.15f, 0, 0));
-        Join("east gallery ceiling-wall", "east gallery ceiling", "east gallery wall shell",
-            new(74.2f, 5.5f, 0), new(0, 0, 4), new(.15f, 0, 0));
-        Join("east gallery lower entrance floor", "east gallery stairs and floor", "nukage basin",
-            new(66, -1.75f, -10), new(0, 0, 1.5f), new(0, .12f, 0));
+        foreach (RecipeJoin join in _joins) Join(join);
         json.WriteEndArray();
         // Explicit regional enclosure with intentional connections to the rest of the level.
         Report("Enclosure", Enclosure(new(-3, -1, 19), new(13, 8, 36), new(7, 1, 32),

@@ -16,7 +16,7 @@ internal static class LoadingBayNorthWingRecipe
     private static readonly Vector2[] FarArm = [new(-1, 31), new(6, 34), new(6, 30), new(3.25f, 29)];
 
     internal static void Compose(IImplicitSurfacesService service, Material wall, Material floor,
-        Material carpet, Material trim, Material ceiling, Material door, Action<RecipeSurface> emit)
+        Material carpet, Material trim, Material ceiling, Material door, Action<RecipeSurface> emit, Action<RecipeJoin>? join = null)
     {
         RecipeWriter writer = new(service, new(.2f, 0, .2f, ImplicitMaterialBoundaryMode.Interpolated),
             surface => emit(surface.Material.Equals(floor) || surface.Material.Equals(carpet) || surface.Material.Equals(ceiling)
@@ -27,15 +27,11 @@ internal static class LoadingBayNorthWingRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = LoadingBayRoomRecipe.Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.3f), max + new Vector3(.3f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.3f), max + new Vector3(.3f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.2f), Vector2.Zero) : null);
         }
         ImplicitNode Corridor(ImplicitRecipe field, float bottom, float top, float expansion = 0)
-            => field.Union(LoadingBayRecipeShapes.Prism(field, NearArm, bottom, top, expansion), LoadingBayRecipeShapes.Prism(field, FarArm, bottom, top, expansion));
+            => field.Union(PlanarRecipes.ConvexPrism(field, NearArm, bottom, top, expansion), PlanarRecipes.ConvexPrism(field, FarArm, bottom, top, expansion));
         // Slabs cover the wall thickness: a shared contact patch survives extraction
         // at diagonal corners, whereas matching only the inner edge leaves cracks.
         using (ImplicitRecipe field = writer.Begin())
@@ -97,6 +93,13 @@ internal static class LoadingBayNorthWingRecipe
         // Source 8/51/52 suggest three 8-unit rises. At this study scale each is 0.25.
         for (int step = 0; step < 3; step++)
             Box("north dais step", new(27 + step, 0, 30), new(step == 2 ? 32 : 28 + step, .25f * (step + 1), 38), carpet);
+        Vector3 along = new(2.5f, 0, 2.5f * 3 / 7);
+        Vector3 across = Vector3.Normalize(new(-3, 0, 7)) * .15f;
+        Vector3 edge = new Vector3(2.5f, 0, 32.5f) + Vector3.Normalize(new(-3, 0, 7)) * .2f;
+        join?.Invoke(new("dogleg north ceiling-wall", "dogleg ceiling", "dogleg wall shell", edge with { Y = 4.5f }, along, across));
+        join?.Invoke(new("dogleg north floor-wall", "dogleg floor", "dogleg wall shell", edge, along, across));
+        join?.Invoke(new("door approach ceiling transition", "dogleg ceiling", "vestibule approach ceiling",
+            new(6, 4.7f, 32), new(0, .12f, 0), new(0, 0, 1.8f)));
     }
 
 }

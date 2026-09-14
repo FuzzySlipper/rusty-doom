@@ -22,6 +22,10 @@ internal static class LoadingBayStudyCoordinates
         {
             Root = service.Transform(new(surface.Field, surface.Root,
                 new(Vector3.Zero, Quaternion.Identity, new(1, 1, -1)))),
+            Sampling = surface.Sampling with { TextureMapping = surface.Sampling.TextureMapping.Enabled
+                && surface.Sampling.TextureMapping.Projection == ImplicitTextureProjection.Basis
+                ? surface.Sampling.TextureMapping with { UAxis = World(surface.Sampling.TextureMapping.UAxis), VAxis = World(surface.Sampling.TextureMapping.VAxis) }
+                : surface.Sampling.TextureMapping },
             Min = Minimum(surface.Min, surface.Max),
             Max = Maximum(surface.Min, surface.Max),
             Placement = new(World(surface.Placement.Translation), new(-q.X, -q.Y, q.Z, q.W), surface.Placement.Scale),

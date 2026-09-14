@@ -82,8 +82,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
                 surface = LoadingBayStudyCoordinates.World(engine.ImplicitSurfaces, surface);
                 MeshResource mesh = engine.ImplicitSurfaces.Generate(new ImplicitGenerateRequest(
                     surface.Field, surface.Root, surface.Min, surface.Max, surface.Sampling.CellSize,
-                    surface.Sampling.CreaseDegrees, surface.Sampling.TextureRepeats, surface.Material, surface.Regions,
-                    surface.Sampling.MaterialBoundaries));
+                    surface.Sampling.CreaseDegrees, surface.Sampling.TextureRepeats, surface.Sampling.TextureMapping, surface.Material, surface.Regions,
+                    surface.Sampling.MaterialBoundaries, surface.Sampling.MaterialSampleSpacing, surface.Sampling.MaxExtractionVertices, surface.Sampling.MaxExtractionTriangles));
                 _studyAudit?.Capture(surface, mesh);
                 for (int i = 0; i < _doors.Length; i++)
                     if (surface.Name == _doors[i].Definition.SurfaceName) _doorIndices[i] = _meshes.Count;
@@ -91,12 +91,13 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
                 _placements.Add(surface.Placement);
                 _appearances.Add(engine.Graphics.CreateMeshAppearance(mesh));
             }
+            void Join(RecipeJoin join) => _studyAudit?.Register(join);
             Material brownWall = Material("wall/BROWN1.png"), southernFloor = Material("flat/FLOOR5_2.png");
-            LoadingBayRoomRecipe.Compose(engine.ImplicitSurfaces, wall, floor, carpet, trim, ceiling, door, brownWall, Emit);
+            LoadingBayRoomRecipe.Compose(engine.ImplicitSurfaces, wall, floor, carpet, trim, ceiling, door, brownWall, Emit, Join);
             Material liquid = Material("flat/NUKAGE3.png");
             LoadingBayEastWingRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor,
-                liquid, trim, ceiling, door, Emit);
-            LoadingBayEastGalleryRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor, ceiling, Emit);
+                liquid, trim, ceiling, door, Emit, Join);
+            LoadingBayEastGalleryRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor, ceiling, Emit, Join);
             LoadingBayCourtyardRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor, liquid, trim, Emit);
             LoadingBayTerminalRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor, trim, ceiling, door, Emit);
             LoadingBaySouthPassageRecipe.Compose(engine.ImplicitSurfaces, brownWall, southernFloor, trim, ceiling, door, Emit);

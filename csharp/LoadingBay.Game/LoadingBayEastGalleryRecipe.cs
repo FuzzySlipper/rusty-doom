@@ -12,7 +12,7 @@ internal static class LoadingBayEastGalleryRecipe
     private static readonly Vector2[] UpperRoute = [new(72, 11), new(75, 12), new(72, 17), new(66.8f, 17)];
 
     internal static void Compose(IImplicitSurfacesService service, Material wall, Material floor,
-        Material ceiling, Action<RecipeSurface> emit)
+        Material ceiling, Action<RecipeSurface> emit, Action<RecipeJoin>? join = null)
     {
         RecipeWriter writer = new(service, new(.125f, 0, .2f, ImplicitMaterialBoundaryMode.Interpolated),
             surface => emit(surface.Material.Equals(wall) ? surface
@@ -21,7 +21,7 @@ internal static class LoadingBayEastGalleryRecipe
             => writer.Surface(name, f, shape, new(65.7f, -2.3f, -12.7f), new(78.7f, 6.2f, 20.3f),
                 material, LoadingBayRoomRecipe.Identity);
         ImplicitNode Gallery(ImplicitRecipe f, float bottom, float top, float expansion = 0)
-            => f.Intersect(LoadingBayRecipeShapes.Walkway(f, UpperRoute, 2 + expansion, bottom, top),
+            => f.Intersect(PlanarRecipes.Walkway(f, UpperRoute, 2 + expansion, bottom, top),
                 f.Box(new(66, bottom, 11 - expansion), new(78.4f, top, 19.6f + expansion)));
         ImplicitNode Footprint(ImplicitRecipe f, float bottom, float top, float expansion = 0)
             => f.Union(Gallery(f, bottom, top, expansion), f.Union(
@@ -58,5 +58,9 @@ internal static class LoadingBayEastGalleryRecipe
             shell = f.Subtract(shell, Floor(f));
             Surface("east gallery wall shell", f, shell, wall);
         }
+        join?.Invoke(new("east gallery ceiling-wall", "east gallery ceiling", "east gallery wall shell",
+            new(74.2f, CeilingHeight, 0), new(0, 0, 4), new(.15f, 0, 0)));
+        join?.Invoke(new("east gallery lower entrance floor", "east gallery stairs and floor", "nukage basin",
+            new(66, -1.75f, -10), new(0, 0, 1.5f), new(0, .12f, 0)));
     }
 }

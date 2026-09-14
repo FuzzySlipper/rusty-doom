@@ -22,23 +22,19 @@ internal static class LoadingBayWestWingRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = LoadingBayRoomRecipe.Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.25f), max + new Vector3(.25f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.25f), max + new Vector3(.25f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.2f), Vector2.Zero) : null);
         }
         using (ImplicitRecipe field = writer.Begin())
-            Surface("western chamber floor", field, LoadingBayRecipeShapes.Prism(field, Chamber, -.75f, -.25f),
+            Surface("western chamber floor", field, PlanarRecipes.ConvexPrism(field, Chamber, -.75f, -.25f),
                 new(-38, -.75f, 2), new(-24.5f, -.25f, 16), floor);
         using (ImplicitRecipe field = writer.Begin())
-            Surface("western chamber ceiling", field, LoadingBayRecipeShapes.Prism(field, Chamber, 7, 7.4f),
+            Surface("western chamber ceiling", field, PlanarRecipes.ConvexPrism(field, Chamber, 7, 7.4f),
                 new(-38, 7, 2), new(-24.5f, 7.4f, 16), ceiling);
         using (ImplicitRecipe field = writer.Begin())
         {
-            ImplicitNode shell = field.Subtract(LoadingBayRecipeShapes.Prism(field, Chamber, -.25f, 7, .4f),
-                LoadingBayRecipeShapes.Prism(field, Chamber, -.35f, 7.1f));
+            ImplicitNode shell = field.Subtract(PlanarRecipes.ConvexPrism(field, Chamber, -.25f, 7, .4f),
+                PlanarRecipes.ConvexPrism(field, Chamber, -.35f, 7.1f));
             shell = field.Subtract(shell, field.Box(new(-25, -.35f, 6.75f), new(-24, 3.75f, 11.25f)));
             shell = field.Subtract(shell, field.Box(new(-38.5f, -.35f, 6), new(-37.9f, 6, 12)));
             Surface("western chamber wall shell", field, shell, new(-38.4f, -.25f, 1.6f), new(-24.1f, 7, 16.4f), wall);

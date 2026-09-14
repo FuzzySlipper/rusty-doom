@@ -21,12 +21,8 @@ internal static class LoadingBayTerminalRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = LoadingBayRoomRecipe.Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.2f), max + new Vector3(.2f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.2f), max + new Vector3(.2f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.2f), Vector2.Zero) : null);
         }
         // One floor owns the approach, constriction, and chamber; adjacent slabs end at z=-32.
         using (ImplicitRecipe field = writer.Begin())

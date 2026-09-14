@@ -19,7 +19,7 @@ internal static class LoadingBayEastWingRecipe
         new(58, 8), new(54, 3), new(56, -3), new(54, -6), new(54, -15)];
 
     internal static void Compose(IImplicitSurfacesService service, Material wall, Material floor,
-        Material liquid, Material trim, Material ceiling, Material door, Action<RecipeSurface> emit)
+        Material liquid, Material trim, Material ceiling, Material door, Action<RecipeSurface> emit, Action<RecipeJoin>? join = null)
     {
         RecipeWriter writer = new(service, new(.25f, 0, .2f, ImplicitMaterialBoundaryMode.Interpolated),
             surface => emit(surface.Material.Equals(floor) || surface.Material.Equals(liquid) || surface.Material.Equals(ceiling)
@@ -30,26 +30,22 @@ internal static class LoadingBayEastWingRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = LoadingBayRoomRecipe.Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.3f), max + new Vector3(.3f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.3f), max + new Vector3(.3f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.2f), Vector2.Zero) : null);
         }
         ImplicitNode Connector(ImplicitRecipe field, float bottom, float top, float expansion = 0)
         {
-            ImplicitNode result = LoadingBayRecipeShapes.Prism(field, Descent[0], bottom, top, expansion);
+            ImplicitNode result = PlanarRecipes.ConvexPrism(field, Descent[0], bottom, top, expansion);
             for (int i = 1; i < Descent.Length; i++) result = field.Union(result,
-                LoadingBayRecipeShapes.Prism(field, Descent[i], bottom, top, expansion));
+                PlanarRecipes.ConvexPrism(field, Descent[i], bottom, top, expansion));
             return result;
         }
         using (ImplicitRecipe field = writer.Begin())
         {
             // One stepped solid removes buried shared faces between the diagonal landings.
-            ImplicitNode stepped = LoadingBayRecipeShapes.Prism(field, Descent[0], -1.25f, -.25f);
+            ImplicitNode stepped = PlanarRecipes.ConvexPrism(field, Descent[0], -1.25f, -.25f);
             for (int i = 1; i < Descent.Length; i++) stepped = field.Union(stepped,
-                LoadingBayRecipeShapes.Prism(field, Descent[i], -1.25f, -.25f * (i + 1)));
+                PlanarRecipes.ConvexPrism(field, Descent[i], -1.25f, -.25f * (i + 1)));
             // Short sloped lead-ins keep diagonal joins traversable without relying on a
             // capsule's discrete step probe at the exact seam between two contour pieces.
             foreach ((Vector2 a, Vector2 b, float high) in new[] {
@@ -58,7 +54,7 @@ internal static class LoadingBayEastWingRecipe
             {
                 Vector2 edge = b - a, downhill = Vector2.Normalize(new(edge.Y, -edge.X));
                 const float run = .75f, rise = .25f;
-                ImplicitNode leadIn = LoadingBayRecipeShapes.Prism(field,
+                ImplicitNode leadIn = PlanarRecipes.ConvexPrism(field,
                     [a, b, b + downhill * run, a + downhill * run], -1.25f, high);
                 Vector3 normal = new(downhill.X * rise / run, 1, downhill.Y * rise / run);
                 leadIn = field.Intersect(leadIn, field.Plane(normal, high + normal.X * a.X + normal.Z * a.Y));
@@ -118,7 +114,7 @@ internal static class LoadingBayEastWingRecipe
         }
         using (ImplicitRecipe field = writer.Begin())
         {
-            ImplicitNode walk = LoadingBayRecipeShapes.Walkway(field, WalkwayCenterline, 1.75f, -1.5f, -.75f);
+            ImplicitNode walk = PlanarRecipes.Walkway(field, WalkwayCenterline, 1.75f, -1.5f, -.75f);
             walk = field.Union(walk, field.Box(new(52, -1.5f, -12), new(54, -.75f, -8)));
             walk = field.Intersect(walk, field.Box(new(46, -1.5f, -15), new(66, -.75f, 20)));
             Surface("raised zigzag walkway", field, walk, new(46, -1.5f, -15), new(66, -.75f, 20), floor);
@@ -150,5 +146,8 @@ internal static class LoadingBayEastWingRecipe
         }
         Box("southern west soffit", new(44, 1.5f, -32), new(49, 3.25f, -20), trim);
         Box("southern east soffit", new(59, 1.5f, -32), new(64, 3.25f, -20), trim);
+        Vector3 across = Vector3.Normalize(new Vector3(2, 0, 4));
+        join?.Invoke(new("east connector ceiling-wall", "east connector ceiling", "east connector shell",
+            new Vector3(50, 2.25f, 25) + across * .2f, new(1.6f, 0, -.8f), across * .15f));
     }
 }

@@ -22,21 +22,17 @@ internal static class LoadingBayCourtyardRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = LoadingBayRoomRecipe.Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.25f), max + new Vector3(.25f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.25f), max + new Vector3(.25f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.2f), Vector2.Zero) : null);
         }
         using (ImplicitRecipe field = writer.Begin())
         {
             ImplicitNode ground = field.Subtract(field.Box(new(3, -3, -4), new(45, -1.75f, 20)),
-                LoadingBayRecipeShapes.Prism(field, Pool, -3.1f, -1.65f));
+                PlanarRecipes.ConvexPrism(field, Pool, -3.1f, -1.65f));
             Surface("courtyard ground around pool", field, ground, new(3, -3, -4), new(45, -1.75f, 20), floor);
         }
         using (ImplicitRecipe field = writer.Begin())
-            Surface("courtyard recessed nukage", field, LoadingBayRecipeShapes.Prism(field, Pool, -3, -2.5f),
+            Surface("courtyard recessed nukage", field, PlanarRecipes.ConvexPrism(field, Pool, -3, -2.5f),
                 new(12, -3, 2.5f), new(28, -2.5f, 13), liquid);
         // One stair solid ends at the courtyard boundary. Quarter-unit rises work
         // in either direction; north hall owns the upper reveal at z=23.6..24.

@@ -25,15 +25,11 @@ internal static class LoadingBaySouthPassageRecipe
         {
             using ImplicitRecipe field = writer.Begin();
             Transform placement = LoadingBayRoomRecipe.Identity;
-            if (sideWall)
-            {
-                (min, max) = (new(-max.Z, min.Y, min.X), new(-min.Z, max.Y, max.X));
-                placement = new(Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), Vector3.One);
-            }
-            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.25f), max + new Vector3(.25f), material, placement);
+            writer.Surface(name, field, field.Box(min, max), min - new Vector3(.25f), max + new Vector3(.25f), material, placement, textureMapping: sideWall
+                ? ImplicitTextureMapping.Basis(-Vector3.UnitZ, Vector3.UnitY, new Vector2(.2f), Vector2.Zero) : null);
         }
         ImplicitNode Lower(ImplicitRecipe field, float bottom, float top, float halfWidth = 2)
-            => field.Intersect(LoadingBayRecipeShapes.Walkway(field, LowerRoute, halfWidth, bottom, top),
+            => field.Intersect(PlanarRecipes.Walkway(field, LowerRoute, halfWidth, bottom, top),
                 field.Union(field.Box(new(23, bottom, -19), new(42, top, -11)),
                     field.Box(new(30, bottom, -19), new(42, top, -7))));
         using (ImplicitRecipe field = writer.Begin())
