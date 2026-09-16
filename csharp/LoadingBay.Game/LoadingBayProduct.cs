@@ -29,13 +29,13 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     private bool _paused;
     private bool _shutdown;
     private readonly LoadingBayLiveDebugModule _liveDebug;
-    private readonly EntityWorldDebugModule _entityWorldDebug;
+    private readonly EntityStoreDebugModule _entityWorldDebug;
     private bool _debugWorldRegistered;
 
     public LoadingBayProduct(ProductCreateContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _entityWorldDebug = CreateEntityWorldDebugModule();
+        _entityWorldDebug = CreateEntityStoreDebugModule();
         _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
 
         if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
@@ -112,7 +112,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     internal LoadingBayProduct(Func<ILoadingBaySession> sessionFactory)
     {
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
-        _entityWorldDebug = CreateEntityWorldDebugModule();
+        _entityWorldDebug = CreateEntityStoreDebugModule();
         _session = _sessionFactory();
         _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
         AdoptDebugWorld(_session);
@@ -341,9 +341,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         return new LoadingBaySession(context.Engine, context.Content, presentation, animation, skyBackground.Readout);
     }
 
-    private static EntityWorldDebugModule CreateEntityWorldDebugModule()
+    private static EntityStoreDebugModule CreateEntityStoreDebugModule()
     {
-        var module = new EntityWorldDebugModule();
+        var module = new EntityStoreDebugModule();
         module.RegisterProjection(EngineComponentTypes.Transform,
             static (in Transform value) => $"translation={Vector(value.Translation)};rotation={QuaternionValue(value.Rotation)};scale={Vector(value.Scale)}");
         module.RegisterProjection(EngineComponentTypes.SpatialCollider,
@@ -361,11 +361,11 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             debugSession.SetDebugEntityWorldChanged(ReplaceDebugWorld);
             if (_debugWorldRegistered)
             {
-                _entityWorldDebug.ReplaceWorld(DebugWorldName, debugSession.DebugEntityWorld);
+                _entityWorldDebug.ReplaceStore(DebugWorldName, debugSession.DebugEntityWorld);
             }
             else
             {
-                _entityWorldDebug.RegisterWorld(DebugWorldName, debugSession.DebugEntityWorld);
+                _entityWorldDebug.RegisterStore(DebugWorldName, debugSession.DebugEntityWorld);
                 _debugWorldRegistered = true;
             }
             return;
@@ -373,7 +373,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
 
         if (_debugWorldRegistered)
         {
-            _entityWorldDebug.UnregisterWorld(DebugWorldName);
+            _entityWorldDebug.UnregisterStore(DebugWorldName);
             _debugWorldRegistered = false;
         }
     }
@@ -388,15 +388,15 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         if (!_debugWorldRegistered)
             return;
-        _entityWorldDebug.UnregisterWorld(DebugWorldName);
+        _entityWorldDebug.UnregisterStore(DebugWorldName);
         _debugWorldRegistered = false;
     }
 
-    private void ReplaceDebugWorld(EntityWorld world)
+    private void ReplaceDebugWorld(EntityStore world)
     {
         ArgumentNullException.ThrowIfNull(world);
         if (_debugWorldRegistered)
-            _entityWorldDebug.ReplaceWorld(DebugWorldName, world);
+            _entityWorldDebug.ReplaceStore(DebugWorldName, world);
     }
 
     private ILoadingBaySession RequireSession() => _session

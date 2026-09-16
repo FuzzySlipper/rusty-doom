@@ -24,15 +24,15 @@ internal sealed class LoadingBayEngineServices : IDisposable
     private readonly LoadingBayHudProjection _hud;
     private readonly LoadingBaySkyReadout _skyReadout;
     private LoadingBayEngineServiceReadout _readout;
-    private readonly EntityWorld _entities;
-    private EntityWorld? _ownedProjectionEntities;
+    private readonly EntityStore _entities;
+    private EntityStore? _ownedProjectionEntities;
     private bool _disposed;
 
     internal LoadingBayEngineServices(
         IEngineContext engine,
         ProductContent content,
         LoadingBayTuning tuning,
-        EntityWorld entities,
+        EntityStore entities,
         EntityId playerEntity,
         LoadingBayExitPresentation exitPresentation,
         LoadingBayExitButtonAnimation exitButtonAnimation,
@@ -79,7 +79,7 @@ internal sealed class LoadingBayEngineServices : IDisposable
     }
 
     /// <summary>The managed entity world currently projected into this Engine service generation.</summary>
-    internal EntityWorld EntityWorld => _entities;
+    internal EntityStore EntityStore => _entities;
 
     internal LoadingBayEngineServiceReadout Readout => _readout;
 
@@ -869,8 +869,8 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
     private const string TriggerScope = "loading-bay.e1m1.pickup";
     // Engine trigger tags are mechanism identifiers; typed program IDs remain product data/facts.
     private const string TriggerTag = "pickup";
-    private readonly EntityWorld _entities;
-    private readonly SpatialEntityWorld _spatialEntities;
+    private readonly EntityStore _entities;
+    private readonly EntityTriggerProjection _spatialEntities;
     private readonly ISpatialService _spatial;
     private readonly SpatialSession _session;
     private readonly EntityId _player;
@@ -881,7 +881,7 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
     private readonly int _maximumFactReadback;
     private bool _disposed;
 
-    internal LoadingBaySemanticPickupCoordinator(IEngineContext engine, LoadingBayPlayerScene player, EntityWorld entities, EntityId playerEntity, LoadingBayTuning tuning)
+    internal LoadingBaySemanticPickupCoordinator(IEngineContext engine, LoadingBayPlayerScene player, EntityStore entities, EntityId playerEntity, LoadingBayTuning tuning)
     {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(player);
@@ -912,7 +912,7 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
             new Transform(player.Position, Quaternion.Identity, Vector3.One));
         _entities.Set(_player, EngineComponentTypes.SpatialCollider,
             new SpatialCollider(-tuning.PlayerPickupHalfExtents, tuning.PlayerPickupHalfExtents, 1, uint.MaxValue, true, false, false));
-        _spatialEntities = new SpatialEntityWorld(_entities, _spatial, _session, EngineComponentTypes.SpatialCollider);
+        _spatialEntities = new EntityTriggerProjection(_entities, _spatial, _session, EngineComponentTypes.SpatialCollider);
         foreach (LoadingBayE1M1PickupPlacement pickup in _pickups)
         {
             _spatial.RegisterTrigger(new SpatialTriggerRegisterRequest(_session, pickup.EntityId, TriggerScope, TriggerTag, SpatialTriggerGeometry.EntityBounds));
@@ -933,7 +933,7 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
     {
         ThrowIfDisposed();
         _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
-        SpatialEntityWorldReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(
+        EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(
             tick, SpatialTriggerCause.Movement, maximumEntities: _maximumEntities, maximumFactReadback: _maximumFactReadback);
         if (receipt.FactsTruncated) throw new InvalidOperationException("E1M1 pickup trigger facts exceeded the deliberate readback bound.");
         foreach (SpatialTriggerFactAtReceipt fact in receipt.Facts.Span)
@@ -1051,11 +1051,11 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
 internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
 {
     private const string TriggerScope = "loading-bay.e1m1.world";
-    private readonly EntityWorld _entities;
-    private readonly SpatialEntityWorld _spatialEntities;
+    private readonly EntityStore _entities;
+    private readonly EntityTriggerProjection _spatialEntities;
     private readonly ISpatialService _spatial;
     private readonly IPerceptionService _perception;
-    private readonly KinematicEntityWorld _kinematics;
+    private readonly EntityKinematicMotion _kinematics;
     private readonly SpatialSession _session;
     private readonly EntityId _player;
     private readonly Vector3 _playerHalfExtents;
@@ -1067,10 +1067,10 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     private readonly int _maximumEntities;
     private bool _disposed;
 
-    internal LoadingBayWorldInteractionCoordinator(IEngineContext engine, LoadingBayPlayerScene player, EntityWorld entities, EntityId playerEntity, LoadingBayTuning tuning)
+    internal LoadingBayWorldInteractionCoordinator(IEngineContext engine, LoadingBayPlayerScene player, EntityStore entities, EntityId playerEntity, LoadingBayTuning tuning)
     {
         _entities = entities; _spatial = engine.Spatial; _perception = engine.Perception; _session = player.Session; _player = playerEntity; _playerHalfExtents = tuning.PlayerPickupHalfExtents;
-        _kinematics = new KinematicEntityWorld(_entities, engine.Kinematic, EngineComponentTypes.SpatialCollider);
+        _kinematics = new EntityKinematicMotion(_entities, engine.Kinematic, EngineComponentTypes.SpatialCollider);
         _maximumEntities = checked((int)tuning.MaximumSpatialEntityBindings);
         _hazards = LoadingBayE1M1SemanticCatalog.Hazards.Select(value => value.EntityId).ToHashSet();
         _floors = LoadingBayE1M1SemanticCatalog.Floors.Select(value => value.EntityId).ToHashSet();
@@ -1096,7 +1096,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         foreach (LoadingBayE1M1LiftDefinition value in LoadingBayE1M1SemanticCatalog.Lifts) BindPlatform(value.PlatformEntityId, value.RaisedTranslation, value.PlatformBoundsMin, value.PlatformBoundsMax);
         _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
         _entities.Set(_player, EngineComponentTypes.SpatialCollider, new SpatialCollider(-_playerHalfExtents, _playerHalfExtents, 1, uint.MaxValue, true, false, false));
-        _spatialEntities = new SpatialEntityWorld(_entities, _spatial, _session, EngineComponentTypes.SpatialCollider);
+        _spatialEntities = new EntityTriggerProjection(_entities, _spatial, _session, EngineComponentTypes.SpatialCollider);
     }
 
     /// <summary>
@@ -1123,7 +1123,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         bool supportPresent,
         ulong supportEntity,
         IReadOnlySet<ulong> platforms,
-        EntityWorld entities)
+        EntityStore entities)
     {
         ArgumentNullException.ThrowIfNull(platforms);
         ArgumentNullException.ThrowIfNull(entities);
@@ -1141,7 +1141,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     /// proposal. This establishes a support identity on landing; it does not introduce a
     /// second geometry representation or a product-owned carry calculation.
     /// </summary>
-    internal static CharacterObstacle[] ProjectPlatformObstacles(IReadOnlySet<ulong> platforms, EntityWorld entities)
+    internal static CharacterObstacle[] ProjectPlatformObstacles(IReadOnlySet<ulong> platforms, EntityStore entities)
     {
         ArgumentNullException.ThrowIfNull(platforms);
         ArgumentNullException.ThrowIfNull(entities);
@@ -1160,7 +1160,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         Func<ulong, ulong, LoadingBayReceipt> activateLift, Func<ulong, LoadingBayReceipt> discoverSecret, Action<LoadingBayFact> record)
     {
         ThrowIfDisposed(); _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
-        SpatialEntityWorldReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement, maximumEntities: _maximumEntities, maximumFactReadback: 64);
+        EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement, maximumEntities: _maximumEntities, maximumFactReadback: 64);
         if (receipt.FactsTruncated) throw new InvalidOperationException("E1M1 world trigger facts exceeded the deliberate bound.");
         foreach (SpatialTriggerFactAtReceipt fact in receipt.Facts.Span)
         {

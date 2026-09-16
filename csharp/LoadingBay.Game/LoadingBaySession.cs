@@ -11,12 +11,12 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
 {
     private const double HudDiagnosticsCadenceSeconds = .25d;
     private readonly LoadingBayTuning _tuning;
-    private readonly EntityWorld _entities = new([
+    private readonly EntityStore _entities = new([
         EngineComponentTypes.Transform,
         EngineComponentTypes.SpatialCollider,
         EngineComponentTypes.Kinematic,
     ]);
-    private readonly Mechanics.InventoryWorld _inventory = new();
+    private readonly Mechanics.InventoryStore _inventory = new();
     private SimulationScheduler _scheduler = new();
     private readonly LoadingBayWorldState _world = new();
     private ProductStateStore<LoadingBaySnapshot>? _store;
@@ -52,7 +52,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private double _hudDiagnosticElapsed;
     private bool _disposed;
     private ulong _dropped;
-    private Action<EntityWorld>? _debugEntityWorldChanged;
+    private Action<EntityStore>? _debugEntityWorldChanged;
 
     public LoadingBaySession(LoadingBayTuning? tuning = null)
     {
@@ -185,9 +185,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     LoadingBayEngineServiceReadout ILoadingBaySession.EngineReadout()
         => _engineServices?.Readout ?? LoadingBayEngineServiceReadout.Empty;
 
-    EntityWorld ILoadingBayDebugSession.DebugEntityWorld => _engineServices?.EntityWorld ?? _entities;
+    EntityStore ILoadingBayDebugSession.DebugEntityWorld => _engineServices?.EntityStore ?? _entities;
 
-    void ILoadingBayDebugSession.SetDebugEntityWorldChanged(Action<EntityWorld>? callback)
+    void ILoadingBayDebugSession.SetDebugEntityWorldChanged(Action<EntityStore>? callback)
         => _debugEntityWorldChanged = callback;
 
     internal LoadingBayReceipt CollectPickup(string pickup, LoadingBayItem item, ulong quantity)
@@ -571,7 +571,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
                 _engineServices = replacement;
                 try
                 {
-                    _debugEntityWorldChanged?.Invoke(replacement.EntityWorld);
+                    _debugEntityWorldChanged?.Invoke(replacement.EntityStore);
                 }
                 catch (Exception debugWorldFailure)
                 {
@@ -689,7 +689,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     {
         if (_engineContext is null || _productContent is null || _exitPresentation is null || _exitButtonAnimation is null)
             throw new InvalidOperationException("Loading Bay cannot rebuild an Engine-backed continuation without its product composition inputs.");
-        EntityWorld projection = new([
+        EntityStore projection = new([
             EngineComponentTypes.Transform,
             EngineComponentTypes.SpatialCollider,
             EngineComponentTypes.Kinematic,
@@ -770,7 +770,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         if (quantity > starterAmmo.MechanicsDefinition.MaximumQuantity - pickup.StarterAmmunitionQuantity) return false;
         try
         {
-            Mechanics.InventoryWorldCandidate candidate = _inventory.Prepare();
+            Mechanics.InventoryEdit candidate = _inventory.Prepare();
             if (!OwnedWeaponIds().Contains(weapon.Id, StringComparer.Ordinal))
                 candidate.MaterializeUnique(new Mechanics.ItemState(new EntityId(_entities.NextEntityValue), weapon.MechanicsDefinition), _player);
             candidate.Grant(_player, starterAmmo.MechanicsDefinition, pickup.StarterAmmunitionQuantity);
@@ -789,7 +789,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         EntityId? newWeaponEntity = null;
         try
         {
-            Mechanics.InventoryWorldCandidate candidate = _inventory.Prepare();
+            Mechanics.InventoryEdit candidate = _inventory.Prepare();
             if (!OwnedWeaponIds().Contains(weapon.Id, StringComparer.Ordinal))
             {
                 newWeaponEntity = _entities.Create();
@@ -812,7 +812,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         tuning.InitialPosition,
         new LookState(-(tuning.InitialYawDegrees * (MathF.PI / 180f)), tuning.InitialPitchDegrees * (MathF.PI / 180f)),
         null);
-    private static void BootstrapCanonicalEntities(EntityWorld entities)
+    private static void BootstrapCanonicalEntities(EntityStore entities)
     {
         for (ulong expected = 1; expected <= LoadingBayE1M1SemanticCatalog.CanonicalEntityCount; expected++)
         {
@@ -929,7 +929,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     {
         string? current = EquippedWeaponId();
         if (current == desired) return;
-        Mechanics.InventoryWorldCandidate candidate = _inventory.Prepare();
+        Mechanics.InventoryEdit candidate = _inventory.Prepare();
         if (current is null) candidate.Equip(_player, WeaponEntity(desired!), [LoadingBayDefinitions.WeaponSlot]);
         else if (desired is null) candidate.Unequip(_player, WeaponEntity(current));
         else candidate.Swap(_player, WeaponEntity(current), WeaponEntity(desired), [LoadingBayDefinitions.WeaponSlot]);
@@ -944,7 +944,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         List<EntityId> removed = [];
         try
         {
-            Mechanics.InventoryWorldCandidate candidate = _inventory.Prepare();
+            Mechanics.InventoryEdit candidate = _inventory.Prepare();
             string? equipped = EquippedWeaponId();
             if (equipped is not null && !target.Contains(equipped)) candidate.Unequip(_player, current[equipped]);
             foreach ((string weaponId, EntityId entity) in current.Where(pair => !target.Contains(pair.Key)).ToArray())

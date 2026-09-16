@@ -26,7 +26,7 @@ bool admittedTickOverflowRejected = false;
 try { _ = LoadingBayAdmittedStepTicks.At(Update(step: ulong.MaxValue, admittedSteps: 2).Facts, 1); }
 catch (OverflowException) { admittedTickOverflowRejected = true; }
 Require(admittedTickOverflowRejected, "admitted movement tick overflow was not rejected");
-using (var supportWorld = new EntityWorld([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
+using (var supportWorld = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
 {
     EntityId movingLift = supportWorld.Create();
     Transform advancedLiftTransform = new(new Vector3(112f, 6f, 76f), Quaternion.Identity, Vector3.One);
