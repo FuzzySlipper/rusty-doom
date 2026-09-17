@@ -909,7 +909,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     }
     private void EquipWeapon(string weapon)
     {
-        Mechanics.EquipmentService.Equip(_inventory, _player, WeaponEntity(weapon), [LoadingBayDefinitions.WeaponSlot]);
+        _inventory.Equip(_player, WeaponEntity(weapon), [LoadingBayDefinitions.WeaponSlot]);
     }
     private string[] OwnedWeaponIds() => _inventory.View(_player).UniqueItems
         .Select(item => WeaponId(item.Definition))
