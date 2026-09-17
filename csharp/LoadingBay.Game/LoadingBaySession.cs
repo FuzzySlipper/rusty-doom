@@ -39,8 +39,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private readonly Dictionary<ulong, EnemyState> _actors = new();
     private readonly Dictionary<string, ulong> _weaponReadyAt = new(StringComparer.Ordinal);
     private readonly HashSet<string> _secrets = new(StringComparer.Ordinal);
-    private Mechanics.ExactTrack _health;
-    private Mechanics.ExactTrack _armor;
+    private Mechanics.Track _health;
+    private Mechanics.Track _armor;
     private LoadingBayArmorProtection _armorProtection = LoadingBayArmorProtection.None;
     private LoadingBayPlayerSnapshot _playerSnapshot;
     private readonly EntityId _player;
@@ -61,8 +61,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         _player = new EntityId(1);
         _inventory.RegisterInventory(new Mechanics.InventoryState(_player, [new Mechanics.InventoryCapacityLimit(Mechanics.CapacityMetricId.Parse("loading-bay.inventory.slots"), _tuning.InventorySlots)]));
         _inventory.RegisterEquipment(new Mechanics.EquipmentState(_player));
-        _health = Track("health", _tuning.StartingHealth, _tuning.MaximumHealth);
-        _armor = Track("armor", _tuning.StartingArmor, _tuning.MaximumArmor);
+        _health = Track(_tuning.StartingHealth, _tuning.MaximumHealth);
+        _armor = Track(_tuning.StartingArmor, _tuning.MaximumArmor);
         _playerSnapshot = InitialPlayerSnapshot(_tuning);
         foreach (LoadingBayE1M1PickupPlacement pickup in LoadingBayE1M1SemanticCatalog.Pickups)
             _pickupStates.Add(pickup.EntityId, new LoadingBayPickupSnapshot(pickup.EntityId, pickup.ItemId, pickup.ProgramId, pickup.StartsDormant ? LoadingBayPickupLifecycle.Dormant : LoadingBayPickupLifecycle.Active, "bootstrap", 0, 0));
@@ -178,7 +178,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    internal LoadingBayReadout Readout() => new(_player, _hasFacts ? _facts : default, _health.Current.Raw, _armor.Current.Raw, _armorProtection, BulletQuantity(), ShellQuantity(), OwnedWeaponIds(), EquippedWeaponId(), WeaponCooldowns(), _playerSnapshot, PickupSnapshots(), ActorReadouts(), _complete, _scheduler.Readout.Pending, _tuning, _journal.ToArray(), _dropped);
+    internal LoadingBayReadout Readout() => new(_player, _hasFacts ? _facts : default, _health.ValueInt64, _armor.ValueInt64, _armorProtection, BulletQuantity(), ShellQuantity(), OwnedWeaponIds(), EquippedWeaponId(), WeaponCooldowns(), _playerSnapshot, PickupSnapshots(), ActorReadouts(), _complete, _scheduler.Readout.Pending, _tuning, _journal.ToArray(), _dropped);
 
     LoadingBayReadout ILoadingBaySession.Readout() => Readout();
 
@@ -194,25 +194,25 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     {
         ThrowIfDisposed();
         if (_manualPickupKeys.Contains(pickup)) return Reject("pickup.already-collected");
-        if (_health.Current.Raw == 0) { _manualPickupKeys.Remove(pickup); return Reject("pickup.player-defeated"); }
+        if (_health.ValueInt64 == 0) { _manualPickupKeys.Remove(pickup); return Reject("pickup.player-defeated"); }
         try
         {
             if (!CanApplyPickup(item)) return Reject("pickup.not-needed");
             if (item.PickupPolicy is LoadingBayPickupPolicy.Restore(var amount, var maximum, _))
             {
                 long boundedMaximum = Math.Min(_tuning.MaximumHealth, maximum);
-                _health.Restore(new Mechanics.ExactValue(amount), new Mechanics.ExactTrackBounds(new Mechanics.ExactValue(0), new Mechanics.ExactValue(boundedMaximum)));
+                if (!TryRestoreWithinPickupCap(_health, amount, boundedMaximum)) return Reject("pickup.inventory-rejected");
             }
             else if (item.PickupPolicy is LoadingBayPickupPolicy.SetMinimum(var minimum, var setProtection))
             {
-                _armor.Set(new Mechanics.ExactValue(Math.Max(_armor.Current.Raw, minimum)), Mechanics.ExactTrackSetPolicy.RejectOutOfBounds);
+                _armor.SetCurrent(Math.Max(_armor.Value, minimum));
                 _armorProtection = setProtection;
             }
             else if (item.PickupPolicy is LoadingBayPickupPolicy.RestoreArmor(var armorAmount, var armorMaximum, _, var armorProtection))
             {
                 long boundedMaximum = Math.Min(_tuning.MaximumArmor, armorMaximum);
-                bool hadProtection = _armor.Current.Raw > 0 && _armorProtection.Mode != LoadingBayArmorProtectionMode.None;
-                _armor.Restore(new Mechanics.ExactValue(armorAmount), new Mechanics.ExactTrackBounds(new Mechanics.ExactValue(0), new Mechanics.ExactValue(boundedMaximum)));
+                bool hadProtection = _armor.ValueInt64 > 0 && _armorProtection.Mode != LoadingBayArmorProtectionMode.None;
+                if (!TryRestoreWithinPickupCap(_armor, armorAmount, boundedMaximum)) return Reject("pickup.inventory-rejected");
                 // E1M1's bonus armor preserves an existing green/blue armor class.
                 if (!hadProtection) _armorProtection = armorProtection;
             }
@@ -240,7 +240,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     internal bool CanCollectCanonicalPickup(ulong entityId)
     {
         LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(entityId);
-        if (_pickupStates[entityId].Lifecycle != LoadingBayPickupLifecycle.Active || _health.Current.Raw == 0) return false;
+        if (_pickupStates[entityId].Lifecycle != LoadingBayPickupLifecycle.Active || _health.ValueInt64 == 0) return false;
         return pickup.ProgramId == "pickup/weapon-starter"
             ? CanApplyWeaponStarter(pickup)
             : CanApplyPickup(LoadingBayDefinitions.Item(pickup.ItemId));
@@ -251,12 +251,12 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         ThrowIfDisposed();
         if (target != "player") return Reject("damage.unknown-target");
         if (damage <= 0) return Reject("damage.invalid");
-        if (_health.Current.Raw == 0) return Reject("damage.target-defeated");
-        long absorbed = _armorProtection.AbsorptionDivisor == 0 ? 0 : Math.Min(_armor.Current.Raw, damage / _armorProtection.AbsorptionDivisor);
-        if (absorbed > 0) _armor.Spend(new Mechanics.ExactValue(absorbed));
-        long applied = Math.Min(_health.Current.Raw, damage - absorbed);
-        if (applied > 0) _health.Spend(new Mechanics.ExactValue(applied));
-        bool defeated = _health.Current.Raw == 0;
+        if (_health.ValueInt64 == 0) return Reject("damage.target-defeated");
+        long absorbed = _armorProtection.AbsorptionDivisor == 0 ? 0 : Math.Min(_armor.ValueInt64, damage / _armorProtection.AbsorptionDivisor);
+        if (absorbed > 0) _armor.Spend(absorbed);
+        long applied = Math.Min(_health.ValueInt64, damage - absorbed);
+        if (applied > 0) _health.Spend(applied);
+        bool defeated = _health.ValueInt64 == 0;
         Record(new DamageAppliedFact(target, damage, absorbed, applied, cause, defeated));
         return Accept(defeated ? "damage.defeated" : "damage.applied");
     }
@@ -424,7 +424,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     internal LoadingBayReceipt CompleteExit(string exit)
     {
         ThrowIfDisposed();
-        if (_health.Current.Raw == 0) return Reject("exit.player-defeated");
+        if (_health.ValueInt64 == 0) return Reject("exit.player-defeated");
         if (_complete) return Reject("exit.already-complete");
         _complete = true; Record(new ExitCompletedFact(exit)); return Accept("exit.completed");
     }
@@ -515,16 +515,16 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         ThrowIfDisposed();
         ulong currentGeneration = _hasFacts ? _facts.Generation : 0;
         if (generation != currentGeneration) return Reject("developer.stale-generation", correlation);
-        Mechanics.ExactTrack selected = track switch { "health" => _health, "armor" => _armor, _ => throw new ArgumentOutOfRangeException(nameof(track)) };
-        try { selected.Set(new Mechanics.ExactValue(value), Mechanics.ExactTrackSetPolicy.RejectOutOfBounds); }
-        catch (Mechanics.MechanicsException) { return Reject("developer.track-rejected", correlation); }
+        Mechanics.Track selected = track switch { "health" => _health, "armor" => _armor, _ => throw new ArgumentOutOfRangeException(nameof(track)) };
+        try { selected.SetCurrent(value); }
+        catch (ArgumentOutOfRangeException) { return Reject("developer.track-rejected", correlation); }
         Record(new DeveloperTrackChangedFact(track, value, correlation)); return Accept("developer.track-set", correlation);
     }
 
     LoadingBayReceipt ILoadingBaySession.DeveloperSetTrack(ulong generation, string track, int value, string correlation)
         => DeveloperSetTrack(generation, track, value, correlation);
 
-    internal LoadingBaySnapshot Capture(string contentIdentity) => new(contentIdentity, _health.Current.Raw, _armor.Current.Raw, _armorProtection, BulletQuantity(), ShellQuantity(), OwnedWeaponIds(), EquippedWeaponId(), WeaponCooldowns(), _engineServices?.CapturePlayer() ?? _playerSnapshot, PickupSnapshots(), _secrets.OrderBy(x => x, StringComparer.Ordinal).ToArray(), _complete, _doors.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new LoadingBayNamedState(x.Key, x.Value)).ToArray(), ActorSnapshots(), EncounterSnapshots(), _world.Capture());
+    internal LoadingBaySnapshot Capture(string contentIdentity) => new(contentIdentity, _health.ValueInt64, _armor.ValueInt64, _armorProtection, BulletQuantity(), ShellQuantity(), OwnedWeaponIds(), EquippedWeaponId(), WeaponCooldowns(), _engineServices?.CapturePlayer() ?? _playerSnapshot, PickupSnapshots(), _secrets.OrderBy(x => x, StringComparer.Ordinal).ToArray(), _complete, _doors.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new LoadingBayNamedState(x.Key, x.Value)).ToArray(), ActorSnapshots(), EncounterSnapshots(), _world.Capture());
 
     internal LoadingBayReceipt Restore(LoadingBaySnapshot snapshot, string identity)
     {
@@ -658,8 +658,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private void ApplySnapshot(LoadingBaySnapshot snapshot)
     {
         RestoreWeapons(snapshot.OwnedWeapons, snapshot.EquippedWeapon);
-        _health.Set(new Mechanics.ExactValue(snapshot.Health), Mechanics.ExactTrackSetPolicy.RejectOutOfBounds);
-        _armor.Set(new Mechanics.ExactValue(snapshot.Armor), Mechanics.ExactTrackSetPolicy.RejectOutOfBounds);
+        _health.SetCurrent(snapshot.Health);
+        _armor.SetCurrent(snapshot.Armor);
         _armorProtection = snapshot.ArmorProtection;
         SetBulletQuantity(snapshot.Bullets);
         SetShellQuantity(snapshot.Shells);
@@ -783,7 +783,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     {
         string key = CanonicalPickupKey(pickup.EntityId);
         if (_pickupStates[pickup.EntityId].Lifecycle == LoadingBayPickupLifecycle.Collected) return Reject("pickup.already-collected");
-        if (_health.Current.Raw == 0) return Reject("pickup.player-defeated");
+        if (_health.ValueInt64 == 0) return Reject("pickup.player-defeated");
         if (!CanApplyWeaponStarter(pickup)) return Reject("pickup.not-needed");
         if (pickup.StarterAmmunitionItemId is null || !LoadingBayDefinitions.Weapons.TryGetValue(pickup.ItemId, out LoadingBayWeapon? weapon)) return Reject("pickup.invalid-catalog");
         EntityId? newWeaponEntity = null;
@@ -807,7 +807,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             return Reject("pickup.inventory-rejected");
         }
     }
-    private static Mechanics.ExactTrack Track(string name, int current, int maximum) => new(new Mechanics.ExactTrackDefinition(Mechanics.TrackId.Parse($"loading-bay.{name}"), new Mechanics.ExactValue(0), new Mechanics.ExactTrackMaximum.Fixed(new Mechanics.ExactValue(maximum))), new Mechanics.ExactValue(current));
+    private static Mechanics.Track Track(int current, int maximum) => new(maximum, current,
+        quantum: 1, rounding: MidpointRounding.ToZero, integerRounding: MidpointRounding.ToZero);
     private static LoadingBayPlayerSnapshot InitialPlayerSnapshot(LoadingBayTuning tuning) => new(
         tuning.InitialPosition,
         new LookState(-(tuning.InitialYawDegrees * (MathF.PI / 180f)), tuning.InitialPitchDegrees * (MathF.PI / 180f)),
@@ -890,11 +891,17 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     }
     private bool CanApplyPickup(LoadingBayItem item) => item.PickupPolicy switch
     {
-        LoadingBayPickupPolicy.Restore(_, var maximum, var consumeAtCap) => _health.Current.Raw < Math.Min(_tuning.MaximumHealth, maximum) || consumeAtCap,
-        LoadingBayPickupPolicy.SetMinimum(var minimum, _) => _armor.Current.Raw < minimum,
-        LoadingBayPickupPolicy.RestoreArmor(_, var maximum, var consumeAtCap, _) => _armor.Current.Raw < Math.Min(_tuning.MaximumArmor, maximum) || consumeAtCap,
+        LoadingBayPickupPolicy.Restore(_, var maximum, var consumeAtCap) => _health.ValueInt64 < Math.Min(_tuning.MaximumHealth, maximum) || consumeAtCap,
+        LoadingBayPickupPolicy.SetMinimum(var minimum, _) => _armor.ValueInt64 < minimum,
+        LoadingBayPickupPolicy.RestoreArmor(_, var maximum, var consumeAtCap, _) => _armor.ValueInt64 < Math.Min(_tuning.MaximumArmor, maximum) || consumeAtCap,
         _ => true,
     };
+    private static bool TryRestoreWithinPickupCap(Mechanics.Track track, long amount, long maximum)
+    {
+        if (track.Value > maximum) return false;
+        track.SetCurrent(Math.Min(maximum, track.Value + amount));
+        return true;
+    }
     private void MaterializeWeapon(LoadingBayWeapon weapon)
     {
         EntityId entity = _entities.Create();

@@ -130,6 +130,27 @@ Require(state.CollectCanonicalPickup(78).Accepted && state.Readout().Health == 1
 Require(!state.CollectCanonicalPickup(78).Accepted, "canonical health pickup collected more than once");
 LoadingBaySnapshot collectedSnapshot = state.Capture("doom-e1m1");
 Require(state.ApplyDamage("player", 20, "post-pickup").Accepted && state.Restore(collectedSnapshot, "doom-e1m1").Accepted && state.Readout().Health == 100, "canonical pickup snapshot did not restore its health result");
+using (var pickupCapSession = new LoadingBaySession())
+{
+    Require(pickupCapSession.DeveloperSetTrack(0, "health", 200, "health-bonus-at-cap").Accepted
+        && pickupCapSession.CollectPickup("health-bonus-at-cap", LoadingBayDefinitions.HealthBonus, 1).Accepted
+        && pickupCapSession.Readout().Health == 200, "health bonus was not consumed without lowering health at its authored cap");
+    LoadingBayItem lowerHealthCap = LoadingBayDefinitions.HealthBonus with
+    {
+        PickupPolicy = new LoadingBayPickupPolicy.Restore(1, 100, ConsumeAtCap: true),
+    };
+    Require(pickupCapSession.DeveloperSetTrack(0, "health", 150, "health-above-local-cap").Accepted
+        && !pickupCapSession.CollectPickup("health-bonus-above-local-cap", lowerHealthCap, 1).Accepted
+        && pickupCapSession.Readout().Health == 150, "health pickup above its local cap was consumed or lowered health");
+    LoadingBayPickupPolicy.RestoreArmor armorBonus = (LoadingBayPickupPolicy.RestoreArmor)LoadingBayDefinitions.ArmorBonus.PickupPolicy!;
+    LoadingBayItem lowerArmorCap = LoadingBayDefinitions.ArmorBonus with
+    {
+        PickupPolicy = armorBonus with { Maximum = 100 },
+    };
+    Require(pickupCapSession.DeveloperSetTrack(0, "armor", 150, "armor-above-local-cap").Accepted
+        && !pickupCapSession.CollectPickup("armor-bonus-above-local-cap", lowerArmorCap, 1).Accepted
+        && pickupCapSession.Readout().Armor == 150, "armor pickup above its local cap was consumed or lowered armor");
+}
 Require(!state.CollectPickup("medikit-full", LoadingBayDefinitions.Medikit, 1).Accepted, "full-health medikit was consumed");
 Require(state.ApplyDamage("player", 30, "exercise").Accepted, "damage was rejected");
 Require(state.CollectPickup("medikit-full", LoadingBayDefinitions.Medikit, 1).Accepted, "rejected medikit was incorrectly retired");
