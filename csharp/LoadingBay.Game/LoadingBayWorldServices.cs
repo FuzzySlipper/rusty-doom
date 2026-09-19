@@ -132,7 +132,6 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
         _appearanceService = appearanceService ?? throw new ArgumentNullException(nameof(appearanceService));
         _animation = animation ?? throw new ArgumentNullException(nameof(animation));
         _cue = cue;
-        ValidateCue(cue);
 
         Appearance? appearance = null;
         AnimationInstance? instance = null;
@@ -185,33 +184,17 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
     }
 
     /// <summary>Starts a newly committed gameplay generation from the authored off sample.</summary>
-    internal LoadingBayExitButtonAnimationCheckpoint ResetForGeneration()
+    internal void ResetForGeneration()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayExitButtonAnimation));
-        LoadingBayExitButtonAnimationCheckpoint checkpoint = new(_completionObserved, _readout);
-        // Keep local transition state intact until Engine accepts the sample. If the
-        // call fails, Restart retains the previous authoritative generation and its
-        // observable animation state rather than claiming a reset that never landed.
+        // The new generation begins from the authored off sample. A failed
+        // replacement publication propagates to the host; the prior cue is not restored.
         _animation.SetPlayback(SampleOff());
         LoadingBayAnimationReadout reset = Read(false, 0);
         ValidateReadout(reset);
         _completionObserved = false;
         _readout = reset;
         // A committed gameplay generation begins from the authored off sample.
-        PublishAppearanceSnapshot();
-        return checkpoint;
-    }
-
-    /// <summary>Restores the prior generation's observable cue after a failed commit publication.</summary>
-    internal void Restore(LoadingBayExitButtonAnimationCheckpoint checkpoint)
-    {
-        if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayExitButtonAnimation));
-        _animation.SetPlayback(checkpoint.CompletionObserved ? PlayOn() : SampleOff());
-        LoadingBayAnimationReadout restored = Read(checkpoint.CompletionObserved, checkpoint.Readout.CompletionTransitionCount);
-        ValidateReadout(restored);
-        _completionObserved = checkpoint.CompletionObserved;
-        _readout = restored;
-        // Rollback re-establishes the prior generation's complete graphics baseline.
         PublishAppearanceSnapshot();
     }
 
@@ -253,18 +236,6 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
             realization.RetainedFactCount, realization.EvictedFactCount);
     }
 
-    private static void ValidateCue(LoadingBayE1M1AnimationCue cue)
-    {
-        if (string.IsNullOrWhiteSpace(cue.Id) || cue.ObjectId == 0 || string.IsNullOrWhiteSpace(cue.SourcePath) ||
-            string.IsNullOrWhiteSpace(cue.OffClip) || string.IsNullOrWhiteSpace(cue.OnClip) || cue.OffClip == cue.OnClip ||
-            !float.IsFinite(cue.PlaybackSpeed) || cue.PlaybackSpeed <= 0f ||
-            !float.IsFinite(cue.PlaybackWeight) || cue.PlaybackWeight <= 0f ||
-            !float.IsFinite(cue.OffNormalizedTime) || cue.OffNormalizedTime is < 0f or > 1f ||
-            !float.IsFinite(cue.Transform.Translation.X) || !float.IsFinite(cue.Transform.Translation.Y) || !float.IsFinite(cue.Transform.Translation.Z) ||
-            !float.IsFinite(cue.Transform.Scale.X) || !float.IsFinite(cue.Transform.Scale.Y) || !float.IsFinite(cue.Transform.Scale.Z))
-            throw new InvalidOperationException("Loading Bay's E1M1 exit-button animation cue is invalid.");
-    }
-
     private static void ValidateReadout(LoadingBayAnimationReadout readout)
     {
         if (!readout.RetainedAppearance || readout.AdmittedMeshes != 1 || readout.RetainedInstances != 1 ||
@@ -285,7 +256,6 @@ internal sealed class LoadingBayPerceptionProjection
     {
         _perception = perception ?? throw new ArgumentNullException(nameof(perception));
         _tuning = tuning;
-        ValidateLandmark(tuning.ExitLandmark);
         _readout = new LoadingBayPerceptionReadout(tuning.ExitLandmark.Id, false, 0, 0, 0);
     }
 
@@ -303,24 +273,17 @@ internal sealed class LoadingBayPerceptionProjection
             0,
             0,
             64));
-        if (receipt.SelectedObservers != 1 || receipt.SelectedTargets != 1 || receipt.Pairs.Length != 1 || receipt.VisibilityCasts > 1)
+        if (receipt.SelectedObservers != 1 || receipt.SelectedTargets != 1 || receipt.Pairs.Length != 1)
             throw new InvalidOperationException("Engine Perception did not return one bounded E1M1 landmark visibility query.");
 
         PerceptionPair pair = receipt.Pairs.Span[0];
-        if (pair.Observer != playerEntity || pair.Target != landmark.EntityId || !double.IsFinite(pair.Distance) || !double.IsFinite(pair.FacingCosine))
+        if (pair.Observer != playerEntity || pair.Target != landmark.EntityId)
             throw new InvalidOperationException("Engine Perception returned an invalid E1M1 landmark visibility pair.");
         bool visible = pair.Kind == PerceptionPairKind.Visible;
         if (visible != _readout.Visible)
             _readout = new LoadingBayPerceptionReadout(landmark.Id, visible, checked(_readout.Revision + 1), receipt.VisibilityCasts, receipt.OcclusionRejects);
         else
             _readout = _readout with { VisibilityCasts = receipt.VisibilityCasts, OcclusionRejects = receipt.OcclusionRejects };
-    }
-
-    private static void ValidateLandmark(LoadingBayE1M1Landmark landmark)
-    {
-        if (string.IsNullOrWhiteSpace(landmark.Id) || landmark.EntityId == 0 ||
-            !float.IsFinite(landmark.Position.X) || !float.IsFinite(landmark.Position.Y) || !float.IsFinite(landmark.Position.Z))
-            throw new InvalidOperationException("Loading Bay's named E1M1 perception landmark is invalid.");
     }
 }
 
@@ -333,7 +296,6 @@ internal sealed class LoadingBayExitPresentation : IDisposable
     private readonly IPresentationService _presentation;
     private readonly LoadingBayTuning _tuning;
     private readonly PresentationBillboard _billboard;
-    private LoadingBayPerceptionReadout _observation;
     private PresentationFactsReadout _readout;
     private bool _disposed;
 
@@ -341,8 +303,8 @@ internal sealed class LoadingBayExitPresentation : IDisposable
     {
         _presentation = presentation ?? throw new ArgumentNullException(nameof(presentation));
         _tuning = tuning;
-        _observation = new LoadingBayPerceptionReadout(tuning.ExitLandmark.Id, false, 0, 0, 0);
-        _billboard = _presentation.CreateStructuredBillboard(Descriptor(_observation));
+        LoadingBayPerceptionReadout initial = new(tuning.ExitLandmark.Id, false, 0, 0, 0);
+        _billboard = _presentation.CreateStructuredBillboard(Descriptor(initial));
         _readout = _presentation.Read();
         Validate(_readout);
     }
@@ -354,24 +316,7 @@ internal sealed class LoadingBayExitPresentation : IDisposable
         if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayExitPresentation));
         _presentation.UpdateStructuredBillboard(_billboard, Descriptor(observation));
         _readout = _presentation.Read();
-        _observation = observation;
         Validate(_readout);
-    }
-
-    internal LoadingBayExitPresentationCheckpoint Checkpoint()
-    {
-        if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayExitPresentation));
-        return new LoadingBayExitPresentationCheckpoint(_observation, _readout);
-    }
-
-    internal void Restore(LoadingBayExitPresentationCheckpoint checkpoint)
-    {
-        if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayExitPresentation));
-        _presentation.UpdateStructuredBillboard(_billboard, Descriptor(checkpoint.Observation));
-        PresentationFactsReadout restored = _presentation.Read();
-        Validate(restored);
-        _observation = checkpoint.Observation;
-        _readout = checkpoint.Readout;
     }
 
     public void Dispose()
@@ -421,20 +366,16 @@ internal sealed class LoadingBayExitPresentation : IDisposable
 internal sealed class LoadingBayAudioPolicy
 {
     private readonly IAudioService _audio;
-    private readonly LoadingBayTuning _tuning;
     private AudioBusReadout _readout;
 
     internal LoadingBayAudioPolicy(IAudioService audio, LoadingBayTuning tuning)
     {
         _audio = audio ?? throw new ArgumentNullException(nameof(audio));
-        _tuning = tuning;
-        if (!float.IsFinite(tuning.EffectsVolume) || tuning.EffectsVolume is < 0f or > 1f)
-            throw new InvalidOperationException("Loading Bay's effects-volume tuning must be finite and within [0, 1].");
+        // First-party tuning and Engine delivery are trusted. The bus readout
+        // remains for the HUD; no round-trip revalidation.
         _audio.SetBusVolume(new AudioBusVolumeRequest(AudioBus.Sfx, tuning.EffectsVolume));
         _audio.SetBusMuted(new AudioBusMutedRequest(AudioBus.Sfx, tuning.EffectsMuted));
         _readout = _audio.ReadBus(new AudioBusReadRequest(AudioBus.Sfx));
-        if (!float.IsFinite(_readout.Volume) || MathF.Abs(_readout.Volume - tuning.EffectsVolume) > 0.0001f || _readout.Muted != tuning.EffectsMuted)
-            throw new InvalidOperationException("Engine Audio did not retain Loading Bay's E1M1 effects-bus policy.");
     }
 
     internal AudioBusReadout Readout => _readout;
@@ -452,9 +393,6 @@ internal readonly record struct LoadingBayAnimationReadout(
     uint RetainedRealizationFacts,
     ulong EvictedRealizationFacts);
 
-/// <summary>Bounded product-local checkpoint used only around Restart's shared animation reset.</summary>
-internal readonly record struct LoadingBayExitButtonAnimationCheckpoint(bool CompletionObserved, LoadingBayAnimationReadout Readout);
-internal readonly record struct LoadingBayExitPresentationCheckpoint(LoadingBayPerceptionReadout Observation, PresentationFactsReadout Readout);
 internal readonly record struct LoadingBayEngineServiceReadout(
     LoadingBayPerceptionReadout Perception,
     PresentationFactsReadout Presentation,

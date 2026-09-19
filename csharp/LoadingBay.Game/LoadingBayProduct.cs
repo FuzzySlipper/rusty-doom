@@ -40,7 +40,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
 
         if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
         {
-            _skyBackground = new LoadingBaySkyBackground(context.Engine.Content, context.Content,
+            _skyBackground = new LoadingBaySkyBackground(context.Engine.Content,
                 context.Engine.Graphics, context.Engine.CameraView);
             try
             {
@@ -66,7 +66,6 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         {
             skyBackground = new LoadingBaySkyBackground(
                 context.Engine.Content,
-                context.Content,
                 context.Engine.Graphics,
                 context.Engine.CameraView);
             _skyBackground = skyBackground;
@@ -191,41 +190,15 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         ILoadingBaySession replacement = _sessionFactory();
         try
         {
-            if (_exitButtonAnimation is { } animation && _exitPresentation is { } presentation)
-            {
-                LoadingBayExitPresentationCheckpoint presentationCheckpoint = presentation.Checkpoint();
-                LoadingBayExitButtonAnimationCheckpoint checkpoint = animation.ResetForGeneration();
-                try
-                {
-                    // This is the one replacement publication that may touch shared
-                    // Engine realizations. It therefore carries only fresh state.
-                    replacement.ActivateSharedRealizations();
-                    replacement.Publish();
-                }
-                catch (Exception publicationFailure)
-                {
-                    List<Exception>? failures = null;
-                    try { replacement.DeactivateSharedRealizations(); }
-                    catch (Exception rollbackFailure) { (failures ??= []).Add(rollbackFailure); }
-                    try { presentation.Restore(presentationCheckpoint); }
-                    catch (Exception rollbackFailure) { (failures ??= []).Add(rollbackFailure); }
-                    try { animation.Restore(checkpoint); }
-                    catch (Exception rollbackFailure) { (failures ??= []).Add(rollbackFailure); }
-                    if (failures is { Count: > 0 })
-                    {
-                        failures.Insert(0, publicationFailure);
-                        throw new AggregateException(failures);
-                    }
-                    throw;
-                }
-            }
-            else
-            {
-                // The lifecycle exercise's pure session seam has no Engine-owned
-                // realization to preflight, so it retains the direct publication.
-                if (replacement is LoadingBayRoomStudy) replacement.ActivateSharedRealizations();
-                replacement.Publish();
-            }
+            // The shared exit-button cue starts the new generation from its authored
+            // off sample. A failed replacement publication propagates to the host's
+            // terminal incarnation failure; there is no same-instance retry, so the
+            // prior generation's cue is not restored.
+            _exitButtonAnimation?.ResetForGeneration();
+            replacement.ActivateSharedRealizations();
+            // This is the one replacement publication that may touch shared
+            // Engine realizations. It therefore carries only fresh state.
+            replacement.Publish();
         }
         catch
         {
@@ -338,7 +311,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         ArgumentNullException.ThrowIfNull(presentation);
         ArgumentNullException.ThrowIfNull(animation);
         ArgumentNullException.ThrowIfNull(skyBackground);
-        return new LoadingBaySession(context.Engine, context.Content, presentation, animation, skyBackground.Readout);
+        return new LoadingBaySession(context.Engine, presentation, animation, skyBackground.Readout);
     }
 
     private static EntityStoreDebugModule CreateEntityStoreDebugModule()

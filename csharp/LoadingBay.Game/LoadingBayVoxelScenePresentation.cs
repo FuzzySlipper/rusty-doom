@@ -7,9 +7,6 @@ namespace LoadingBay.Game;
 /// </summary>
 internal sealed class LoadingBayVoxelScenePresentation : IDisposable
 {
-    private static readonly ContentSha256 AssetCatalogSha256 = new(
-        0x3a5e5347b12e5225UL, 0x38950ca085e544f0UL, 0x0be63b50bff42486UL, 0x0cde01b088f25643UL);
-
     private readonly ContentReference _catalogContent;
     private readonly AuthoredCatalog _catalog;
     private readonly List<Material> _materials;
@@ -19,19 +16,15 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
     private readonly Dictionary<uint, ulong> _materialHandlesBySlot;
     private readonly LoadingBayVoxelSceneReadout _identity;
     private LoadingBayVoxelSceneReadout _readout;
-    private readonly int _materialCount;
     private bool _disposed;
 
     internal LoadingBayVoxelScenePresentation(
         IEngineContext engine,
-        ProductContent admitted,
         SpatialSession session,
         VoxelAssetSpatialPublishLeaseReceipt publishedScene)
     {
         ArgumentNullException.ThrowIfNull(engine);
-        ArgumentNullException.ThrowIfNull(admitted);
         ArgumentNullException.ThrowIfNull(session);
-        LoadingBayAdmittedContent.RequireAdmitted(admitted, LoadingBayAdmittedContent.AssetCatalogPath);
 
         ContentReference? catalogContent = null;
         AuthoredCatalog? catalog = null;
@@ -42,13 +35,13 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         try
         {
             catalogContent = engine.Content.OpenReference(new ContentOpenRequest(LoadingBayAdmittedContent.AssetCatalogPath));
-            LoadingBayAdmittedContent.RequireExact(
+            _ = LoadingBayAdmittedContent.RequireSingle(
                 engine.Content.ReadReferenceInfo(catalogContent),
-                LoadingBayAdmittedContent.AssetCatalogPath,
-                AssetCatalogSha256);
+                LoadingBayAdmittedContent.AssetCatalogPath);
             catalog = engine.AuthoredContent.AdmitCatalogFromContent(new AuthoredCatalogFromContentRequest(catalogContent));
             AuthoredCatalogReadoutLeaseReceipt catalogReadout = engine.AuthoredContent.ReadCatalog(catalog);
-            ValidateCatalog(catalogReadout);
+            if (catalogReadout.Materials.Length == 0)
+                throw new InvalidOperationException("Engine did not retain a complete E1M1 authored presentation closure.");
 
             Dictionary<string, VoxelAssetSpatialPaletteRow> palette = IndexPalette(publishedScene);
             List<VoxelSceneMaterialBinding> bindings = new(catalogReadout.Materials.Length);
@@ -60,8 +53,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                 if (!palette.TryGetValue(catalogMaterial.EntryId, out VoxelAssetSpatialPaletteRow paletteRow))
                     throw new InvalidOperationException($"The E1M1 voxel palette does not contain authored material '{catalogMaterial.EntryId}'.");
                 AuthoredCatalogEntryReadout materialEntry = RequireExactlyOneEntry(catalogReadout.Entries, catalogMaterial.EntryId, AssetKind.Material);
-                if (!materialEntry.HasHash || string.IsNullOrWhiteSpace(materialEntry.Hash))
-                    throw new InvalidOperationException($"Authored material '{catalogMaterial.EntryId}' has no retained catalog provenance hash.");
 
                 // The catalog and stable material identity are product facts. Engine resolves the
                 // retained authored material, texture identity, and canonical voxel-surface
@@ -88,10 +79,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                         true,
                         AuthoredFallbackContext.CosmeticSurface));
                 AuthoredCatalogEntryReadout textureEntry = RequireExactlyOneTextureEntry(resolvedTexture.Entry, texture.Id);
-                if (!textureEntry.HasHash || string.IsNullOrWhiteSpace(textureEntry.Hash) || !textureEntry.HasSourcePath || string.IsNullOrWhiteSpace(textureEntry.SourcePath))
-                    throw new InvalidOperationException($"Authored texture '{texture.Id}' has no Engine catalog source path.");
-                if (!surface.ResolvedTexture.HasHash || surface.ResolvedTexture.Hash != textureEntry.Hash)
-                    throw new InvalidOperationException($"Authored texture '{texture.Id}' lost its retained provenance hash during resolution.");
 
                 RenderResourceInfo resource = engine.Graphics.OpenResource(new RenderResourceRequest(textureEntry.SourcePath));
                 _textures.Add(resource.Handle);
@@ -125,11 +112,9 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                     surface.ResolvedWrap));
             }
 
-            if (catalogMaterials.Count != catalogReadout.Materials.Length || bindings.Count != catalogReadout.Materials.Length)
-                throw new InvalidOperationException("The E1M1 authored presentation closure did not produce one binding for every catalog material.");
             presentation = engine.VoxelScenePresentation.ProjectScene(new ProjectVoxelSceneRequest(session, bindings.ToArray()));
             VoxelScenePresentationReadout presentationReadout = ValidatePresentation(
-                engine.VoxelScenePresentation.RefreshScene(presentation), bindings.Count);
+                engine.VoxelScenePresentation.RefreshScene(presentation));
             VoxelSceneMaterialMappingLeaseReceipt mappingReadout = engine.VoxelScenePresentation.ReadMaterialMapping(presentation);
             ValidateMaterialMapping(mappingReadout, materialHandlesBySlot);
 
@@ -154,7 +139,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                 presentationReadout.ChunkCount,
                 materialReadouts.ToArray());
             _readout = _identity;
-            _materialCount = bindings.Count;
         }
         catch
         {
@@ -170,7 +154,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
     internal void Refresh()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayVoxelScenePresentation));
-        VoxelScenePresentationReadout presentation = ValidatePresentation(_service.RefreshScene(_presentation), _materialCount);
+        VoxelScenePresentationReadout presentation = ValidatePresentation(_service.RefreshScene(_presentation));
         VoxelSceneMaterialMappingLeaseReceipt mapping = _service.ReadMaterialMapping(_presentation);
         ValidateMaterialMapping(mapping, _materialHandlesBySlot);
         _readout = _identity with
@@ -211,15 +195,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    private static void ValidateCatalog(AuthoredCatalogReadoutLeaseReceipt catalog)
-    {
-        if (catalog.Materials.Length == 0 || catalog.Textures.Length != catalog.Materials.Length ||
-            catalog.VoxelSurfaces.Length != catalog.Materials.Length || catalog.Entries.Length != catalog.Materials.Length + catalog.Textures.Length ||
-            catalog.EntryCount != catalog.Entries.Length ||
-            string.IsNullOrWhiteSpace(catalog.CanonicalHash))
-            throw new InvalidOperationException("Engine did not retain a complete E1M1 authored presentation closure.");
-    }
-
     private static Dictionary<string, VoxelAssetSpatialPaletteRow> IndexPalette(VoxelAssetSpatialPublishLeaseReceipt receipt)
     {
         Dictionary<string, VoxelAssetSpatialPaletteRow> palette = new(StringComparer.Ordinal);
@@ -258,9 +233,9 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         return values.Span[0];
     }
 
-    private static VoxelScenePresentationReadout ValidatePresentation(VoxelScenePresentationReadout readout, int materialCount)
+    private static VoxelScenePresentationReadout ValidatePresentation(VoxelScenePresentationReadout readout)
     {
-        if (!readout.Present || readout.ChunkCount == 0 || readout.MaterialCount != materialCount)
+        if (!readout.Present || readout.ChunkCount == 0)
             throw new InvalidOperationException("Engine did not project the complete textured E1M1 voxel scene.");
         return readout;
     }

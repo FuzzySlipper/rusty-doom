@@ -17,7 +17,7 @@ internal interface ILoadingBaySession : IDisposable
     /// <summary>Enables this generation to publish the product-owned E1M1 realization handles.</summary>
     void ActivateSharedRealizations();
 
-    /// <summary>Returns a failed replacement to preflight-only publication.</summary>
+    /// <summary>Disables this generation's shared-realization publishes ahead of disposal.</summary>
     void DeactivateSharedRealizations();
 
     LoadingBayReadout Readout();

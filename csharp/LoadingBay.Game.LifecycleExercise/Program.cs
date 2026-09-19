@@ -26,6 +26,24 @@ bool admittedTickOverflowRejected = false;
 try { _ = LoadingBayAdmittedStepTicks.At(Update(step: ulong.MaxValue, admittedSteps: 2).Facts, 1); }
 catch (OverflowException) { admittedTickOverflowRejected = true; }
 Require(admittedTickOverflowRejected, "admitted movement tick overflow was not rejected");
+bool requireSingleEmptyRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(ReadOnlyMemory<ContentReferenceInfo>.Empty, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleEmptyRejected = true; }
+Require(requireSingleEmptyRejected, "admission trust did not reject an empty Engine content readout");
+bool requireSingleZeroLengthRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", default, 0) }, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleZeroLengthRejected = true; }
+Require(requireSingleZeroLengthRejected, "admission trust did not reject a zero-length Engine content entry");
+bool requireSingleWrongPathRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("evil.json", default, 100) }, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleWrongPathRejected = true; }
+Require(requireSingleWrongPathRejected, "admission trust did not reject a wrong-path Engine content entry");
+bool requireSingleMultipleRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", default, 100), new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", default, 100) }, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleMultipleRejected = true; }
+Require(requireSingleMultipleRejected, "admission trust did not reject a multi-entry Engine content readout");
+ContentReferenceInfo trustedEntry = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", new ContentSha256(1, 2, 3, 4), 100) }, "doom-e1m1/doom-e1m1.voxel.json");
+Require(trustedEntry.Path == "doom-e1m1/doom-e1m1.voxel.json" && trustedEntry.ByteLength == 100, "admission trust did not accept a path-matched Engine content entry regardless of hash");
 using (var supportWorld = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
 {
     EntityId movingLift = supportWorld.Create();

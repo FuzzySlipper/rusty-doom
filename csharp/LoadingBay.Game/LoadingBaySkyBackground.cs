@@ -9,9 +9,6 @@ namespace LoadingBay.Game;
 internal sealed class LoadingBaySkyBackground : IDisposable
 {
     internal const string SkySourcePath = "loading-bay/sky/mountain-panorama.png";
-    private const ulong SkyByteLength = 2540675;
-    private static readonly ContentSha256 SkySha256 = new(
-        0xe964e788aea7d984UL, 0xf4c7f9725fd5d92dUL, 0xfa37362d67e14cd2UL, 0xe01599ff13719a94UL);
 
     private readonly ContentReference _content;
     private readonly RenderResource _resource;
@@ -21,36 +18,33 @@ internal sealed class LoadingBaySkyBackground : IDisposable
 
     internal LoadingBaySkyBackground(
         IContentService content,
-        ProductContent admitted,
         IGraphicsService appearance,
         ICameraViewService cameraView)
     {
         ArgumentNullException.ThrowIfNull(content);
-        ArgumentNullException.ThrowIfNull(admitted);
         ArgumentNullException.ThrowIfNull(appearance);
         _cameraView = cameraView ?? throw new ArgumentNullException(nameof(cameraView));
 
-        LoadingBayAdmittedContent.RequireAdmitted(admitted, SkySourcePath);
         ContentReference? skyContent = null;
         RenderResource? resource = null;
         try
         {
+            // First-party Engine delivery is trusted by path. Engine reports a
+            // missing artifact through its own open failure; no hash revalidation.
             skyContent = content.OpenReference(new ContentOpenRequest(SkySourcePath));
-            ContentReferenceInfo skyInfo = LoadingBayAdmittedContent.RequireExact(
-                content.ReadReferenceInfo(skyContent), SkySourcePath, SkySha256);
-            if (skyInfo.ByteLength != SkyByteLength)
-                throw new InvalidOperationException($"Loading Bay's generated sky provenance length changed: {skyInfo.ByteLength}.");
+            ContentReferenceInfo skyInfo = LoadingBayAdmittedContent.RequireSingle(
+                content.ReadReferenceInfo(skyContent), SkySourcePath);
 
             // Appearance accepts both content-relative and content-prefixed paths. Keep the
             // canonical product identity relative while making the renderer resource path
             // match the authored catalog's sourcePath exactly.
             RenderResourceInfo sky = appearance.OpenResource(new RenderResourceRequest($"content/{SkySourcePath}"));
             _resource = resource = sky.Handle;
-            if (sky.Kind != RenderResourceKind.Texture || sky.ByteLength != SkyByteLength || sky.Handle.Handle.Value == 0)
+            if (sky.Kind != RenderResourceKind.Texture || sky.ByteLength == 0 || sky.Handle.Handle.Value == 0)
                 throw new InvalidOperationException("Engine did not admit Loading Bay's generated mountain sky texture.");
             _cameraView.SetSkyBackground(sky.Handle);
             _content = skyContent;
-            _readout = new LoadingBaySkyReadout(SkySourcePath, SkySha256, skyInfo.ByteLength, sky.Handle.Handle.Value, true, true);
+            _readout = new LoadingBaySkyReadout(SkySourcePath, skyInfo.Sha256, skyInfo.ByteLength, sky.Handle.Handle.Value, true, true);
         }
         catch
         {

@@ -22,7 +22,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private ProductStateStore<LoadingBaySnapshot>? _store;
     private LoadingBayEngineServices? _engineServices;
     private IEngineContext? _engineContext;
-    private ProductContent? _productContent;
     private LoadingBayExitPresentation? _exitPresentation;
     private LoadingBayExitButtonAnimation? _exitButtonAnimation;
     private LoadingBaySkyReadout _skyReadout;
@@ -74,7 +73,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
 
     public LoadingBaySession(
         IEngineContext engine,
-        ProductContent content,
         LoadingBayExitPresentation exitPresentation,
         LoadingBayExitButtonAnimation exitButtonAnimation,
         LoadingBaySkyReadout skyReadout)
@@ -84,8 +82,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         try
         {
             store = new ProductStateStore<LoadingBaySnapshot>(engine, "loading-bay", new LoadingBaySnapshotCodec());
-            _engineContext = engine; _productContent = content; _exitPresentation = exitPresentation; _exitButtonAnimation = exitButtonAnimation; _skyReadout = skyReadout;
-            _engineServices = new LoadingBayEngineServices(engine, content, _tuning, _entities, _player, exitPresentation, exitButtonAnimation, skyReadout);
+            _engineContext = engine; _exitPresentation = exitPresentation; _exitButtonAnimation = exitButtonAnimation; _skyReadout = skyReadout;
+            _engineServices = new LoadingBayEngineServices(engine, _tuning, _entities, _player, exitPresentation, exitButtonAnimation, skyReadout);
             _playerSnapshot = _engineServices.CapturePlayer();
             _store = store;
         }
@@ -687,7 +685,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private void ScheduleWorldContinuation(ulong dueStep) => _scheduler.ScheduleAt(dueStep, context => _world.Advance(context.SimulationStep, Record));
     private LoadingBayEngineServices CreateFreshEngineServices()
     {
-        if (_engineContext is null || _productContent is null || _exitPresentation is null || _exitButtonAnimation is null)
+        if (_engineContext is null || _exitPresentation is null || _exitButtonAnimation is null)
             throw new InvalidOperationException("Loading Bay cannot rebuild an Engine-backed continuation without its product composition inputs.");
         EntityStore projection = new([
             EngineComponentTypes.Transform,
@@ -697,7 +695,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         try
         {
             BootstrapCanonicalEntities(projection);
-            return new LoadingBayEngineServices(_engineContext, _productContent, _tuning, projection, _player, _exitPresentation, _exitButtonAnimation, _skyReadout, ownsProjectionEntities: true);
+            return new LoadingBayEngineServices(_engineContext, _tuning, projection, _player, _exitPresentation, _exitButtonAnimation, _skyReadout, ownsProjectionEntities: true);
         }
         catch
         {
