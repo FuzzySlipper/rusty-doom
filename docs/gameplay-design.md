@@ -58,15 +58,15 @@ authority and are never translated by the map. No generic ECS framework.
 
 ## Game-domain owners
 
-Owners as landed by #8378 (#8379 owns the interaction-plumbing row):
+Owners as landed by #8378–#8379:
 
 | Concern | Landed owner |
 | --- | --- |
 | Player/enemy/pickup/world-object state | Attached components over canonical entities (`StatsComponent` vitality via `LoadingBayStats`; `LoadingBayEnemyStateComponent`; `LoadingBayPickupStateComponent`; door/lift/floor/barrel/hazard components owned by `LoadingBayWorldState`); Engine inventory/equipment keyed to the same canonical player entity |
-| Combat and world interactions | `LoadingBaySession` policy mixed with prepare/settle receipts; `LoadingBayEngineServices.Update` positional delegate list (`LoadingBayEngineServices.cs:84-105`); `LoadingBayWorldServices` coordinators → #8379: small named owners with explicit cohesive dependencies (never a universal interface with the same twenty methods, a generic bus, or task-specific Engine API) |
-| Doors | Canonical `LoadingBayWorldState` door operations own supported behavior; the former freeform session ledger is removed and `SwitchActivated` resolves labels to canonical activation; named-door save shape is a derived read-only projection |
-| Pickups/doors in fixtures | Fixture-only manual keys (`_manualPickupKeys`) deliberately separate from canonical components |
-| Reads | Live typed reads (`WorldState.DoorState/FloorState/LiftState`, component reads); `Capture` stays at save/diagnostic boundaries |
+| Combat and world interactions | Named game-domain owners with explicit state and typed operations: `LoadingBayCombat` (damage, fire/equipment/loadout, enemy attacks, projectiles, encounters), `LoadingBayWorld` (hazards, movers, secrets, doors, exit, barrels, completion), `LoadingBayPickups` (collection, lifecycle); Engine coordinators call them directly. `Update` carries the three owners plus the world store, one fact-publication callback, and one barrel Engine-composition seam — no delegate list, no universal interface, no bus, no task-specific Engine API |
+| Doors | Canonical `LoadingBayWorldState` door operations own supported behavior; the former freeform session ledger and the dead world-action switch path are removed; named-door save shape is a derived read-only projection |
+| Pickups/doors in fixtures | Fixture-only manual keys (inside `LoadingBayPickups`) deliberately separate from canonical components |
+| Reads | Live typed reads (`WorldState.DoorState/FloorState/LiftState`, component reads, live motion iteration); `Capture` stays at save/diagnostic boundaries |
 
 Armor protection policy and Doom pickup caps are preserved; the game does not
 become a generic RPG. Static generated catalog definitions and native
@@ -81,19 +81,17 @@ HUD/audio/debug — not mandatory replay acceptance. A legitimate
 query-then-apply split with concrete meaning may remain; names alone are not
 defects.
 
-Remaining ceremony (#8379 owns all three; #8378 already removed the named-door
-ledger and the `Capture`-shaped live reads):
+Ceremony removed by #8379 (all three survey items landed):
 
-- `LoadingBayEngineServices.Update` receiving ~20 `Action`/`Func` delegates
-  for pickups, hazards, doors, combat, and world reads
-  (`LoadingBayEngineServices.cs:84-105`), with prepare/settle receipts split
-  across session and coordinators;
-- `LoadingBayWorldState.DamageBarrel` cloning the whole barrel map before the
-  chain (`LoadingBayWorldState.cs:126-152`) instead of a bounded work queue
-  with one explosion per barrel;
-- barrel/chain inputs kept as whole-world defensive copies rather than local
-  resolved query inputs; failure semantics of native calls preserved with no
-  rollback promise for terminal callbacks.
+- the ~20-delegate `Update` list is replaced by three named owners plus the
+  world store, one fact-publication callback, and one barrel
+  Engine-composition seam; prepare/settle policy lives in the owners,
+  called directly by the coordinators;
+- `DamageBarrel` runs a bounded work queue with one explosion per barrel
+  and per-barrel commit;
+- chain inputs are locally resolved (occlusion at discovery); failure
+  semantics of native calls preserved with no rollback promise for
+  terminal callbacks.
 
 Preserved: real delayed projectile timing, weapon cooldown/ammo accounting,
 enemy attack policy, ray/line-of-effect occlusion, pickup atomicity, and

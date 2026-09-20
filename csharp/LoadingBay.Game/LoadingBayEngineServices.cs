@@ -88,47 +88,38 @@ internal sealed class LoadingBayEngineServices : IDisposable
         ProductUpdate update,
         LoadingBayTuning tuning,
         Action<LoadingBayFact> record,
-        Func<ulong, bool> canCollectCanonicalPickup,
-        Func<ulong, LoadingBayReceipt> collectCanonicalPickup,
-        Func<ulong, ulong, LoadingBayReceipt> applyCanonicalHazard,
-        Func<ulong, ulong, LoadingBayReceipt> activateCanonicalFloor,
-        Func<ulong, ulong, LoadingBayReceipt> activateCanonicalLift,
-        Func<ulong, LoadingBayReceipt> discoverCanonicalSecret,
-        Func<ulong, ulong, LoadingBayReceipt> activateCanonicalDoor,
-        Func<ulong, LoadingBayReceipt> completeCanonicalExit,
-        Func<LoadingBayWorldSnapshot> readWorld,
-        Func<ulong, LoadingBayWeaponFirePlan?> prepareWeaponFire,
-        Func<LoadingBayWeaponFirePlan, IReadOnlyList<LoadingBayWeaponImpact>, LoadingBayReceipt> settleWeaponFire,
-        Func<ulong, int, ulong, LoadingBayReceipt> damageCanonicalBarrel,
-        Func<IReadOnlySet<ulong>> eligibleEnemyEntities,
-        Func<ulong, IReadOnlySet<ulong>, uint, uint, IReadOnlyList<LoadingBayEnemyAttackPlan>> prepareEnemyAttacks,
-        Func<LoadingBayEnemyAttackPlan, bool, string, LoadingBayReceipt> settleEnemyAttack,
-        Action<ulong, ulong, string> recordProjectileOutcome,
-        Func<ulong, int, ulong, LoadingBayReceipt> applyProjectileDamage,
-        Func<ulong, ulong, LoadingBayReceipt> activateEncounter)
+        LoadingBayPickups pickups,
+        LoadingBayWorld worldPolicy,
+        LoadingBayWorldState world,
+        LoadingBayCombat combat,
+        Func<ulong, int, ulong, LoadingBayReceipt> damageCanonicalBarrel)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(pickups);
+        ArgumentNullException.ThrowIfNull(worldPolicy);
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(combat);
         float fixedDeltaSeconds = (float)update.Facts.FixedDeltaSeconds;
         LoadingBaySemanticInput input = _player.Update(update, tuning,
             (tick, supportPresent, supportEntity) => _worldInteractions.PrepareCharacterStep(
-                tick, fixedDeltaSeconds, readWorld(), supportPresent, supportEntity),
+                tick, fixedDeltaSeconds, world, supportPresent, supportEntity),
             tick =>
             {
-                _semanticPickups.ReconcileMovementStep(tick, _player, canCollectCanonicalPickup, collectCanonicalPickup, record);
-                _worldInteractions.ReconcileMovementStep(tick, _player, applyCanonicalHazard, activateCanonicalFloor, activateCanonicalLift, discoverCanonicalSecret, record);
-                _encounters.ReconcileMovementStep(tick, activateEncounter);
-                _combat.Advance(tick, fixedDeltaSeconds, prepareEnemyAttacks, settleEnemyAttack, recordProjectileOutcome, applyProjectileDamage);
+                _semanticPickups.ReconcileMovementStep(tick, _player, pickups, record);
+                _worldInteractions.ReconcileMovementStep(tick, _player, worldPolicy, record);
+                _encounters.ReconcileMovementStep(tick, combat);
+                _combat.Advance(tick, fixedDeltaSeconds, combat);
             });
         _worldServices.Update(update);
         if (input.UseRequested)
         {
             record(new SemanticInputFact("player.use"));
-            _worldInteractions.Use(update.Facts.SimulationStep, _player, activateCanonicalDoor, completeCanonicalExit, record);
+            _worldInteractions.Use(update.Facts.SimulationStep, _player, worldPolicy, record);
         }
         if (input.FireRequested)
         {
             record(new SemanticInputFact("player.fire"));
-            _combat.Fire(update.Facts.SimulationStep, prepareWeaponFire, settleWeaponFire, eligibleEnemyEntities, damageCanonicalBarrel);
+            _combat.Fire(update.Facts.SimulationStep, combat, damageCanonicalBarrel);
         }
     }
 
@@ -585,8 +576,11 @@ internal sealed class LoadingBayEncounterCoordinator
         _playerEntity = playerEntity;
     }
 
-    internal void ReconcileMovementStep(ulong tick, Func<ulong, ulong, LoadingBayReceipt> activate)
+    internal void ReconcileMovementStep(
+        ulong tick,
+        LoadingBayCombat combat)
     {
+        ArgumentNullException.ThrowIfNull(combat);
         foreach (LoadingBayE1M1EncounterDefinition encounter in LoadingBayE1M1SemanticCatalog.Encounters)
         {
             if (_active.Contains(encounter.EntityId)) continue;
@@ -602,7 +596,7 @@ internal sealed class LoadingBayEncounterCoordinator
             foreach (PerceptionPair pair in readout.Pairs.Span)
                 if (pair.Observer == encounter.EntityId && pair.Target == _playerEntity.Value) { inRange = true; break; }
             if (!inRange) continue;
-            LoadingBayReceipt outcome = activate(encounter.EntityId, tick);
+            LoadingBayReceipt outcome = combat.ActivateEncounter(encounter.EntityId, tick);
             if (!outcome.Accepted) throw new InvalidOperationException($"Canonical encounter {encounter.EntityId} overlap could not settle: {outcome.Code}.");
             _active.Add(encounter.EntityId);
         }
@@ -652,12 +646,13 @@ internal sealed class LoadingBayCombatCoordinator : IDisposable
         catch { _projectileWorld.Dispose(); throw; }
     }
 
-    internal void Fire(ulong tick, Func<ulong, LoadingBayWeaponFirePlan?> prepare, Func<LoadingBayWeaponFirePlan, IReadOnlyList<LoadingBayWeaponImpact>, LoadingBayReceipt> settle, Func<IReadOnlySet<ulong>> eligibleEnemyEntities, Func<ulong, int, ulong, LoadingBayReceipt> damageBarrel)
+    internal void Fire(ulong tick, LoadingBayCombat combat, Func<ulong, int, ulong, LoadingBayReceipt> damageBarrel)
     {
-        LoadingBayWeaponFirePlan? plan = prepare(tick);
+        ArgumentNullException.ThrowIfNull(combat);
+        LoadingBayWeaponFirePlan? plan = combat.PrepareWeaponFire(tick);
         if (plan is null) return;
         List<LoadingBayWeaponImpact> impacts = [];
-        IReadOnlySet<ulong> eligibleEnemies = eligibleEnemyEntities();
+        IReadOnlySet<ulong> eligibleEnemies = combat.EligibleEnemyEntities();
         SpatialEntityCollider[] eligibleHitboxes = _enemyHitboxes.Where(hitbox => eligibleEnemies.Contains(hitbox.Entity)).Concat(_barrelHitboxes).ToArray();
         for (int pellet = 0; pellet < plan.PelletCount; pellet++)
         {
@@ -674,38 +669,36 @@ internal sealed class LoadingBayCombatCoordinator : IDisposable
             bool enemy = hit.Present && hit.Kind == SpatialHitKind.Entity && eligibleEnemies.Contains(hit.Entity);
             impacts.Add(new LoadingBayWeaponImpact(enemy ? hit.Entity : 0, damage, pellet, hit.Present && !enemy));
         }
-        _ = settle(plan, impacts);
+        _ = combat.SettleWeaponFire(plan, impacts);
     }
 
     /// <summary>Runs once per host-admitted movement step: Engine visibility first, then product readiness, then Engine attack realization.</summary>
     internal void Advance(
         ulong tick,
         float fixedDeltaSeconds,
-        Func<ulong, IReadOnlySet<ulong>, uint, uint, IReadOnlyList<LoadingBayEnemyAttackPlan>> prepare,
-        Func<LoadingBayEnemyAttackPlan, bool, string, LoadingBayReceipt> settle,
-        Action<ulong, ulong, string> recordProjectileOutcome,
-        Func<ulong, int, ulong, LoadingBayReceipt> applyProjectileDamage)
+        LoadingBayCombat combat)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(combat);
         if (!float.IsFinite(fixedDeltaSeconds) || fixedDeltaSeconds <= 0f) throw new InvalidOperationException("Engine admitted an invalid E1M1 combat step duration.");
         PerceptionReadoutLeaseReceipt perception = ObserveEnemies();
         HashSet<ulong> visible = [];
         foreach (PerceptionPair pair in perception.Pairs.Span)
             if (pair.Target == _playerEntity.Value && pair.Kind == PerceptionPairKind.Visible) visible.Add(pair.Observer);
-        foreach (LoadingBayEnemyAttackPlan plan in prepare(tick, visible, perception.VisibilityCasts, perception.OcclusionRejects))
+        foreach (LoadingBayEnemyAttackPlan plan in combat.PrepareEnemyAttacks(tick, visible, perception.VisibilityCasts, perception.OcclusionRejects))
         {
             if (plan.Kind == LoadingBayE1M1EnemyAttackKind.Hitscan)
             {
                 bool hitPlayer = HitscanReachesPlayer(plan);
-                _ = settle(plan, hitPlayer, hitPlayer ? "combat.hitscan-player" : "combat.hitscan-occluded");
+                _ = combat.SettleEnemyAttack(plan, hitPlayer, hitPlayer ? "combat.hitscan-player" : "combat.hitscan-occluded");
             }
             else
             {
                 RealizeProjectile(plan);
-                _ = settle(plan, false, "combat.projectile-launched");
+                _ = combat.SettleEnemyAttack(plan, false, "combat.projectile-launched");
             }
         }
-        StepProjectiles(tick, fixedDeltaSeconds, recordProjectileOutcome, applyProjectileDamage);
+        StepProjectiles(tick, fixedDeltaSeconds, combat);
     }
 
     private PerceptionReadoutLeaseReceipt ObserveEnemies()
@@ -758,8 +751,9 @@ internal sealed class LoadingBayCombatCoordinator : IDisposable
         _projectiles.Add(new ActiveProjectile(plan.EnemyEntityId, body, checked(plan.Tick + (ulong)plan.ProjectileLifetimeTicks), direction * plan.ProjectileImpulse, plan.Damage, plan.Origin));
     }
 
-    private void StepProjectiles(ulong tick, float fixedDeltaSeconds, Action<ulong, ulong, string> recordOutcome, Func<ulong, int, ulong, LoadingBayReceipt> applyDamage)
+    private void StepProjectiles(ulong tick, float fixedDeltaSeconds, LoadingBayCombat combat)
     {
+        ArgumentNullException.ThrowIfNull(combat);
         if (_projectiles.Count == 0) return;
         DynamicsAction[] actions = _projectiles.Select(projectile => new DynamicsAction(projectile.Body, Vector3.Zero, Vector3.Zero, projectile.PendingImpulse, Vector3.Zero, true)).ToArray();
         DynamicsStepAndReadLeaseReceipt receipt = _dynamics.StepAndRead(new DynamicsStepAndReadRequest(_projectileWorld, fixedDeltaSeconds, 1, actions, _projectiles.Select(projectile => projectile.Body).ToArray()));
@@ -779,8 +773,8 @@ internal sealed class LoadingBayCombatCoordinator : IDisposable
                 projectile.LastTranslation = readout.Value.Readout.Transform.Translation;
                 continue;
             }
-            if (hitPlayer) _ = applyDamage(projectile.EnemyEntityId, projectile.Damage, tick);
-            recordOutcome(projectile.EnemyEntityId, tick, hitPlayer ? "combat.projectile-player-impact" : collidedWithWorld ? "combat.projectile-world-impact" : "combat.projectile-expired");
+            if (hitPlayer) _ = combat.ApplyProjectileDamage(projectile.EnemyEntityId, projectile.Damage, tick);
+            combat.RecordProjectileOutcome(projectile.EnemyEntityId, tick, hitPlayer ? "combat.projectile-player-impact" : collidedWithWorld ? "combat.projectile-world-impact" : "combat.projectile-expired");
             projectile.Body.Dispose();
             _projectiles.RemoveAt(index);
         }
@@ -906,11 +900,11 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
     internal void ReconcileMovementStep(
         ulong tick,
         LoadingBayPlayerScene player,
-        Func<ulong, bool> canCollect,
-        Func<ulong, LoadingBayReceipt> collect,
+        LoadingBayPickups pickups,
         Action<LoadingBayFact> record)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(pickups);
         _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
         EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(
             tick, SpatialTriggerCause.Movement, maximumEntities: _maximumEntities, maximumFactReadback: _maximumFactReadback);
@@ -918,9 +912,9 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         foreach (SpatialTriggerFactAtReceipt fact in receipt.Facts.Span)
         {
             if (!fact.Present || !fact.Enter || fact.Subject != _player.Value || !_pickups.Any(pickup => pickup.EntityId == fact.Trigger)) continue;
-            if (!canCollect(fact.Trigger))
+            if (!pickups.CanCollectCanonicalPickup(fact.Trigger))
             {
-                LoadingBayReceipt rejected = collect(fact.Trigger);
+                LoadingBayReceipt rejected = pickups.CollectCanonicalPickup(fact.Trigger);
                 record(new CanonicalPickupOverlapFact(fact.Trigger, fact.Subject, fact.Tick, rejected.Accepted, rejected.Code));
                 SpatialTriggerReadReceipt observed = _spatial.ReadTrigger(new SpatialTriggerReadRequest(_session, fact.Trigger));
                 LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(fact.Trigger);
@@ -934,7 +928,7 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
             LoadingBayReceipt outcome;
             try
             {
-                outcome = collect(fact.Trigger);
+                outcome = pickups.CollectCanonicalPickup(fact.Trigger);
             }
             catch (Exception collectionFailure)
             {
@@ -1087,11 +1081,12 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     internal LoadingBayCharacterStepEnvironment PrepareCharacterStep(
         ulong tick,
         float fixedDeltaSeconds,
-        LoadingBayWorldSnapshot world,
+        LoadingBayWorldState world,
         bool supportPresent,
         ulong supportEntity)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(world);
         RealizeMotion(tick, fixedDeltaSeconds, world);
         return new LoadingBayCharacterStepEnvironment(
             ResolvePlatformSupport(supportPresent, supportEntity, _platforms, _entities, _entityMap),
@@ -1139,10 +1134,11 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     }
 
     internal void ReconcileMovementStep(ulong tick, LoadingBayPlayerScene player,
-        Func<ulong, ulong, LoadingBayReceipt> applyHazard, Func<ulong, ulong, LoadingBayReceipt> activateFloor,
-        Func<ulong, ulong, LoadingBayReceipt> activateLift, Func<ulong, LoadingBayReceipt> discoverSecret, Action<LoadingBayFact> record)
+        LoadingBayWorld worldPolicy, Action<LoadingBayFact> record)
     {
-        ThrowIfDisposed(); _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(worldPolicy);
+        _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
         EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement, maximumEntities: _maximumEntities, maximumFactReadback: 64);
         if (receipt.FactsTruncated) throw new InvalidOperationException("E1M1 world trigger facts exceeded the deliberate bound.");
         foreach (SpatialTriggerFactAtReceipt fact in receipt.Facts.Span)
@@ -1152,16 +1148,16 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
             // Facts encode edges only. Continued hazard truth is read below from the active Engine overlap set.
             if (_hazards.Contains(fact.Trigger)) { record(new WorldInteractionFact("hazard-edge", fact.Trigger, fact.Enter ? "enter" : "exit", fact.Tick, 0)); continue; }
             if (!fact.Enter) continue;
-            else if (_floors.Contains(fact.Trigger)) result = activateFloor(fact.Trigger, fact.Tick);
-            else if (_lifts.Contains(fact.Trigger)) result = activateLift(fact.Trigger, fact.Tick);
-            else if (_secrets.Contains(fact.Trigger)) result = discoverSecret(fact.Trigger);
+            else if (_floors.Contains(fact.Trigger)) result = worldPolicy.ActivateFloor(fact.Trigger, fact.Tick);
+            else if (_lifts.Contains(fact.Trigger)) result = worldPolicy.ActivateLift(fact.Trigger, fact.Tick);
+            else if (_secrets.Contains(fact.Trigger)) result = worldPolicy.DiscoverSecretByEntity(fact.Trigger);
             else continue;
             record(new WorldInteractionFact("trigger", fact.Trigger, result.Code, fact.Tick, 0));
         }
-        ReconcileHazardOverlaps(tick, applyHazard, record);
+        ReconcileHazardOverlaps(tick, worldPolicy, record);
     }
 
-    private void ReconcileHazardOverlaps(ulong tick, Func<ulong, ulong, LoadingBayReceipt> applyHazard, Action<LoadingBayFact> record)
+    private void ReconcileHazardOverlaps(ulong tick, LoadingBayWorld worldPolicy, Action<LoadingBayFact> record)
     {
         foreach (ulong trigger in _hazards.OrderBy(value => value))
         {
@@ -1177,15 +1173,16 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
                 if (overlap.Subject == _player.Value) playerOverlapping = true;
             }
             if (!playerOverlapping) continue;
-            LoadingBayReceipt outcome = applyHazard(trigger, tick);
+            LoadingBayReceipt outcome = worldPolicy.ApplyHazard(trigger, tick);
             record(new WorldInteractionFact("hazard-overlap", trigger, outcome.Code, tick, 0));
         }
     }
 
     /// <summary>One bounded Engine perception query chooses the authored use target; product policy decides only what that target means.</summary>
-    internal void Use(ulong tick, LoadingBayPlayerScene player, Func<ulong, ulong, LoadingBayReceipt> activateDoor, Func<ulong, LoadingBayReceipt> completeExit, Action<LoadingBayFact> record)
+    internal void Use(ulong tick, LoadingBayPlayerScene player, LoadingBayWorld worldPolicy, Action<LoadingBayFact> record)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(worldPolicy);
         LoadingBayE1M1DoorDefinition[] doors = LoadingBayE1M1SemanticCatalog.Doors;
         LoadingBayE1M1ExitDefinition[] exits = LoadingBayE1M1SemanticCatalog.Exits;
         PerceptionTarget[] targets = doors.Select(value => new PerceptionTarget(value.EntityId, value.ClosedTranslation))
@@ -1205,8 +1202,8 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         if (candidates.Length == 0) { record(new WorldInteractionFact("use", 0, "unavailable", tick, 0)); return; }
         PerceptionPair selected = candidates[0];
         LoadingBayReceipt result = doors.Any(door => door.EntityId == selected.Target)
-            ? activateDoor(selected.Target, tick)
-            : completeExit(selected.Target);
+            ? worldPolicy.ActivateDoor(selected.Target, tick)
+            : worldPolicy.CompleteExitByEntity(selected.Target);
         record(new WorldInteractionFact("use", selected.Target, result.Code, tick, 0));
     }
 
@@ -1223,23 +1220,26 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         return hit.Present && hit.Kind is SpatialHitKind.Voxel or SpatialHitKind.StaticMesh;
     }
 
-    private void RealizeMotion(ulong tick, float deltaSeconds, LoadingBayWorldSnapshot world)
+    private void RealizeMotion(ulong tick, float deltaSeconds, LoadingBayWorldState world)
     {
         if (!float.IsFinite(deltaSeconds) || deltaSeconds <= 0f) return;
         List<EntityId> active = [];
-        foreach (LoadingBayDoorSnapshot state in world.Doors.Where(value => value.State is LoadingBayDoorState.Opening or LoadingBayDoorState.Closing))
+        foreach (LoadingBayE1M1DoorDefinition definition in LoadingBayE1M1SemanticCatalog.Doors.OrderBy(value => value.EntityId))
         {
-            LoadingBayE1M1DoorDefinition definition = LoadingBayE1M1SemanticCatalog.Doors.Single(value => value.EntityId == state.EntityId);
+            LoadingBayDoorSnapshot state = world.DoorState(definition.EntityId);
+            if (state.State is not (LoadingBayDoorState.Opening or LoadingBayDoorState.Closing)) continue;
             SetVelocity(_entityMap.Runtime(state.EntityId), state.State == LoadingBayDoorState.Opening ? definition.OpenTranslation : definition.ClosedTranslation, state.DueStep, tick, deltaSeconds, active);
         }
-        foreach (LoadingBayFloorSnapshot state in world.Floors.Where(value => value.State == LoadingBayFloorState.Lowering))
+        foreach (LoadingBayE1M1FloorDefinition definition in LoadingBayE1M1SemanticCatalog.Floors.OrderBy(value => value.EntityId))
         {
-            LoadingBayE1M1FloorDefinition definition = LoadingBayE1M1SemanticCatalog.Floors.Single(value => value.EntityId == state.EntityId);
+            LoadingBayFloorSnapshot state = world.FloorState(definition.EntityId);
+            if (state.State != LoadingBayFloorState.Lowering) continue;
             SetVelocity(_entityMap.Runtime(definition.PlatformEntityId), definition.LoweredTranslation, state.DueStep, tick, deltaSeconds, active);
         }
-        foreach (LoadingBayLiftSnapshot state in world.Lifts.Where(value => value.State is LoadingBayLiftState.Lowering or LoadingBayLiftState.Raising))
+        foreach (LoadingBayE1M1LiftDefinition definition in LoadingBayE1M1SemanticCatalog.Lifts.OrderBy(value => value.EntityId))
         {
-            LoadingBayE1M1LiftDefinition definition = LoadingBayE1M1SemanticCatalog.Lifts.Single(value => value.EntityId == state.EntityId);
+            LoadingBayLiftSnapshot state = world.LiftState(definition.EntityId);
+            if (state.State is not (LoadingBayLiftState.Lowering or LoadingBayLiftState.Raising)) continue;
             SetVelocity(_entityMap.Runtime(definition.PlatformEntityId), state.State == LoadingBayLiftState.Lowering ? definition.LoweredTranslation : definition.RaisedTranslation, state.DueStep, tick, deltaSeconds, active);
         }
         if (active.Count != 0) _kinematics.Prepare(_session, deltaSeconds, 6, active.ToArray()).Apply();

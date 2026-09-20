@@ -209,32 +209,33 @@ internal sealed class LoadingBayWorldState
     {
         if (damage <= 0) return [];
         ArgumentNullException.ThrowIfNull(occluded);
-        // Local staging only: a failed Engine line-of-effect query cannot leave one barrel committed
-        // while later members of its chain are unresolved. The bounded chain rework belongs to task #8379.
-        Dictionary<ulong, LoadingBayBarrelSnapshot> staged = LoadingBayE1M1SemanticCatalog.Barrels
-            .ToDictionary(value => value.EntityId, value => new LoadingBayBarrelSnapshot(value.EntityId, Barrel(value.EntityId).Health, Barrel(value.EntityId).Exploded));
-        Queue<(ulong Id, int Damage, bool Chained)> pending = new(); pending.Enqueue((entityId, damage, false)); List<(LoadingBayE1M1BarrelDefinition Barrel, bool Chained)> exploded = [];
-        while (pending.TryDequeue(out (ulong Id, int Damage, bool Chained) item))
+        ArgumentNullException.ThrowIfNull(record);
+        // Unknown barrels reject before touching canonical state.
+        LoadingBayE1M1BarrelDefinition first = LoadingBayE1M1SemanticCatalog.Barrels.Single(value => value.EntityId == entityId);
+        // Bounded work queue with one explosion per barrel. Each barrel commits immediately:
+        // a failed Engine line-of-effect query leaves earlier barrels committed (no rollback promise
+        // for terminal callbacks). Occlusion is resolved locally when a neighbor is discovered.
+        Queue<(LoadingBayE1M1BarrelDefinition Barrel, int Damage, bool Chained)> pending = new();
+        pending.Enqueue((first, damage, false));
+        List<(LoadingBayE1M1BarrelDefinition Barrel, bool Chained)> exploded = [];
+        while (pending.TryDequeue(out (LoadingBayE1M1BarrelDefinition Barrel, int Damage, bool Chained) item))
         {
-            if (!staged.TryGetValue(item.Id, out LoadingBayBarrelSnapshot? state) || state.Exploded) continue;
-            int health = Math.Max(0, state.Health - item.Damage); staged[item.Id] = state with { Health = health };
+            LoadingBayBarrelStateComponent state = Barrel(item.Barrel.EntityId);
+            if (state.Exploded) continue;
+            int health = Math.Max(0, state.Health - item.Damage);
+            state.Health = health;
             if (health != 0) continue;
-            LoadingBayE1M1BarrelDefinition barrel = LoadingBayE1M1SemanticCatalog.Barrels.Single(value => value.EntityId == item.Id);
-            staged[item.Id] = new(item.Id, 0, true); exploded.Add((barrel, item.Chained));
-            foreach (LoadingBayE1M1BarrelDefinition candidate in LoadingBayE1M1SemanticCatalog.Barrels.Where(value => value.EntityId != barrel.EntityId))
+            state.Exploded = true;
+            exploded.Add((item.Barrel, item.Chained));
+            record(new BarrelExplosionFact(item.Barrel.EntityId, item.Barrel.Damage, item.Barrel.Radius, tick, item.Chained));
+            foreach (LoadingBayE1M1BarrelDefinition candidate in LoadingBayE1M1SemanticCatalog.Barrels.Where(value => value.EntityId != item.Barrel.EntityId))
             {
-                double distance = Vector3.Distance(barrel.Translation, candidate.Translation);
-                if (distance > barrel.Radius || occluded(barrel, candidate)) continue;
-                int scaled = (int)Math.Ceiling(barrel.Damage * (1d - distance / barrel.Radius));
-                if (scaled > 0) pending.Enqueue((candidate.EntityId, scaled, true));
+                double distance = Vector3.Distance(item.Barrel.Translation, candidate.Translation);
+                if (distance > item.Barrel.Radius || occluded(item.Barrel, candidate)) continue;
+                int scaled = (int)Math.Ceiling(item.Barrel.Damage * (1d - distance / item.Barrel.Radius));
+                if (scaled > 0) pending.Enqueue((candidate, scaled, true));
             }
         }
-        foreach ((ulong id, LoadingBayBarrelSnapshot state) in staged)
-        {
-            LoadingBayBarrelStateComponent live = Barrel(id);
-            live.Health = state.Health; live.Exploded = state.Exploded;
-        }
-        foreach ((LoadingBayE1M1BarrelDefinition barrel, bool chained) in exploded) record(new BarrelExplosionFact(barrel.EntityId, barrel.Damage, barrel.Radius, tick, chained));
         return exploded.Select(value => value.Barrel).ToArray();
     }
 

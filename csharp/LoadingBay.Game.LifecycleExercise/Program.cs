@@ -163,6 +163,35 @@ Require(state.DiscoverCanonicalSecret(150).Accepted && !state.DiscoverCanonicalS
 Require(state.CompleteCanonicalExit(149).Accepted, "canonical exit was incorrectly encounter-gated");
 Require(state.Readout().OwnedWeapons.SequenceEqual([LoadingBayDefinitions.Fist.Id, LoadingBayDefinitions.Pistol.Id], StringComparer.Ordinal), "E1M1 did not own fist and pistol");
 Require(state.Readout().EquippedWeapon == LoadingBayDefinitions.Pistol.Id && state.Readout().Bullets == 50, "E1M1 equipment or bullets drifted");
+using (var direct = new LoadingBaySession())
+{
+    LoadingBayWeaponFirePlan? directPlan = direct.PrepareWeaponFire(200);
+    Require(directPlan is not null && directPlan.WeaponId == LoadingBayDefinitions.Pistol.Id, "headless weapon fire did not prepare the equipped pistol plan");
+    ulong directBullets = direct.Readout().Bullets;
+    Require(direct.SettleWeaponFire(directPlan!, [new LoadingBayWeaponImpact(0, 7, 0, false), new LoadingBayWeaponImpact(0, 5, 1, true)]).Accepted
+        && direct.Readout().Facts.OfType<WeaponFiredFact>().Count() == 1
+        && direct.Readout().Facts.OfType<WeaponMissedFact>().Count() == 2
+        && direct.Readout().Bullets == directBullets - (ulong)directPlan!.AmmunitionCost,
+        "headless weapon settlement did not consume ammunition, record fire/miss facts, or set cooldown");
+    Require(!direct.SettleWeaponFire(directPlan!, []).Accepted, "headless weapon settlement ignored its cooldown gate");
+    long directHealth = direct.Readout().Health;
+    Require(direct.ApplyProjectileDamage(2, 10, 201).Accepted && direct.Readout().Health < directHealth
+        && direct.Readout().Facts.OfType<EnemyAttackFact>().Any(fact => fact.EnemyEntityId == 2 && fact.Kind == LoadingBayE1M1EnemyAttackKind.Projectile && fact.HitPlayer),
+        "headless projectile damage did not apply typed canonical damage");
+    direct.RecordProjectileOutcome(2, 201, "exercise.projectile-expired");
+    Require(direct.Readout().Facts.OfType<EnemyProjectileFact>().Any(fact => fact.EnemyEntityId == 2 && fact.Tick == 201), "headless projectile outcome was not recorded");
+    Require(direct.DamageCanonicalBarrel(60, 5, 202).Accepted
+        && direct.Capture("doom-e1m1").World.Barrels.Single(barrel => barrel.EntityId == 60).Health == 15
+        && !direct.Readout().Facts.OfType<BarrelExplosionFact>().Any(), "headless barrel damage did not commit scaled health without exploding");
+    Require(direct.DamageCanonicalBarrel(60, 20, 203).Accepted
+        && direct.Readout().Facts.OfType<BarrelExplosionFact>().Count(fact => fact.BarrelEntityId == 60) == 1
+        && direct.Readout().Facts.OfType<BarrelExplosionFact>().Single(fact => fact.BarrelEntityId == 60).Chained == false,
+        "headless barrel explosion did not record exactly one unchained explosion fact");
+    Require(direct.DamageCanonicalBarrel(60, 20, 204).Accepted
+        && direct.Readout().Facts.OfType<BarrelExplosionFact>().Count(fact => fact.BarrelEntityId == 60) == 1,
+        "headless barrel damage exploded the same barrel twice");
+    Require(!direct.DamageCanonicalBarrel(999, 10, 205).Accepted, "headless barrel damage accepted an unknown barrel");
+}
 Require(state.DeveloperSetTrack(1, "health", 99, "canonical-pickup").Accepted, "exercise could not establish a health-bonus delta");
 Require(state.CollectCanonicalPickup(78).Accepted && state.Readout().Health == 100, "canonical health pickup did not use generated E1M1 semantics");
 Require(!state.CollectCanonicalPickup(78).Accepted, "canonical health pickup collected more than once");

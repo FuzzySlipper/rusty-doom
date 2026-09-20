@@ -30,19 +30,16 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private readonly Queue<LoadingBayFact> _journal = new();
     private readonly Queue<Exception> _retiredProjectionFailures = new();
     private ulong _droppedRetiredProjectionFailures;
-    private readonly HashSet<ulong> _activatedEncounters = [];
+    private readonly LoadingBayCombat _combat;
+    private readonly LoadingBayWorld _worldPolicy;
+    private readonly LoadingBayPickups _pickups;
     // Direct fixture-only collection keys are deliberately separate from canonical E1M1 state.
     // Canonical pickups have exactly one authority: the attached pickup component.
-    private readonly HashSet<string> _manualPickupKeys = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ulong> _weaponReadyAt = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _secrets = new(StringComparer.Ordinal);
     private readonly Mechanics.StatsComponent _playerStats;
-    private LoadingBayArmorProtection _armorProtection = LoadingBayArmorProtection.None;
     private LoadingBayPlayerSnapshot _playerSnapshot;
     private readonly EntityId _player;
     private ProductUpdateFacts _facts;
     private bool _hasFacts;
-    private bool _complete;
     private bool _hudDirty = true;
     private bool _hudDiagnosticsEnabled;
     private double _hudDiagnosticElapsed;
@@ -60,6 +57,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         _entities.Add(_player, _playerStats);
         _inventory.RegisterInventory(new Mechanics.InventoryState(_player, [new Mechanics.InventoryCapacityLimit(Mechanics.CapacityMetricId.Parse("loading-bay.inventory.slots"), _tuning.InventorySlots)]));
         _inventory.RegisterEquipment(new Mechanics.EquipmentState(_player));
+        _combat = new LoadingBayCombat(_inventory, _player, _playerStats, _tuning, _entities, _entityMap, Record, () => _hasFacts ? _facts.SimulationStep : 0);
+        _pickups = new LoadingBayPickups(_inventory, _player, _playerStats, _tuning, _entities, _entityMap, _combat, Record, () => _hasFacts ? _facts.SimulationStep : 0);
+        _worldPolicy = new LoadingBayWorld(_world, _combat, _playerStats, Record, ScheduleWorldContinuation);
         _playerSnapshot = InitialPlayerSnapshot(_tuning);
         foreach (LoadingBayE1M1PickupPlacement pickup in LoadingBayE1M1SemanticCatalog.Pickups)
         {
@@ -90,6 +90,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             store = new ProductStateStore<LoadingBaySnapshot>(engine, "loading-bay", new LoadingBaySnapshotCodec());
             _engineContext = engine; _exitPresentation = exitPresentation; _exitButtonAnimation = exitButtonAnimation; _skyReadout = skyReadout;
             _engineServices = new LoadingBayEngineServices(engine, _tuning, _entities, _entityMap, _player, exitPresentation, exitButtonAnimation, skyReadout);
+            _combat.MaterializeDrop = _engineServices.MaterializeEnemyDrop;
             _playerSnapshot = _engineServices.CapturePlayer();
             _store = store;
         }
@@ -116,10 +117,131 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         _scheduler.Advance(update);
         for (uint offset = 0; offset < update.Facts.AdmittedStepCount; offset++)
             _world.Advance(LoadingBayAdmittedStepTicks.At(update.Facts, offset), Record);
-        _engineServices?.Update(update, _tuning, Record, CanCollectCanonicalPickup, CollectCanonicalPickup, ApplyCanonicalHazard, ActivateCanonicalFloor, ActivateCanonicalLift, DiscoverCanonicalSecret, ActivateCanonicalDoor, CompleteCanonicalExit, _world.Capture, PrepareWeaponFire, SettleWeaponFire, DamageCanonicalBarrel, EligibleEnemyEntities, PrepareEnemyAttacks, SettleEnemyAttack, RecordProjectileOutcome, ApplyProjectileDamage, ActivateEncounter);
+        _engineServices?.Update(update, _tuning, Record, _pickups, _worldPolicy, _world, _combat, DamageCanonicalBarrel);
         if (_engineServices is not null) _playerSnapshot = _engineServices.CapturePlayer();
         PublishFromUpdate(update.Facts);
         return ProductUpdateResult.None;
+    }
+
+    // Exercise-facing forwards to the combat owner; the session root composes but does not duplicate policy.
+    internal LoadingBayReceipt ApplyDamage(string target, int damage, string cause)
+    {
+        ThrowIfDisposed();
+        return _combat.ApplyDamage(target, damage, cause);
+    }
+
+    internal LoadingBayReceipt ActivateEncounter(ulong encounterEntityId, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _combat.ActivateEncounter(encounterEntityId, tick);
+    }
+
+    internal LoadingBayReceipt ApplyWeaponDamage(ulong enemyEntityId, string weaponId, int damage, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _combat.ApplyWeaponDamage(enemyEntityId, weaponId, damage, tick);
+    }
+
+    internal IReadOnlyList<LoadingBayEnemyAttackPlan> PrepareEnemyAttacks(ulong tick, IReadOnlySet<ulong> visibleEnemies, uint visibilityCasts, uint occlusionRejects)
+    {
+        ThrowIfDisposed();
+        return _combat.PrepareEnemyAttacks(tick, visibleEnemies, visibilityCasts, occlusionRejects);
+    }
+
+    internal LoadingBayReceipt SettleEnemyAttack(LoadingBayEnemyAttackPlan plan, bool hitPlayer, string cause)
+    {
+        ThrowIfDisposed();
+        return _combat.SettleEnemyAttack(plan, hitPlayer, cause);
+    }
+
+    // Exercise-facing forwards to the world owner; Engine-service composition stays here.
+    internal LoadingBayReceipt ApplyCanonicalHazard(ulong hazardEntityId, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _worldPolicy.ApplyHazard(hazardEntityId, tick);
+    }
+
+    internal LoadingBayReceipt ActivateCanonicalDoor(ulong doorEntityId, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _worldPolicy.ActivateDoor(doorEntityId, tick);
+    }
+
+    internal LoadingBayReceipt ActivateCanonicalFloor(ulong floorEntityId, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _worldPolicy.ActivateFloor(floorEntityId, tick);
+    }
+
+    internal LoadingBayReceipt ActivateCanonicalLift(ulong liftEntityId, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _worldPolicy.ActivateLift(liftEntityId, tick);
+    }
+
+    internal LoadingBayReceipt DiscoverCanonicalSecret(ulong secretEntityId)
+    {
+        ThrowIfDisposed();
+        return _worldPolicy.DiscoverSecretByEntity(secretEntityId);
+    }
+
+    internal LoadingBayReceipt CompleteCanonicalExit(ulong exitEntityId)
+    {
+        ThrowIfDisposed();
+        return _worldPolicy.CompleteExitByEntity(exitEntityId);
+    }
+
+    internal LoadingBayReceipt DamageCanonicalBarrel(ulong barrelEntityId, int damage, ulong tick)
+    {
+        ThrowIfDisposed();
+        Func<LoadingBayE1M1BarrelDefinition, LoadingBayE1M1BarrelDefinition, bool> occluded = _engineServices is null
+            ? static (_, _) => false
+            : _engineServices.BarrelOccluded;
+        return _worldPolicy.DamageBarrel(barrelEntityId, damage, tick, occluded);
+    }
+
+    // Exercise-facing forwards to the combat owner; the session root composes but does not duplicate policy.
+    internal LoadingBayWeaponFirePlan? PrepareWeaponFire(ulong tick)
+    {
+        ThrowIfDisposed();
+        return _combat.PrepareWeaponFire(tick);
+    }
+
+    internal LoadingBayReceipt SettleWeaponFire(LoadingBayWeaponFirePlan plan, IReadOnlyList<LoadingBayWeaponImpact> impacts)
+    {
+        ThrowIfDisposed();
+        return _combat.SettleWeaponFire(plan, impacts);
+    }
+
+    internal LoadingBayReceipt ApplyProjectileDamage(ulong enemyEntityId, int damage, ulong tick)
+    {
+        ThrowIfDisposed();
+        return _combat.ApplyProjectileDamage(enemyEntityId, damage, tick);
+    }
+
+    internal void RecordProjectileOutcome(ulong enemyEntityId, ulong tick, string cause)
+    {
+        ThrowIfDisposed();
+        _combat.RecordProjectileOutcome(enemyEntityId, tick, cause);
+    }
+
+    // Exercise-facing forwards to the pickup owner; the session root composes but does not duplicate policy.
+    internal LoadingBayReceipt CollectPickup(string pickup, LoadingBayItem item, ulong quantity)
+    {
+        ThrowIfDisposed();
+        return _pickups.CollectPickup(pickup, item, quantity);
+    }
+
+    internal LoadingBayReceipt CollectCanonicalPickup(ulong entityId)
+    {
+        ThrowIfDisposed();
+        return _pickups.CollectCanonicalPickup(entityId);
+    }
+
+    internal bool CanCollectCanonicalPickup(ulong entityId)
+    {
+        ThrowIfDisposed();
+        return _pickups.CanCollectCanonicalPickup(entityId);
     }
 
     public void Publish()
@@ -182,7 +304,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    internal LoadingBayReadout Readout() => new(_player, _hasFacts ? _facts : default, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _armorProtection, BulletQuantity(), ShellQuantity(), OwnedWeaponIds(), EquippedWeaponId(), WeaponCooldowns(), _playerSnapshot, PickupSnapshots(), ActorReadouts(), _complete, _scheduler.Readout.Pending, _tuning, _journal.ToArray(), _dropped);
+    internal LoadingBayReadout Readout() => new(_player, _hasFacts ? _facts : default, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _combat.ArmorProtection, _combat.BulletQuantity(), _combat.ShellQuantity(), _combat.OwnedWeaponIds(), _combat.EquippedWeaponId(), _combat.WeaponCooldowns(), _playerSnapshot, _pickups.PickupSnapshots(), _combat.ActorReadouts(), _worldPolicy.Complete, _scheduler.Readout.Pending, _tuning, _journal.ToArray(), _dropped);
 
     LoadingBayReadout ILoadingBaySession.Readout() => Readout();
 
@@ -194,336 +316,32 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     void ILoadingBayDebugSession.SetDebugEntityWorldChanged(Action<EntityStore>? callback)
         => _debugEntityWorldChanged = callback;
 
-    internal LoadingBayReceipt CollectPickup(string pickup, LoadingBayItem item, ulong quantity)
-    {
-        ThrowIfDisposed();
-        if (_manualPickupKeys.Contains(pickup)) return Reject("pickup.already-collected");
-        if (HealthTrack.ValueInt64 == 0) { _manualPickupKeys.Remove(pickup); return Reject("pickup.player-defeated"); }
-        try
-        {
-            if (!CanApplyPickup(item)) return Reject("pickup.not-needed");
-            if (item.PickupPolicy is LoadingBayPickupPolicy.Restore(var amount, var maximum, _))
-            {
-                long boundedMaximum = Math.Min(_tuning.MaximumHealth, maximum);
-                if (!TryRestoreWithinPickupCap(HealthTrack, amount, boundedMaximum)) return Reject("pickup.inventory-rejected");
-            }
-            else if (item.PickupPolicy is LoadingBayPickupPolicy.SetMinimum(var minimum, var setProtection))
-            {
-                ArmorTrack.SetCurrent(Math.Max(ArmorTrack.Value, minimum));
-                _armorProtection = setProtection;
-            }
-            else if (item.PickupPolicy is LoadingBayPickupPolicy.RestoreArmor(var armorAmount, var armorMaximum, _, var armorProtection))
-            {
-                long boundedMaximum = Math.Min(_tuning.MaximumArmor, armorMaximum);
-                bool hadProtection = ArmorTrack.ValueInt64 > 0 && _armorProtection.Mode != LoadingBayArmorProtectionMode.None;
-                if (!TryRestoreWithinPickupCap(ArmorTrack, armorAmount, boundedMaximum)) return Reject("pickup.inventory-rejected");
-                // E1M1's bonus armor preserves an existing green/blue armor class.
-                if (!hadProtection) _armorProtection = armorProtection;
-            }
-            else _inventory.Grant(_player, item.MechanicsDefinition, quantity);
-            _manualPickupKeys.Add(pickup);
-            Record(new PickupCollectedFact(pickup, item.Id, quantity));
-            return Accept("pickup.collected");
-        }
-        catch (Mechanics.MechanicsException) { _manualPickupKeys.Remove(pickup); return Reject("pickup.inventory-rejected"); }
-    }
 
-    internal LoadingBayReceipt CollectCanonicalPickup(ulong entityId)
-    {
-        LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(entityId);
-        if (PickupState(entityId).Lifecycle == LoadingBayPickupLifecycle.Collected) return Reject("pickup.already-collected");
-        if (PickupState(entityId).Lifecycle == LoadingBayPickupLifecycle.Dormant) return Reject("pickup.dormant");
-        LoadingBayReceipt outcome = pickup.ProgramId == "pickup/weapon-starter"
-            ? CollectWeaponStarter(pickup)
-            : CollectPickup(CanonicalPickupKey(entityId), LoadingBayDefinitions.Item(pickup.ItemId), pickup.Quantity);
-        _manualPickupKeys.Remove(CanonicalPickupKey(entityId));
-        UpdatePickupState(pickup, outcome.Accepted ? LoadingBayPickupLifecycle.Collected : PickupState(entityId).Lifecycle, outcome.Code, _hasFacts ? _facts.SimulationStep : 0, 0);
-        return outcome;
-    }
 
-    internal bool CanCollectCanonicalPickup(ulong entityId)
-    {
-        LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(entityId);
-        if (PickupState(entityId).Lifecycle != LoadingBayPickupLifecycle.Active || HealthTrack.ValueInt64 == 0) return false;
-        return pickup.ProgramId == "pickup/weapon-starter"
-            ? CanApplyWeaponStarter(pickup)
-            : CanApplyPickup(LoadingBayDefinitions.Item(pickup.ItemId));
-    }
 
-    internal LoadingBayReceipt ApplyDamage(string target, int damage, string cause)
-    {
-        ThrowIfDisposed();
-        if (target != "player") return Reject("damage.unknown-target");
-        if (damage <= 0) return Reject("damage.invalid");
-        if (HealthTrack.ValueInt64 == 0) return Reject("damage.target-defeated");
-        long absorbed = _armorProtection.AbsorptionDivisor == 0 ? 0 : Math.Min(ArmorTrack.ValueInt64, damage / _armorProtection.AbsorptionDivisor);
-        if (absorbed > 0) ArmorTrack.Spend(absorbed);
-        long applied = Math.Min(HealthTrack.ValueInt64, damage - absorbed);
-        if (applied > 0) HealthTrack.Spend(applied);
-        bool defeated = HealthTrack.ValueInt64 == 0;
-        Record(new DamageAppliedFact(target, damage, absorbed, applied, cause, defeated));
-        return Accept(defeated ? "damage.defeated" : "damage.applied");
-    }
 
-    internal LoadingBayReceipt ActivateEncounter(ulong encounterEntityId, ulong tick)
-    {
-        LoadingBayE1M1EncounterDefinition encounter = LoadingBayE1M1SemanticCatalog.Encounters.Single(value => value.EntityId == encounterEntityId);
-        if (!_activatedEncounters.Add(encounter.EntityId)) return Reject("encounter.already-active");
-        Record(new EncounterActivatedFact(encounter.EntityId, encounter.Label, encounter.ActivationRadius, tick));
-        foreach (ulong member in encounter.Members)
-        {
-            LoadingBayE1M1EnemyDefinition enemy = LoadingBayE1M1SemanticCatalog.Enemy(member);
-            EntityId entity = _entityMap.Runtime(member);
-            LoadingBayEnemyStateComponent state = EnemyState(entity);
-            if (state.Posture == LoadingBayEnemyPosture.Dormant)
-            {
-                state.Posture = LoadingBayEnemyPosture.Active;
-                Record(new EnemyPostureChangedFact(member, state.Posture, EnemyHealth(EnemyVitality(entity)), tick, "encounter.activated"));
-            }
-        }
-        return Accept("encounter.activated");
-    }
 
-    internal LoadingBayReceipt ApplyWeaponDamage(ulong enemyEntityId, string weaponId, int damage, ulong tick)
-    {
-        ThrowIfDisposed();
-        if (damage <= 0 || !LoadingBayDefinitions.Weapons.ContainsKey(weaponId)) return Reject("combat.invalid-hit");
-        if (!TryEnemyEntity(enemyEntityId, out EntityId entity)) return Reject("combat.unknown-enemy");
-        LoadingBayEnemyStateComponent state = EnemyState(entity);
-        Mechanics.Track vitality = EnemyVitality(entity);
-        if (state.Posture is LoadingBayEnemyPosture.Dormant or LoadingBayEnemyPosture.Defeated) return Reject("combat.ineligible-target");
-        vitality.SetCurrent(Math.Max(0, EnemyHealth(vitality) - damage));
-        Record(new EnemyHitFact(enemyEntityId, weaponId, damage, EnemyHealth(vitality), tick));
-        if (EnemyHealth(vitality) > 0)
-        {
-            LoadingBayE1M1EnemyDefinition enemy = LoadingBayE1M1SemanticCatalog.Enemy(enemyEntityId);
-            state.Posture = LoadingBayEnemyPosture.Pained;
-            state.ReadyAtTick = checked(tick + (ulong)enemy.PainDurationTicks);
-            Record(new EnemyPostureChangedFact(enemyEntityId, state.Posture, EnemyHealth(vitality), tick, "combat.pain"));
-            return Accept("combat.hit");
-        }
-        state.Posture = LoadingBayEnemyPosture.Defeated;
-        state.Visible = false;
-        LoadingBayE1M1EnemyDefinition defeated = LoadingBayE1M1SemanticCatalog.Enemy(enemyEntityId);
-        Record(new EnemyPostureChangedFact(enemyEntityId, state.Posture, 0, tick, "combat.defeated"));
-        Record(new EnemyDefeatedFact(enemyEntityId, defeated.DropPickupEntityId, tick));
-        if (defeated.DropPickupEntityId != 0)
-        {
-            LoadingBayE1M1PickupPlacement drop = LoadingBayE1M1SemanticCatalog.Pickup(defeated.DropPickupEntityId);
-            UpdatePickupState(drop, LoadingBayPickupLifecycle.Active, "enemy.drop-materialized", tick, 0);
-            if (_engineServices is not null) Record(_engineServices.MaterializeEnemyDrop(defeated.DropPickupEntityId, defeated.Translation, tick));
-        }
-        foreach (LoadingBayE1M1EncounterDefinition encounter in LoadingBayE1M1SemanticCatalog.Encounters.Where(encounter => _activatedEncounters.Contains(encounter.EntityId) && encounter.Members.Contains(enemyEntityId)))
-        {
-            if (encounter.Members.All(member => EnemyState(_entityMap.Runtime(member)).Posture == LoadingBayEnemyPosture.Defeated))
-                Record(new EncounterChangedFact(encounter.Label, true));
-        }
-        return Accept("combat.defeated");
-    }
 
-    internal LoadingBayWeaponFirePlan? PrepareWeaponFire(ulong tick)
-    {
-        ThrowIfDisposed();
-        string? weaponId = EquippedWeaponId();
-        if (weaponId is null) { Reject("combat.no-equipped-weapon"); return null; }
-        LoadingBayE1M1Weapon weapon = LoadingBayE1M1SemanticCatalog.Item<LoadingBayE1M1Weapon>(weaponId);
-        if (_weaponReadyAt.TryGetValue(weaponId, out ulong readyAt) && tick < readyAt) { Reject("combat.weapon-cooldown"); return null; }
-        if (weapon.AmmunitionCost > 0 && ItemQuantity(LoadingBayDefinitions.Item(weapon.AmmunitionId)) < (ulong)weapon.AmmunitionCost) { Reject("combat.insufficient-ammunition"); return null; }
-        return new LoadingBayWeaponFirePlan(weaponId, weapon.AmmunitionId, weapon.AmmunitionCost, weapon.DamageRolls, weapon.Damage, weapon.PelletCount == 0 ? 1 : weapon.PelletCount, weapon.SpreadDegrees, weapon.MaximumDistance, tick);
-    }
 
-    internal IReadOnlySet<ulong> EligibleEnemyEntities() => LoadingBayE1M1SemanticCatalog.Enemies
-        .Where(enemy => EnemyState(_entityMap.Runtime(enemy.EntityId)).Posture is LoadingBayEnemyPosture.Active or LoadingBayEnemyPosture.Pained)
-        .Select(enemy => enemy.EntityId).ToHashSet();
-
-    internal LoadingBayReceipt SettleWeaponFire(LoadingBayWeaponFirePlan plan, IReadOnlyList<LoadingBayWeaponImpact> impacts)
-    {
-        ThrowIfDisposed();
-        if (plan.WeaponId != EquippedWeaponId()) return Reject("combat.stale-fire-plan");
-        LoadingBayE1M1Weapon weapon = LoadingBayE1M1SemanticCatalog.Item<LoadingBayE1M1Weapon>(plan.WeaponId);
-        if (_weaponReadyAt.TryGetValue(plan.WeaponId, out ulong readyAt) && plan.Tick < readyAt) return Reject("combat.weapon-cooldown");
-        try
-        {
-            if (plan.AmmunitionCost > 0) _inventory.Consume(_player, LoadingBayDefinitions.Item(plan.AmmunitionId).MechanicsDefinition, (ulong)plan.AmmunitionCost);
-        }
-        catch (Mechanics.MechanicsException) { return Reject("combat.insufficient-ammunition"); }
-        _weaponReadyAt[plan.WeaponId] = checked(plan.Tick + (ulong)weapon.CooldownTicks);
-        Record(new WeaponFiredFact(plan.WeaponId, plan.Tick, plan.PelletCount, impacts.Count));
-        foreach (LoadingBayWeaponImpact impact in impacts)
-        {
-            if (impact.EnemyEntityId == 0) Record(new WeaponMissedFact(plan.WeaponId, plan.Tick, impact.PelletIndex, impact.WorldOccluded ? "combat.world-occluded" : "combat.miss"));
-            else _ = ApplyWeaponDamage(impact.EnemyEntityId, plan.WeaponId, impact.Damage, plan.Tick);
-        }
-        return Accept("combat.fired");
-    }
 
     /// <summary>Product policy consumes Engine visibility evidence and admits only active, ready actors.</summary>
-    internal IReadOnlyList<LoadingBayEnemyAttackPlan> PrepareEnemyAttacks(ulong tick, IReadOnlySet<ulong> visibleEnemies, uint visibilityCasts, uint occlusionRejects)
-    {
-        ThrowIfDisposed();
-        List<LoadingBayEnemyAttackPlan> plans = [];
-        foreach (LoadingBayE1M1EnemyDefinition enemy in LoadingBayE1M1SemanticCatalog.Enemies)
-        {
-            EntityId entity = _entityMap.Runtime(enemy.EntityId);
-            LoadingBayEnemyStateComponent state = EnemyState(entity);
-            Mechanics.Track vitality = EnemyVitality(entity);
-            if (state.Posture == LoadingBayEnemyPosture.Pained && tick >= state.ReadyAtTick)
-            {
-                state.Posture = LoadingBayEnemyPosture.Active;
-                Record(new EnemyPostureChangedFact(enemy.EntityId, state.Posture, EnemyHealth(vitality), tick, "combat.pain-recovered"));
-            }
-            bool visible = visibleEnemies.Contains(enemy.EntityId);
-            if ((state.Posture is LoadingBayEnemyPosture.Active or LoadingBayEnemyPosture.Pained) && state.Visible != visible)
-            {
-                state.Visible = visible;
-                Record(new EnemyPerceptionFact(enemy.EntityId, visible, tick, visibilityCasts, occlusionRejects));
-            }
-            if (!visible || state.Posture != LoadingBayEnemyPosture.Active || tick < state.ReadyAtTick) continue;
-            plans.Add(new LoadingBayEnemyAttackPlan(
-                enemy.EntityId, enemy.AttackKind, enemy.Translation + enemy.AttackOriginOffset,
-                enemy.AttackDamage, enemy.AttackRange, enemy.AttackCooldownTicks,
-                (float)enemy.ProjectileMass, (float)enemy.ProjectileRadius, (float)enemy.ProjectileImpulse,
-                (float)enemy.ProjectileGravityScale, enemy.ProjectileLifetimeTicks, (float)enemy.ProjectileRestitution, tick));
-        }
-        return plans;
-    }
 
     /// <summary>Only a completed Engine combat execution advances the corresponding actor's readiness.</summary>
-    internal LoadingBayReceipt SettleEnemyAttack(LoadingBayEnemyAttackPlan plan, bool hitPlayer, string cause)
-    {
-        ThrowIfDisposed();
-        if (!TryEnemyEntity(plan.EnemyEntityId, out EntityId entity)) return Reject("combat.stale-enemy-attack");
-        LoadingBayEnemyStateComponent state = EnemyState(entity);
-        if (state.Posture != LoadingBayEnemyPosture.Active || state.ReadyAtTick > plan.Tick)
-            return Reject("combat.stale-enemy-attack");
-        LoadingBayE1M1EnemyDefinition enemy = LoadingBayE1M1SemanticCatalog.Enemy(plan.EnemyEntityId);
-        state.ReadyAtTick = checked(plan.Tick + (ulong)enemy.AttackCooldownTicks);
-        Record(new EnemyAttackFact(plan.EnemyEntityId, plan.Kind, hitPlayer, plan.Tick, cause));
-        if (plan.Kind == LoadingBayE1M1EnemyAttackKind.Projectile)
-            Record(new EnemyProjectileFact(plan.EnemyEntityId, plan.Tick, "combat.projectile-realized"));
-        return hitPlayer ? ApplyDamage("player", plan.Damage, $"enemy.{enemy.Label}") : Accept(cause);
-    }
 
-    internal void RecordProjectileOutcome(ulong enemyEntityId, ulong tick, string cause) => Record(new EnemyProjectileFact(enemyEntityId, tick, cause));
 
-    internal LoadingBayReceipt ApplyProjectileDamage(ulong enemyEntityId, int damage, ulong tick)
-    {
-        ThrowIfDisposed();
-        if (!TryEnemyEntity(enemyEntityId, out EntityId entity)) return Reject("combat.invalid-projectile-impact");
-        LoadingBayEnemyStateComponent state = EnemyState(entity);
-        if (state.Posture == LoadingBayEnemyPosture.Defeated || damage <= 0)
-            return Reject("combat.invalid-projectile-impact");
-        LoadingBayE1M1EnemyDefinition enemy = LoadingBayE1M1SemanticCatalog.Enemy(enemyEntityId);
-        Record(new EnemyAttackFact(enemyEntityId, LoadingBayE1M1EnemyAttackKind.Projectile, true, tick, "combat.projectile-player-impact"));
-        return ApplyDamage("player", damage, $"enemy.{enemy.Label}.projectile");
-    }
 
-    internal LoadingBayReceipt DiscoverSecret(string secret)
-    {
-        ThrowIfDisposed();
-        if (!_secrets.Add(secret)) return Reject("secret.already-discovered");
-        Record(new SecretDiscoveredFact(secret)); return Accept("secret.discovered");
-    }
 
-    internal LoadingBayReceipt CompleteExit(string exit)
-    {
-        ThrowIfDisposed();
-        if (HealthTrack.ValueInt64 == 0) return Reject("exit.player-defeated");
-        if (_complete) return Reject("exit.already-complete");
-        _complete = true; Record(new ExitCompletedFact(exit)); return Accept("exit.completed");
-    }
 
     /// <summary>Called only after Engine's overlap coordinator has established a canonical hazard enter/stay fact.</summary>
-    internal LoadingBayReceipt ApplyCanonicalHazard(ulong hazardEntityId, ulong tick)
-    {
-        if (!_world.HazardReady(hazardEntityId, tick)) return Reject("hazard.cooldown");
-        try { _world.ApplyHazard(hazardEntityId, tick, (damage, cause) => ApplyDamage("player", damage, cause), Record); return Accept("hazard.applied"); }
-        catch (InvalidOperationException) { return Reject("hazard.unknown"); }
-    }
 
-    internal LoadingBayReceipt ActivateCanonicalDoor(ulong doorEntityId, ulong tick)
-    {
-        try
-        {
-            if (_world.DoorState(doorEntityId).State is not (LoadingBayDoorState.Closed or LoadingBayDoorState.Closing)) return Reject("door.unavailable");
-            LoadingBayDoorSnapshot state = _world.ActivateDoor(doorEntityId, tick, Record);
-            if (state.DueStep > tick) ScheduleWorldContinuation(state.DueStep);
-            Record(new DoorChangedFact(LoadingBayE1M1SemanticCatalog.Doors.Single(value => value.EntityId == doorEntityId).Label, true));
-            return Accept("door.opening");
-        }
-        catch (InvalidOperationException) { return Reject("door.unknown"); }
-    }
 
-    internal LoadingBayReceipt ActivateCanonicalFloor(ulong floorEntityId, ulong tick)
-    {
-        try
-        {
-            if (_world.FloorState(floorEntityId).State != LoadingBayFloorState.Armed) return Reject("floor.unavailable");
-            LoadingBayFloorSnapshot state = _world.ActivateFloor(floorEntityId, tick, Record); if (state.DueStep > tick) ScheduleWorldContinuation(state.DueStep); return Accept("floor.lowering");
-        }
-        catch (InvalidOperationException) { return Reject("floor.unknown"); }
-    }
 
-    internal LoadingBayReceipt ActivateCanonicalLift(ulong liftEntityId, ulong tick)
-    {
-        try
-        {
-            if (_world.LiftState(liftEntityId).State != LoadingBayLiftState.Raised) return Reject("lift.unavailable");
-            LoadingBayLiftSnapshot state = _world.ActivateLift(liftEntityId, tick, Record); if (state.DueStep > tick) ScheduleWorldContinuation(state.DueStep); return Accept("lift.lowering");
-        }
-        catch (InvalidOperationException) { return Reject("lift.unknown"); }
-    }
 
-    internal LoadingBayReceipt DamageCanonicalBarrel(ulong barrelEntityId, int damage, ulong tick)
-    {
-        try
-        {
-            Func<LoadingBayE1M1BarrelDefinition, LoadingBayE1M1BarrelDefinition, bool> occluded = _engineServices is null
-                ? static (_, _) => false
-                : _engineServices.BarrelOccluded;
-            foreach (LoadingBayE1M1BarrelDefinition barrel in _world.DamageBarrel(barrelEntityId, damage, tick, occluded, Record))
-                RecordWorldAction("barrel.exploded", barrel.Label);
-            return Accept("barrel.damage-applied");
-        }
-        catch (InvalidOperationException) { return Reject("barrel.unknown"); }
-    }
 
-    internal LoadingBayReceipt DiscoverCanonicalSecret(ulong secretEntityId)
-    {
-        try { return DiscoverSecret(LoadingBayE1M1SemanticCatalog.Secrets.Single(value => value.EntityId == secretEntityId).Label); }
-        catch (InvalidOperationException) { return Reject("secret.unknown"); }
-    }
 
-    internal LoadingBayReceipt CompleteCanonicalExit(ulong exitEntityId)
-    {
-        try { return CompleteExit(LoadingBayE1M1SemanticCatalog.Exits.Single(value => value.EntityId == exitEntityId).Label); }
-        catch (InvalidOperationException) { return Reject("exit.unknown"); }
-    }
 
     /// <summary>Consumes already-resolved world facts; it deliberately performs no spatial query or presentation work.</summary>
-    internal LoadingBayReceipt ResolveWorldAction(LoadingBayWorldAction action)
-    {
-        ThrowIfDisposed();
-        return action switch
-        {
-            LoadingBayWorldAction.EncounterActivated(var encounter, _) => ActivateCanonicalEncounterByLabel(encounter),
-            LoadingBayWorldAction.EnemyDefeated(var enemy) => Reject($"world-action.enemy-defeat-deferred:{enemy}"),
-            LoadingBayWorldAction.HazardApplied(var damage, var cause) => ApplyDamage("player", damage, cause),
-            LoadingBayWorldAction.BarrelExploded(var damage) => ApplyDamage("player", damage, "barrel"),
-            LoadingBayWorldAction.FloorActivated(var floor) => RecordWorldAction("floor.activated", floor),
-            LoadingBayWorldAction.LiftActivated(var lift) => RecordWorldAction("lift.activated", lift),
-            LoadingBayWorldAction.SwitchActivated(var door) => ActivateDoorByLabel(door),
-            _ => throw new ArgumentOutOfRangeException(nameof(action)),
-        };
-    }
 
-    private LoadingBayReceipt ActivateDoorByLabel(string label)
-    {
-        LoadingBayE1M1DoorDefinition? door = LoadingBayE1M1SemanticCatalog.Doors.SingleOrDefault(value => value.Label == label);
-        return door is null
-            ? Reject("door.unknown")
-            : ActivateCanonicalDoor(door.EntityId, _hasFacts ? _facts.SimulationStep : 0);
-    }
 
     internal LoadingBayReceipt DeveloperSetTrack(ulong generation, string track, int value, string correlation)
     {
@@ -539,7 +357,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     LoadingBayReceipt ILoadingBaySession.DeveloperSetTrack(ulong generation, string track, int value, string correlation)
         => DeveloperSetTrack(generation, track, value, correlation);
 
-    internal LoadingBaySnapshot Capture(string contentIdentity) => new(contentIdentity, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _armorProtection, BulletQuantity(), ShellQuantity(), OwnedWeaponIds(), EquippedWeaponId(), WeaponCooldowns(), _engineServices?.CapturePlayer() ?? _playerSnapshot, PickupSnapshots(), _secrets.OrderBy(x => x, StringComparer.Ordinal).ToArray(), _complete, DoorSnapshots(), ActorSnapshots(), EncounterSnapshots(), _world.Capture());
+    internal LoadingBaySnapshot Capture(string contentIdentity) => new(contentIdentity, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _combat.ArmorProtection, _combat.BulletQuantity(), _combat.ShellQuantity(), _combat.OwnedWeaponIds(), _combat.EquippedWeaponId(), _combat.WeaponCooldowns(), _engineServices?.CapturePlayer() ?? _playerSnapshot, _pickups.PickupSnapshots(), _worldPolicy.SecretSnapshots(), _worldPolicy.Complete, _worldPolicy.DoorSnapshots(), _combat.ActorSnapshots(), _combat.EncounterSnapshots(), _world.Capture());
 
     internal LoadingBayReceipt Restore(LoadingBaySnapshot snapshot, string identity)
     {
@@ -573,7 +391,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
                 {
                     replacement.RestorePlayer(snapshot.Player);
                     triggerFacts = replacement.RestoreSemanticPickups(snapshot.Pickups);
-                    replacement.RestoreEncounterActivations(_activatedEncounters);
+                    replacement.RestoreEncounterActivations(_combat.ActivatedEncounters);
                     replacement.RestoreWorldMotion(snapshot.World, _hasFacts ? _facts.SimulationStep : 0);
                     if (_sharedRealizationsActive) replacement.ActivateSharedRealizations();
                 }
@@ -584,6 +402,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
                 }
                 LoadingBayEngineServices previousServices = _engineServices;
                 _engineServices = replacement;
+                _combat.MaterializeDrop = replacement.MaterializeEnemyDrop;
                 try
                 {
                     _debugEntityWorldChanged?.Invoke(replacement.EntityStore);
@@ -591,6 +410,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
                 catch (Exception debugWorldFailure)
                 {
                     _engineServices = previousServices;
+                    _combat.MaterializeDrop = previousServices is null ? null : previousServices.MaterializeEnemyDrop;
                     try { replacement.Dispose(); }
                     catch (Exception replacementCleanupFailure) { throw new AggregateException(debugWorldFailure, replacementCleanupFailure); }
                     throw;
@@ -628,14 +448,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
 
     private void Record(LoadingBayFact fact)
     {
-        if (fact is PickupLifecycleFact lifecycle)
-        {
-            LoadingBayPickupStateComponent state = PickupState(lifecycle.PickupEntityId);
-            state.Lifecycle = lifecycle.Lifecycle;
-            state.Cause = lifecycle.Cause;
-            state.Tick = lifecycle.Tick;
-            state.TriggerRevision = lifecycle.TriggerRevision;
-        }
+        if (fact is PickupLifecycleFact lifecycle) _pickups.ApplyLifecycleFact(lifecycle);
         if (_journal.Count == _tuning.FactJournalCapacity)
         {
             LoadingBayFact evicted = _journal.Dequeue();
@@ -668,51 +481,39 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         _hudDiagnosticElapsed %= HudDiagnosticsCadenceSeconds;
         return true;
     }
-    private static string CanonicalPickupKey(ulong entityId) => $"e1m1.pickup.{entityId}";
-    private void UpdatePickupState(LoadingBayE1M1PickupPlacement pickup, LoadingBayPickupLifecycle lifecycle, string cause, ulong tick, ulong triggerRevision)
+    private void ApplyPlayerSetup(LoadingBayE1M1PlayerSetup setup)
     {
-        LoadingBayPickupStateComponent state = PickupState(pickup.EntityId);
-        state.Lifecycle = lifecycle;
-        state.Cause = cause;
-        state.Tick = tick;
-        state.TriggerRevision = triggerRevision;
+        foreach (LoadingBayE1M1ItemGrant grant in setup.Grants)
+        {
+            if (LoadingBayDefinitions.Weapons.TryGetValue(grant.ItemId, out LoadingBayWeapon? weapon)) _combat.MaterializeWeapon(weapon);
+            else _inventory.Grant(_player, LoadingBayDefinitions.Item(grant.ItemId).MechanicsDefinition, grant.Quantity);
+        }
+        _combat.EquipWeapon(setup.EquippedWeaponId);
     }
     private void ApplySnapshot(LoadingBaySnapshot snapshot)
     {
-        RestoreWeapons(snapshot.OwnedWeapons, snapshot.EquippedWeapon);
-        HealthTrack.SetCurrent(snapshot.Health);
-        ArmorTrack.SetCurrent(snapshot.Armor);
-        _armorProtection = snapshot.ArmorProtection;
-        SetBulletQuantity(snapshot.Bullets);
-        SetShellQuantity(snapshot.Shells);
-        foreach (LoadingBayPickupSnapshot pickup in snapshot.Pickups)
-        {
-            LoadingBayPickupStateComponent state = PickupState(pickup.EntityId);
-            state.Lifecycle = pickup.Lifecycle;
-            state.Cause = pickup.Cause;
-            state.Tick = pickup.Tick;
-            state.TriggerRevision = pickup.TriggerRevision;
-        }
-        _weaponReadyAt.Clear(); foreach (LoadingBayWeaponCooldownSnapshot cooldown in snapshot.WeaponCooldowns) _weaponReadyAt.Add(cooldown.WeaponId, cooldown.ReadyAtTick);
+        _combat.RestoreLoadout(snapshot.OwnedWeapons, snapshot.EquippedWeapon, snapshot.WeaponCooldowns);
+        _combat.RestoreVitals(snapshot.Health, snapshot.Armor, snapshot.ArmorProtection);
+        _combat.SetBulletQuantity(snapshot.Bullets);
+        _combat.SetShellQuantity(snapshot.Shells);
+        _pickups.RestorePickups(snapshot.Pickups);
         _playerSnapshot = snapshot.Player;
-        _secrets.Clear(); foreach (string id in snapshot.Secrets) _secrets.Add(id);
+        _worldPolicy.RestoreSecrets(snapshot.Secrets);
         foreach (LoadingBayActorSnapshot actor in snapshot.Actors)
         {
             EntityId entity = _entityMap.Runtime(actor.EntityId);
-            EnemyVitality(entity).SetCurrent(actor.Health);
-            LoadingBayEnemyStateComponent state = EnemyState(entity);
+            _entities.Get<Mechanics.StatsComponent>(entity).GetTrack(LoadingBayStatIds.Vitality).SetCurrent(actor.Health);
+            LoadingBayEnemyStateComponent state = _entities.Get<LoadingBayEnemyStateComponent>(entity);
             state.Posture = actor.Posture;
             state.Visible = actor.Visible;
             state.ReadyAtTick = actor.ReadyAtTick;
         }
-        _activatedEncounters.Clear();
-        foreach (LoadingBayEncounterSnapshot encounter in snapshot.Encounters.Where(encounter => encounter.Activated)) _activatedEncounters.Add(encounter.EntityId);
-        _complete = snapshot.Complete;
+        _combat.RestoreEncounters(snapshot.Encounters);
+        _worldPolicy.RestoreCompletion(snapshot.Complete);
         if (!_world.TryRestore(snapshot.World)) throw new InvalidOperationException("A prevalidated world snapshot could not be restored.");
         _scheduler = new SimulationScheduler();
         foreach (ulong dueStep in _world.DueSteps()) ScheduleWorldContinuation(dueStep);
     }
-    private LoadingBayReceipt RecordWorldAction(string code, string subject) { Record(new WorldActionFact(code, subject)); return Accept(code); }
     private void ScheduleWorldContinuation(ulong dueStep) => _scheduler.ScheduleAt(dueStep, context => _world.Advance(context.SimulationStep, Record));
     private LoadingBayEngineServices CreateFreshEngineServices()
     {
@@ -746,131 +547,14 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             Record(new RejectedFact("save.previous-projection-dispose-failed", null));
         }
     }
-    private LoadingBayReceipt ActivateCanonicalEncounterByLabel(string label)
-    {
-        LoadingBayE1M1EncounterDefinition? encounter = LoadingBayE1M1SemanticCatalog.Encounters.SingleOrDefault(value => value.Label == label);
-        return encounter is null ? Reject("encounter.unknown") : ActivateEncounter(encounter.EntityId, _hasFacts ? _facts.SimulationStep : 0);
-    }
     private LoadingBayReceipt Accept(string code, string? correlation = null) => new(true, code, correlation);
     private LoadingBayReceipt Reject(string code, string? correlation = null) { Record(new RejectedFact(code, correlation)); return new(false, code, correlation); }
-    private ulong BulletQuantity() => _inventory.Read(_player).Stacks.SingleOrDefault(stack => stack.Definition == LoadingBayDefinitions.Bullets.MechanicsDefinition.Id).Quantity;
-    private LoadingBayPickupSnapshot[] PickupSnapshots() => LoadingBayE1M1SemanticCatalog.Pickups
-        .OrderBy(pickup => pickup.EntityId)
-        .Select(pickup =>
-        {
-            LoadingBayPickupStateComponent state = PickupState(pickup.EntityId);
-            return new LoadingBayPickupSnapshot(pickup.EntityId, pickup.ItemId, pickup.ProgramId, state.Lifecycle, state.Cause, state.Tick, state.TriggerRevision);
-        }).ToArray();
     /// <summary>
     /// Derived read-only projection of canonical door state for save/diagnostic shape.
     /// Restore validates the shape only; the canonical world snapshot owns the truth.
     /// </summary>
-    private LoadingBayNamedState[] DoorSnapshots() => LoadingBayE1M1SemanticCatalog.Doors
-        .OrderBy(door => door.Label, StringComparer.Ordinal)
-        .Select(door => new LoadingBayNamedState(door.Label, _world.DoorState(door.EntityId).State is LoadingBayDoorState.Open or LoadingBayDoorState.Opening))
-        .ToArray();
-    private LoadingBayWeaponCooldownSnapshot[] WeaponCooldowns() => _weaponReadyAt.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new LoadingBayWeaponCooldownSnapshot(pair.Key, pair.Value)).ToArray();
-    private LoadingBayEnemyReadout[] ActorReadouts() => LoadingBayE1M1SemanticCatalog.Enemies.Select(enemy =>
-    {
-        EntityId entity = _entityMap.Runtime(enemy.EntityId);
-        LoadingBayEnemyStateComponent state = EnemyState(entity);
-        return new LoadingBayEnemyReadout(enemy.EntityId, enemy.Label, EnemyHealth(EnemyVitality(entity)), state.Posture, state.Visible, state.ReadyAtTick, enemy.DropPickupEntityId);
-    }).ToArray();
-    private LoadingBayActorSnapshot[] ActorSnapshots() => LoadingBayE1M1SemanticCatalog.Enemies.Select(enemy =>
-    {
-        EntityId entity = _entityMap.Runtime(enemy.EntityId);
-        LoadingBayEnemyStateComponent state = EnemyState(entity);
-        return new LoadingBayActorSnapshot(enemy.EntityId, EnemyHealth(EnemyVitality(entity)), state.Posture, state.Visible, state.ReadyAtTick);
-    }).ToArray();
-    private LoadingBayEncounterSnapshot[] EncounterSnapshots() => LoadingBayE1M1SemanticCatalog.Encounters
-        .Select(encounter => new LoadingBayEncounterSnapshot(encounter.EntityId, _activatedEncounters.Contains(encounter.EntityId), encounter.Members.All(member => EnemyState(_entityMap.Runtime(member)).Posture == LoadingBayEnemyPosture.Defeated)))
-        .ToArray();
-    private ulong ShellQuantity() => _inventory.Read(_player).Stacks.SingleOrDefault(stack => stack.Definition == LoadingBayDefinitions.Shells.MechanicsDefinition.Id).Quantity;
-    private ulong ItemQuantity(LoadingBayItem item) => _inventory.Read(_player).Stacks.SingleOrDefault(stack => stack.Definition == item.MechanicsDefinition.Id).Quantity;
-    private void SetBulletQuantity(ulong quantity)
-    {
-        ulong current = BulletQuantity();
-        if (current < quantity) _inventory.Grant(_player, LoadingBayDefinitions.Bullets.MechanicsDefinition, quantity - current);
-        else if (current > quantity) _inventory.Consume(_player, LoadingBayDefinitions.Bullets.MechanicsDefinition, current - quantity);
-    }
-    private void SetShellQuantity(ulong quantity)
-    {
-        ulong current = ShellQuantity();
-        if (current < quantity) _inventory.Grant(_player, LoadingBayDefinitions.Shells.MechanicsDefinition, quantity - current);
-        else if (current > quantity) _inventory.Consume(_player, LoadingBayDefinitions.Shells.MechanicsDefinition, current - quantity);
-    }
-    private void ApplyPlayerSetup(LoadingBayE1M1PlayerSetup setup)
-    {
-        foreach (LoadingBayE1M1ItemGrant grant in setup.Grants)
-        {
-            if (LoadingBayDefinitions.Weapons.TryGetValue(grant.ItemId, out LoadingBayWeapon? weapon)) MaterializeWeapon(weapon);
-            else _inventory.Grant(_player, LoadingBayDefinitions.Item(grant.ItemId).MechanicsDefinition, grant.Quantity);
-        }
-        EquipWeapon(setup.EquippedWeaponId);
-    }
-    private bool CanApplyWeaponStarter(LoadingBayE1M1PickupPlacement pickup)
-    {
-        if (pickup.StarterAmmunitionItemId is null || pickup.StarterAmmunitionQuantity == 0 || !LoadingBayDefinitions.Weapons.TryGetValue(pickup.ItemId, out LoadingBayWeapon? weapon)) return false;
-        LoadingBayItem starterAmmo = LoadingBayDefinitions.Item(pickup.StarterAmmunitionItemId);
-        ulong quantity = ItemQuantity(starterAmmo);
-        if (quantity > starterAmmo.MechanicsDefinition.MaximumQuantity - pickup.StarterAmmunitionQuantity) return false;
-        try
-        {
-            Mechanics.InventoryEdit candidate = _inventory.Prepare();
-            if (!OwnedWeaponIds().Contains(weapon.Id, StringComparer.Ordinal))
-                candidate.MaterializeUnique(new Mechanics.ItemState(new EntityId(_entities.NextEntityValue), weapon.MechanicsDefinition), _player);
-            candidate.Grant(_player, starterAmmo.MechanicsDefinition, pickup.StarterAmmunitionQuantity);
-            candidate.Validate();
-            return true;
-        }
-        catch (Mechanics.MechanicsException) { return false; }
-    }
-    private LoadingBayReceipt CollectWeaponStarter(LoadingBayE1M1PickupPlacement pickup)
-    {
-        string key = CanonicalPickupKey(pickup.EntityId);
-        if (PickupState(pickup.EntityId).Lifecycle == LoadingBayPickupLifecycle.Collected) return Reject("pickup.already-collected");
-        if (HealthTrack.ValueInt64 == 0) return Reject("pickup.player-defeated");
-        if (!CanApplyWeaponStarter(pickup)) return Reject("pickup.not-needed");
-        if (pickup.StarterAmmunitionItemId is null || !LoadingBayDefinitions.Weapons.TryGetValue(pickup.ItemId, out LoadingBayWeapon? weapon)) return Reject("pickup.invalid-catalog");
-        EntityId? newWeaponEntity = null;
-        try
-        {
-            Mechanics.InventoryEdit candidate = _inventory.Prepare();
-            if (!OwnedWeaponIds().Contains(weapon.Id, StringComparer.Ordinal))
-            {
-                newWeaponEntity = _entities.Create();
-                candidate.MaterializeUnique(new Mechanics.ItemState(newWeaponEntity.Value, weapon.MechanicsDefinition), _player);
-            }
-            candidate.Grant(_player, LoadingBayDefinitions.Item(pickup.StarterAmmunitionItemId).MechanicsDefinition, pickup.StarterAmmunitionQuantity);
-            candidate.Publish();
-            Record(new PickupCollectedFact(key, pickup.ItemId, pickup.Quantity));
-            Record(new PickupLoadoutChangedFact(pickup.EntityId, pickup.ItemId, pickup.ProgramId, false, newWeaponEntity is null ? "pickup.weapon-ammunition" : "pickup.weapon-acquired"));
-            return Accept("pickup.collected");
-        }
-        catch (Mechanics.MechanicsException)
-        {
-            if (newWeaponEntity is EntityId entity && _entities.IsAlive(entity)) _entities.Destroy(entity);
-            return Reject("pickup.inventory-rejected");
-        }
-    }
     private Mechanics.Track HealthTrack => _playerStats.GetTrack(LoadingBayStatIds.Health);
     private Mechanics.Track ArmorTrack => _playerStats.GetTrack(LoadingBayStatIds.Armor);
-    private LoadingBayPickupStateComponent PickupState(ulong pickupEntityId) =>
-        _entities.Get<LoadingBayPickupStateComponent>(_entityMap.Runtime(pickupEntityId));
-    private Mechanics.StatsComponent EnemyStats(EntityId entity) => _entities.Get<Mechanics.StatsComponent>(entity);
-    private LoadingBayEnemyStateComponent EnemyState(EntityId entity) => _entities.Get<LoadingBayEnemyStateComponent>(entity);
-    private Mechanics.Track EnemyVitality(EntityId entity) => EnemyStats(entity).GetTrack(LoadingBayStatIds.Vitality);
-    private static int EnemyHealth(Mechanics.Track vitality) => checked((int)vitality.ValueInt64);
-    private bool TryEnemyEntity(ulong enemyEntityId, out EntityId entity)
-    {
-        if (!_entityMap.TryRuntime(enemyEntityId, out entity)
-            || LoadingBayEntityMap.KindFor(enemyEntityId) != LoadingBayEntityKinds.Enemy)
-        {
-            entity = default;
-            return false;
-        }
-        return true;
-    }
     private static LoadingBayPlayerSnapshot InitialPlayerSnapshot(LoadingBayTuning tuning) => new(
         tuning.InitialPosition,
         new LookState(-(tuning.InitialYawDegrees * (MathF.PI / 180f)), tuning.InitialPitchDegrees * (MathF.PI / 180f)),
@@ -942,99 +626,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
             if (encounter.Cleared != definition.Members.All(member => states[member].Posture == LoadingBayEnemyPosture.Defeated)) return false;
         }
         return true;
-    }
-    private bool CanApplyPickup(LoadingBayItem item) => item.PickupPolicy switch
-    {
-        LoadingBayPickupPolicy.Restore(_, var maximum, var consumeAtCap) => HealthTrack.ValueInt64 < Math.Min(_tuning.MaximumHealth, maximum) || consumeAtCap,
-        LoadingBayPickupPolicy.SetMinimum(var minimum, _) => ArmorTrack.ValueInt64 < minimum,
-        LoadingBayPickupPolicy.RestoreArmor(_, var maximum, var consumeAtCap, _) => ArmorTrack.ValueInt64 < Math.Min(_tuning.MaximumArmor, maximum) || consumeAtCap,
-        _ => true,
-    };
-    private static bool TryRestoreWithinPickupCap(Mechanics.Track track, long amount, long maximum)
-    {
-        if (track.Value > maximum) return false;
-        track.SetCurrent(Math.Min(maximum, track.Value + amount));
-        return true;
-    }
-    private void MaterializeWeapon(LoadingBayWeapon weapon)
-    {
-        EntityId entity = _entities.Create();
-        _inventory.MaterializeUnique(new Mechanics.ItemState(entity, weapon.MechanicsDefinition), _player);
-    }
-    private void EquipWeapon(string weapon)
-    {
-        _inventory.Equip(_player, WeaponEntity(weapon), [LoadingBayDefinitions.WeaponSlot]);
-    }
-    private string[] OwnedWeaponIds() => _inventory.View(_player).UniqueItems
-        .Select(item => WeaponId(item.Definition))
-        .OrderBy(id => id, StringComparer.Ordinal)
-        .ToArray();
-    private string? EquippedWeaponId()
-    {
-        if (!_inventory.TryGetEquipment(_player, out Mechanics.EquipmentState? equipment)) throw new InvalidOperationException("Player equipment is unavailable.");
-        Mechanics.EquipmentAssignment assignment = equipment!.Assignments.SingleOrDefault(value => value.Slot == LoadingBayDefinitions.WeaponSlot.Id);
-        return assignment.Slot is null ? null : WeaponIdForEntity(assignment.Item);
-    }
-    private EntityId WeaponEntity(string weapon) => _inventory.View(_player).UniqueItems
-        .Where(item => WeaponId(item.Definition) == weapon)
-        .Select(item => item.Entity)
-        .Single();
-    private string WeaponIdForEntity(EntityId entity)
-    {
-        if (!_inventory.TryGetItem(entity, out Mechanics.ItemState? item) || item is null) throw new InvalidOperationException("Equipped weapon item is unavailable.");
-        return WeaponId(item.Definition.Id);
-    }
-    private static string WeaponId(Mechanics.ItemDefinitionId definition) => LoadingBayDefinitions.Weapons.Values
-        .Single(weapon => weapon.MechanicsDefinition.Id == definition).Id;
-    private void RestoreEquippedWeapon(string? desired)
-    {
-        string? current = EquippedWeaponId();
-        if (current == desired) return;
-        Mechanics.InventoryEdit candidate = _inventory.Prepare();
-        if (current is null) candidate.Equip(_player, WeaponEntity(desired!), [LoadingBayDefinitions.WeaponSlot]);
-        else if (desired is null) candidate.Unequip(_player, WeaponEntity(current));
-        else candidate.Swap(_player, WeaponEntity(current), WeaponEntity(desired), [LoadingBayDefinitions.WeaponSlot]);
-        candidate.Publish();
-    }
-    private void RestoreWeapons(string[] desiredWeapons, string? desiredEquipped)
-    {
-        Dictionary<string, EntityId> current = _inventory.View(_player).UniqueItems
-            .ToDictionary(item => WeaponId(item.Definition), item => item.Entity, StringComparer.Ordinal);
-        HashSet<string> target = desiredWeapons.ToHashSet(StringComparer.Ordinal);
-        List<EntityId> created = [];
-        List<EntityId> removed = [];
-        try
-        {
-            Mechanics.InventoryEdit candidate = _inventory.Prepare();
-            string? equipped = EquippedWeaponId();
-            if (equipped is not null && !target.Contains(equipped)) candidate.Unequip(_player, current[equipped]);
-            foreach ((string weaponId, EntityId entity) in current.Where(pair => !target.Contains(pair.Key)).ToArray())
-            {
-                candidate.DestroyUnique(entity);
-                removed.Add(entity);
-                current.Remove(weaponId);
-            }
-            foreach (string weaponId in target.Where(id => !current.ContainsKey(id)))
-            {
-                EntityId entity = _entities.Create();
-                created.Add(entity);
-                candidate.MaterializeUnique(new Mechanics.ItemState(entity, LoadingBayDefinitions.Weapons[weaponId].MechanicsDefinition), _player);
-                current.Add(weaponId, entity);
-            }
-            if (desiredEquipped != equipped)
-            {
-                if (desiredEquipped is null && equipped is not null && current.ContainsKey(equipped)) candidate.Unequip(_player, current[equipped]);
-                else if (desiredEquipped is not null && (equipped is null || !current.ContainsKey(equipped))) candidate.Equip(_player, current[desiredEquipped], [LoadingBayDefinitions.WeaponSlot]);
-                else if (desiredEquipped is not null && equipped is not null) candidate.Swap(_player, current[equipped], current[desiredEquipped], [LoadingBayDefinitions.WeaponSlot]);
-            }
-            candidate.Publish();
-            foreach (EntityId entity in removed) if (_entities.IsAlive(entity)) _entities.Destroy(entity);
-        }
-        catch
-        {
-            foreach (EntityId entity in created) if (_entities.IsAlive(entity)) _entities.Destroy(entity);
-            throw;
-        }
     }
     private sealed class PersistenceOnlyContext(IPersistenceService persistence) : IEngineContext
     {

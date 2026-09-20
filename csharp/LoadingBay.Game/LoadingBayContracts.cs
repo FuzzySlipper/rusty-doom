@@ -13,16 +13,6 @@ internal readonly record struct LoadingBayArmorProtection(LoadingBayArmorProtect
 {
     internal static readonly LoadingBayArmorProtection None = new(LoadingBayArmorProtectionMode.None, 0);
 }
-internal abstract record LoadingBayWorldAction
-{
-    internal sealed record EncounterActivated(string Encounter, string[] Members) : LoadingBayWorldAction;
-    internal sealed record EnemyDefeated(string Enemy) : LoadingBayWorldAction;
-    internal sealed record HazardApplied(int Damage, string Cause) : LoadingBayWorldAction;
-    internal sealed record BarrelExploded(int Damage) : LoadingBayWorldAction;
-    internal sealed record FloorActivated(string Floor) : LoadingBayWorldAction;
-    internal sealed record LiftActivated(string Lift) : LoadingBayWorldAction;
-    internal sealed record SwitchActivated(string Door) : LoadingBayWorldAction;
-}
 internal abstract record LoadingBayPickupPolicy
 {
     internal sealed record Restore(int Amount, int Maximum, bool ConsumeAtCap) : LoadingBayPickupPolicy;
