@@ -1,0 +1,44 @@
+# Lane: Behavior and interoperability
+
+**Optional.** Use when the task specifies behavior, real callers, persistence, or
+save/UI contracts.
+
+## One question
+
+Does this implement the task's full specified behavior through the required
+shared operations?
+
+## Basis required for an actionable finding
+
+Show at least one concrete instance:
+
+- a missing branch or unhandled case;
+- a no-op or unconditional success;
+- an input that is accepted and then ignored;
+- a caller that is declared or named but never connected;
+- an incompatible state contract between two owners;
+- an E1M1-semantic mismatch against the referenced authored content or Engine
+  authority (for example dropped armor protection, pickup caps, weapon
+  cooldown/ammo accounting, enemy attack policy, occlusion, or native lifetime
+  the task requires preserved).
+
+Name the file and line for the gap, and the caller, state, or authored symbol
+that proves it matters.
+
+## Not a finding
+
+- A passing demonstration as evidence of completeness. A demo that works does not
+  close this lane.
+- Behavior the task did not specify. That belongs to the requirement lane, or to
+  a follow-up task.
+- A caller that does not exist yet, when the task explicitly lands a prerequisite
+  primitive before its consumer. A primitive may precede its consumer; it may not
+  be a stub, a hardcoded example, or a partial adapter.
+- Broader interactive or browser evaluation as a completion requirement. Focused
+  Engine canvas/HUD/input continuation answers a changed interaction; full
+  `certify:e1m1` traversal does not establish this lane.
+- A demand for defensive validation, verification, or audit machinery as the
+  meaning of "complete". Completeness here means the specified behavior through
+  the required shared operations — direct mutation through the owning service
+  satisfies it. Ceremony requests belong to the runtime-trust lane, which
+  rejects them by default.
