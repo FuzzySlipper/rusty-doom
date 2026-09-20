@@ -28,8 +28,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private LoadingBaySkyReadout _skyReadout;
     private bool _sharedRealizationsActive;
     private readonly Queue<LoadingBayFact> _journal = new();
-    private readonly Queue<Exception> _retiredProjectionFailures = new();
-    private ulong _droppedRetiredProjectionFailures;
     private readonly LoadingBayCombat _combat;
     private readonly LoadingBayWorld _worldPolicy;
     private readonly LoadingBayPickups _pickups;
@@ -87,7 +85,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         ProductStateStore<LoadingBaySnapshot>? store = null;
         try
         {
-            store = new ProductStateStore<LoadingBaySnapshot>(engine, "loading-bay", new LoadingBaySnapshotCodec());
+            store = new ProductStateStore<LoadingBaySnapshot>(engine, "loading-bay", LoadingBaySnapshotCodec.Create());
             _engineContext = engine; _exitPresentation = exitPresentation; _exitButtonAnimation = exitButtonAnimation; _skyReadout = skyReadout;
             _engineServices = new LoadingBayEngineServices(engine, _tuning, _entities, _entityMap, _player, exitPresentation, exitButtonAnimation, skyReadout);
             _combat.MaterializeDrop = _engineServices.MaterializeEnemyDrop;
@@ -106,7 +104,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     internal LoadingBaySession(IPersistenceService persistence)
         : this()
     {
-        _store = new ProductStateStore<LoadingBaySnapshot>(new PersistenceOnlyContext(persistence), "loading-bay", new LoadingBaySnapshotCodec());
+        _store = new ProductStateStore<LoadingBaySnapshot>(new PersistenceOnlyContext(persistence), "loading-bay", LoadingBaySnapshotCodec.Create());
     }
 
     public ProductUpdateResult Update(ProductUpdate update)
@@ -298,9 +296,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         catch (Exception failure) { (failures ??= []).Add(failure); }
         try { _entities.Dispose(); }
         catch (Exception failure) { (failures ??= []).Add(failure); }
-        foreach (Exception failure in _retiredProjectionFailures) (failures ??= []).Add(failure);
-        if (_droppedRetiredProjectionFailures != 0)
-            (failures ??= []).Add(new InvalidOperationException($"Loading Bay dropped {_droppedRetiredProjectionFailures} retired Engine-projection disposal failures."));
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
@@ -357,74 +352,66 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     LoadingBayReceipt ILoadingBaySession.DeveloperSetTrack(ulong generation, string track, int value, string correlation)
         => DeveloperSetTrack(generation, track, value, correlation);
 
-    internal LoadingBaySnapshot Capture(string contentIdentity) => new(contentIdentity, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _combat.ArmorProtection, _combat.BulletQuantity(), _combat.ShellQuantity(), _combat.OwnedWeaponIds(), _combat.EquippedWeaponId(), _combat.WeaponCooldowns(), _engineServices?.CapturePlayer() ?? _playerSnapshot, _pickups.PickupSnapshots(), _worldPolicy.SecretSnapshots(), _worldPolicy.Complete, _worldPolicy.DoorSnapshots(), _combat.ActorSnapshots(), _combat.EncounterSnapshots(), _world.Capture());
+    internal LoadingBaySnapshot Capture(string contentIdentity)
+    {
+        LoadingBayPlayerSnapshot player = _engineServices?.CapturePlayer() ?? _playerSnapshot;
+        return new(contentIdentity, Mechanics.StatsComponentCapture.Capture(_playerStats), _combat.ArmorProtection, _combat.BulletQuantity(), _combat.ShellQuantity(), _combat.OwnedWeaponIds(), _combat.EquippedWeaponId(), _combat.WeaponCooldowns(), new LoadingBayPlayerPose(player.Position, player.Look), _pickups.PickupSnapshots(), _worldPolicy.SecretSnapshots(), _worldPolicy.Complete, _worldPolicy.DoorSnapshots(), _combat.ActorSnapshots(), _combat.EncounterSnapshots(), _world.Capture());
+    }
+
+    private bool ValidVitals(Mechanics.StatsComponentSnapshot vitals)
+    {
+        // Fixed tuning maximums: the captured maximum stats must equal them exactly, both
+        // vitality tracks must be present with currents inside bounds, and Doom never emits
+        // aliases. Rebuild applies constructor validation on top.
+        if (vitals.StatAliases.Count != 0 || vitals.TrackAliases.Count != 0) return false;
+        if (vitals.Stats.Count != 2 || vitals.Tracks.Count != 2) return false;
+        Mechanics.StatCapture? healthMax = vitals.Stats.SingleOrDefault(stat => stat.Id == LoadingBayStatIds.HealthMax.Value);
+        Mechanics.StatCapture? armorMax = vitals.Stats.SingleOrDefault(stat => stat.Id == LoadingBayStatIds.ArmorMax.Value);
+        Mechanics.TrackCapture? health = vitals.Tracks.SingleOrDefault(track => track.Id == LoadingBayStatIds.Health.Value);
+        Mechanics.TrackCapture? armor = vitals.Tracks.SingleOrDefault(track => track.Id == LoadingBayStatIds.Armor.Value);
+        if (healthMax is null || armorMax is null || health is null || armor is null) return false;
+        if (healthMax.BaseValue != _tuning.MaximumHealth || armorMax.BaseValue != _tuning.MaximumArmor) return false;
+        if (health.MaximumId != healthMax.Id || armor.MaximumId != armorMax.Id) return false;
+        if (!double.IsFinite(health.Current) || health.Current < 0 || health.Current > _tuning.MaximumHealth) return false;
+        if (!double.IsFinite(armor.Current) || armor.Current < 0 || armor.Current > _tuning.MaximumArmor) return false;
+        return true;
+    }
 
     internal LoadingBayReceipt Restore(LoadingBaySnapshot snapshot, string identity)
     {
         ThrowIfDisposed();
         if (snapshot.ContentIdentity != identity) return Reject("save.content-identity-mismatch");
-        if (snapshot.Health < 0 || snapshot.Health > _tuning.MaximumHealth || snapshot.Armor < 0 || snapshot.Armor > _tuning.MaximumArmor || !LoadingBayDefinitions.IsKnownArmorProtection(snapshot.ArmorProtection)) return Reject("save.invalid-track");
+        if (snapshot.PlayerVitals is null || snapshot.OwnedWeapons is null || snapshot.WeaponCooldowns is null || snapshot.Player is null || snapshot.Pickups is null || snapshot.Secrets is null || snapshot.Doors is null || snapshot.Actors is null || snapshot.Encounters is null || snapshot.World is null) return Reject("save.invalid-collection");
+        if (!ValidVitals(snapshot.PlayerVitals) || !LoadingBayDefinitions.IsKnownArmorProtection(snapshot.ArmorProtection)) return Reject("save.invalid-track");
         if (snapshot.Bullets > LoadingBayDefinitions.Bullets.MechanicsDefinition.MaximumQuantity || snapshot.Shells > LoadingBayDefinitions.Shells.MechanicsDefinition.MaximumQuantity) return Reject("save.invalid-inventory");
-        LoadingBayWorldSnapshot worldBeforeValidation = _world.Capture();
-        bool validWorld = _world.TryRestore(snapshot.World);
-        _world.TryRestore(worldBeforeValidation);
-        if (!ValidPickupSet(snapshot.Pickups) || !ValidPlayer(snapshot.Player) || !ValidCooldowns(snapshot.WeaponCooldowns, snapshot.OwnedWeapons) || !ValidDistinct(snapshot.Secrets) || !ValidState(snapshot.Doors) || !ValidActors(snapshot.Actors) || !ValidWeapons(snapshot.OwnedWeapons, snapshot.EquippedWeapon) || !ValidEncounters(snapshot.Encounters, snapshot.Actors) || !validWorld) return Reject("save.invalid-collection");
-        LoadingBaySnapshot previous = Capture(identity);
-        IReadOnlyList<CanonicalPickupTriggerStateFact>? triggerFacts = null;
+        if (!ValidPickupSet(snapshot.Pickups) || !ValidPlayer(snapshot.Player) || !ValidCooldowns(snapshot.WeaponCooldowns, snapshot.OwnedWeapons) || !ValidDistinct(snapshot.Secrets) || !ValidState(snapshot.Doors) || !ValidActors(snapshot.Actors) || !ValidWeapons(snapshot.OwnedWeapons, snapshot.EquippedWeapon) || !ValidEncounters(snapshot.Encounters, snapshot.Actors) || !_world.Validate(snapshot.World)) return Reject("save.invalid-collection");
         try { ApplySnapshot(snapshot); }
-        catch (Exception applicationFailure)
+        catch (Mechanics.MechanicsException) { return Reject("save.invalid-equipment"); }
+        catch (ArgumentException)
         {
-            List<Exception> failures = [applicationFailure];
-            try { ApplySnapshot(previous); }
-            catch (Exception rollbackFailure) { failures.Add(rollbackFailure); }
-            if (failures.Count > 1) throw new AggregateException(failures);
-            if (applicationFailure is Mechanics.MechanicsException) return Reject("save.invalid-equipment");
-            throw;
+            // Post-validation structural failures come from Rebuild on hostile capture
+            // values (ValidVitals pins identity; the Engine constructors own the rest).
+            return Reject("save.invalid-track");
         }
         try
         {
             if (_engineServices is not null)
             {
-                // Engine continuations restore only into a fresh compatible Spatial session.
-                LoadingBayEngineServices replacement = CreateFreshEngineServices();
-                try
-                {
-                    replacement.RestorePlayer(snapshot.Player);
-                    triggerFacts = replacement.RestoreSemanticPickups(snapshot.Pickups);
-                    replacement.RestoreEncounterActivations(_combat.ActivatedEncounters);
-                    replacement.RestoreWorldMotion(snapshot.World, _hasFacts ? _facts.SimulationStep : 0);
-                    if (_sharedRealizationsActive) replacement.ActivateSharedRealizations();
-                }
-                catch
-                {
-                    replacement.Dispose();
-                    throw;
-                }
-                LoadingBayEngineServices previousServices = _engineServices;
-                _engineServices = replacement;
-                _combat.MaterializeDrop = replacement.MaterializeEnemyDrop;
-                try
-                {
-                    _debugEntityWorldChanged?.Invoke(replacement.EntityStore);
-                }
-                catch (Exception debugWorldFailure)
-                {
-                    _engineServices = previousServices;
-                    _combat.MaterializeDrop = previousServices is null ? null : previousServices.MaterializeEnemyDrop;
-                    try { replacement.Dispose(); }
-                    catch (Exception replacementCleanupFailure) { throw new AggregateException(debugWorldFailure, replacementCleanupFailure); }
-                    throw;
-                }
-                RetireProjection(previousServices);
+                // Live services restore motion from the validated snapshot; product state is
+                // already applied, and per-step motion re-derives from it, so a failed Engine
+                // restore rejects without rollback and heals on the next admitted update.
+                _engineServices.RestorePlayer(snapshot.Player);
+                IReadOnlyList<CanonicalPickupTriggerStateFact> triggerFacts = _engineServices.RestoreSemanticPickups(snapshot.Pickups);
+                _engineServices.RestoreEncounterActivations(_combat.ActivatedEncounters);
+                _engineServices.RestoreWorldMotion(snapshot.World, _hasFacts ? _facts.SimulationStep : 0);
+                if (_sharedRealizationsActive) _engineServices.ActivateSharedRealizations();
+                foreach (CanonicalPickupTriggerStateFact triggerFact in triggerFacts) Record(triggerFact);
             }
         }
         catch
         {
-            // Product state and derived Engine motion must return together; no partial save restore is observable.
-            ApplySnapshot(previous);
             return Reject("save.world-motion-restore-rejected");
         }
-        if (triggerFacts is not null) foreach (CanonicalPickupTriggerStateFact triggerFact in triggerFacts) Record(triggerFact);
         Record(new SnapshotRestoredFact(identity));
         PublishHud(force: true);
         return Accept("save.restored");
@@ -492,12 +479,17 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     }
     private void ApplySnapshot(LoadingBaySnapshot snapshot)
     {
+        // Rebuild first: structural failures throw before any live mutation, so the
+        // Restore catch below can reject with zero application applied.
+        Mechanics.StatsComponent vitals = Mechanics.StatsComponentCapture.Rebuild(snapshot.PlayerVitals);
         _combat.RestoreLoadout(snapshot.OwnedWeapons, snapshot.EquippedWeapon, snapshot.WeaponCooldowns);
-        _combat.RestoreVitals(snapshot.Health, snapshot.Armor, snapshot.ArmorProtection);
+        // ValidVitals already established the shape; Rebuild applies constructor validation,
+        // then currents flow through the existing track policy.
+        _combat.RestoreVitals(vitals.GetTrack(LoadingBayStatIds.Health).ValueInt64, vitals.GetTrack(LoadingBayStatIds.Armor).ValueInt64, snapshot.ArmorProtection);
         _combat.SetBulletQuantity(snapshot.Bullets);
         _combat.SetShellQuantity(snapshot.Shells);
         _pickups.RestorePickups(snapshot.Pickups);
-        _playerSnapshot = snapshot.Player;
+        _playerSnapshot = new LoadingBayPlayerSnapshot(snapshot.Player.Position, snapshot.Player.Look, null);
         _worldPolicy.RestoreSecrets(snapshot.Secrets);
         foreach (LoadingBayActorSnapshot actor in snapshot.Actors)
         {
@@ -510,43 +502,11 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         }
         _combat.RestoreEncounters(snapshot.Encounters);
         _worldPolicy.RestoreCompletion(snapshot.Complete);
-        if (!_world.TryRestore(snapshot.World)) throw new InvalidOperationException("A prevalidated world snapshot could not be restored.");
+        _world.Apply(snapshot.World);
         _scheduler = new SimulationScheduler();
         foreach (ulong dueStep in _world.DueSteps()) ScheduleWorldContinuation(dueStep);
     }
     private void ScheduleWorldContinuation(ulong dueStep) => _scheduler.ScheduleAt(dueStep, context => _world.Advance(context.SimulationStep, Record));
-    private LoadingBayEngineServices CreateFreshEngineServices()
-    {
-        if (_engineContext is null || _exitPresentation is null || _exitButtonAnimation is null)
-            throw new InvalidOperationException("Loading Bay cannot rebuild an Engine-backed continuation without its product composition inputs.");
-        EntityStore projection = new([
-            EngineComponentTypes.Transform,
-            EngineComponentTypes.SpatialCollider,
-            EngineComponentTypes.Kinematic,
-        ]);
-        try
-        {
-            LoadingBayEntityMap projectionMap = LoadingBayEntityMap.Bootstrap(projection);
-            EntityId projectionPlayer = projectionMap.Runtime(LoadingBayEntityMap.PlayerAuthoredId);
-            return new LoadingBayEngineServices(_engineContext, _tuning, projection, projectionMap, projectionPlayer, _exitPresentation, _exitButtonAnimation, _skyReadout, ownsProjectionEntities: true);
-        }
-        catch
-        {
-            projection.Dispose();
-            throw;
-        }
-    }
-    private void RetireProjection(LoadingBayEngineServices projection)
-    {
-        try { projection.Dispose(); }
-        catch (Exception failure)
-        {
-            const int MaximumRetirementFailures = 8;
-            if (_retiredProjectionFailures.Count == MaximumRetirementFailures) { _retiredProjectionFailures.Dequeue(); _droppedRetiredProjectionFailures++; }
-            _retiredProjectionFailures.Enqueue(failure);
-            Record(new RejectedFact("save.previous-projection-dispose-failed", null));
-        }
-    }
     private LoadingBayReceipt Accept(string code, string? correlation = null) => new(true, code, correlation);
     private LoadingBayReceipt Reject(string code, string? correlation = null) { Record(new RejectedFact(code, correlation)); return new(false, code, correlation); }
     /// <summary>
@@ -582,17 +542,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         cooldowns.Length <= LoadingBayDefinitions.Weapons.Count
         && cooldowns.All(cooldown => !string.IsNullOrWhiteSpace(cooldown.WeaponId) && weapons.Contains(cooldown.WeaponId, StringComparer.Ordinal))
         && cooldowns.Select(cooldown => cooldown.WeaponId).Distinct(StringComparer.Ordinal).Count() == cooldowns.Length;
-    private static bool ValidPlayer(LoadingBayPlayerSnapshot player)
-    {
-        if (!Finite(player.Position) || !float.IsFinite(player.Look.YawRadians) || !float.IsFinite(player.Look.PitchRadians)) return false;
-        if (player.Continuation is null) return true;
-        CharacterMotion motion = player.Continuation.Motion;
-        return Finite(motion.ControlledVelocity) && Finite(motion.ExternalVelocity) && Enum.IsDefined(motion.Stance)
-            && float.IsFinite(motion.JumpBufferRemaining) && float.IsFinite(motion.CoyoteRemaining) && float.IsFinite(motion.LandingLockoutRemaining)
-            && Finite(motion.SupportLocalAnchor) && Finite(motion.SupportPreviousTranslation) && Finite(motion.SupportPointVelocity)
-            && float.IsFinite(motion.FallOriginY) && float.IsFinite(motion.PeakY)
-            && float.IsFinite(motion.SupportPreviousRotation.X) && float.IsFinite(motion.SupportPreviousRotation.Y) && float.IsFinite(motion.SupportPreviousRotation.Z) && float.IsFinite(motion.SupportPreviousRotation.W);
-    }
+    private static bool ValidPlayer(LoadingBayPlayerPose player) =>
+        Finite(player.Position) && float.IsFinite(player.Look.YawRadians) && float.IsFinite(player.Look.PitchRadians);
     private static bool Finite(System.Numerics.Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
     private static bool ValidWeapons(string[] weapons, string? equipped) =>
         ValidDistinct(weapons)

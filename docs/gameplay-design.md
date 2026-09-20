@@ -99,34 +99,25 @@ bounded diagnostics. Completed facts stay useful, not mandatory.
 
 ## Explicit current save capture
 
-One current save schema. Development saves may break: no old-schema migration,
+One current save payload. Development saves may break: no old-schema migration,
 no runtime integrity or replay gates.
 
-Current survey: `LoadingBaySnapshotCodec`
-(`csharp/LoadingBay.Game/LoadingBaySnapshotCodec.cs`) is a hand-maintained
-`CurrentSchema = 8` binary codec; `LoadingBayCharacterContinuationSnapshot`
-(`LoadingBayContracts.cs:93`) serializes source session/generation/spatial/
-content/config fingerprints and raw Engine motion;
-`LoadingBaySession.Restore` (`LoadingBaySession.cs:527-594`) temporarily
-restores `_world` then rolls it back for validation, snapshots live state for
-rollback, and builds a second projection `EntityStore` whose debug identity
-differs from the original store.
-
-Target: Engine `ProductStateStore` plus source-generated
-`JsonProductStateCodec`/current DTOs (or the minimum current equivalent
-justified by actual API). Remove schema numbers, compatibility readers, and
-product-owned serialization of Engine session fingerprints. Capture meaningful
-canonical game state once — health/armor policy, ammo/weapons/cooldowns,
-pose/look, pickup/drop lifecycle, enemies/encounters, world movers/hazards/
-barrels, secrets, completion — reusing upstream component capture/rebuild for
-stat relationships where useful. Transient controller input, support state, and
-optional native continuation are decided and documented separately; supported
-Engine reconstruction supplies any movement value necessary to resume
-correctly. Validate current DTO shape and relationships without mutating the
-live session; build/apply one coherent replacement game state and resource
-binding; keep correct native retirement and usable active state on expected
-failed load. Semantic map identity is a simple content-selection check
-(`ContentIdentity: "doom-e1m1"`), not a historical byte-compatibility gate.
+Landed by #8380: `LoadingBaySnapshotCodec`
+(`csharp/LoadingBay.Game/LoadingBaySnapshotCodec.cs`) is the source-generated
+`JsonProductStateCodec` over current DTOs (one `Vector3` converter; no schema
+numbers, no compatibility readers). Player vitality travels as a captured
+`StatsComponentSnapshot` (fixed tuning maximums validated, shared-maximum
+relationships rebuilt, currents applied through track policy); enemies keep
+plain healths. Saves carry pose/look only — no Engine motion, continuation, or
+session fingerprints; restore rebuilds transient movement state from tuning
+(the supported Engine reconstruction path), and per-step motion re-derives
+from live world state. `Restore` validates the whole DTO shape without
+mutating the live session, then applies one coherent replacement (product
+stores, then live Engine motion); there is no second projection store and no
+rollback. A failed Engine restore rejects while per-step motion heals on the
+next admitted update. Semantic map identity is a simple content-selection
+check (`ContentIdentity: "doom-e1m1"`), not a historical gate.
+Fixture `RoomStudy` restart likewise rebuilds motion from pose.
 
 ## Separate Engine realizations
 

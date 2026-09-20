@@ -181,7 +181,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     public void DeactivateSharedRealizations() => _active = false;
     internal void Restart()
     {
-        _player.Restore(_spawn, _tuning);
+        // Fixture restart rebuilds motion from pose; only the canonical path saves pose.
+        _player.Restore(_spawn.Position, _spawn.Look, _tuning);
         for (int i = 0; i < _doors.Length; i++)
         {
             _doors[i].Reset();

@@ -25,7 +25,6 @@ internal sealed class LoadingBayEngineServices : IDisposable
     private LoadingBayEngineServiceReadout _readout;
     private readonly EntityStore _entities;
     private readonly LoadingBayEntityMap _entityMap;
-    private EntityStore? _ownedProjectionEntities;
     private bool _disposed;
 
     internal LoadingBayEngineServices(
@@ -36,15 +35,13 @@ internal sealed class LoadingBayEngineServices : IDisposable
         EntityId playerEntity,
         LoadingBayExitPresentation exitPresentation,
         LoadingBayExitButtonAnimation exitButtonAnimation,
-        LoadingBaySkyReadout skyReadout,
-        bool ownsProjectionEntities = false)
+        LoadingBaySkyReadout skyReadout)
     {
         _entities = entities ?? throw new ArgumentNullException(nameof(entities));
         _entityMap = entityMap ?? throw new ArgumentNullException(nameof(entityMap));
         List<IDisposable> constructed = [];
         try
         {
-            _ownedProjectionEntities = ownsProjectionEntities ? _entities : null;
             _skyReadout = skyReadout;
             _content = new LoadingBayAdmittedContent(engine.Content, engine.VoxelContent);
             constructed.Add(_content);
@@ -131,7 +128,7 @@ internal sealed class LoadingBayEngineServices : IDisposable
 
     internal LoadingBayPlayerSnapshot CapturePlayer() => _player.Capture();
 
-    internal void RestorePlayer(LoadingBayPlayerSnapshot player) => _player.Restore(player, _player.Tuning);
+    internal void RestorePlayer(LoadingBayPlayerPose player) => _player.Restore(player.Position, player.Look, _player.Tuning);
 
     internal CanonicalPickupTriggerStateFact MaterializeEnemyDrop(ulong pickupEntityId, Vector3 translation, ulong tick)
     {
@@ -191,11 +188,6 @@ internal sealed class LoadingBayEngineServices : IDisposable
         foreach (IDisposable value in new IDisposable[] { _hud, _worldServices, _combat, _worldInteractions, _semanticPickups, _voxelPresentation, _player, _content })
         {
             try { value.Dispose(); }
-            catch (Exception exception) { (failures ??= []).Add(exception); }
-        }
-        if (_ownedProjectionEntities is not null)
-        {
-            try { _ownedProjectionEntities.Dispose(); }
             catch (Exception exception) { (failures ??= []).Add(exception); }
         }
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
@@ -381,36 +373,25 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         return new LoadingBayPlayerSnapshot(_position, _lookState, _continuation);
     }
 
-    /// <summary>Rebuilds the transient camera projection from a validated semantic player state.</summary>
-    internal void Restore(LoadingBayPlayerSnapshot snapshot, LoadingBayTuning tuning)
+    /// <summary>
+    /// Rebuilds the transient camera projection from a validated pose. Movement state is
+    /// reconstructed from tuning; saves carry no Engine motion or continuation.
+    /// </summary>
+    internal void Restore(Vector3 position, LookState look, LoadingBayTuning tuning)
     {
         ThrowIfDisposed();
-        if (!Finite(snapshot.Position) || !float.IsFinite(snapshot.Look.YawRadians) || !float.IsFinite(snapshot.Look.PitchRadians))
+        if (!Finite(position) || !float.IsFinite(look.YawRadians) || !float.IsFinite(look.PitchRadians))
             throw new InvalidOperationException("Snapshot supplied a non-finite E1M1 player pose or look state.");
-        LookReceipt look = Look.Integrate(new LookRequest(snapshot.Look, Vector2.Zero, tuning.PointerLook));
-        if (look.After != snapshot.Look)
+        LookReceipt integrated = Look.Integrate(new LookRequest(look, Vector2.Zero, tuning.PointerLook));
+        if (integrated.After != look)
             throw new InvalidOperationException("Snapshot supplied an out-of-policy E1M1 player look state.");
-        _position = snapshot.Position;
-        _lookState = look.After;
-        _forward = look.Forward;
-        if (snapshot.Continuation is null)
-        {
-            _motion = default;
-            _controller = Tune(_spatial.DefaultCharacterControllerConfig(), tuning);
-            _sequence = 0;
-            _continuation = null;
-        }
-        else
-        {
-            CharacterContinuationCheckpoint checkpoint = Checkpoint(snapshot.Continuation);
-            CharacterContinuationRestoreReceipt restored = _spatial.RestoreCharacterContinuation(new CharacterContinuationRestoreRequest(_session, checkpoint));
-            if (restored.SourceGeneration != checkpoint.SourceGeneration)
-                throw new InvalidOperationException("Engine restored an incoherent E1M1 character continuation generation.");
-            _motion = restored.Motion;
-            _controller = checkpoint.Config;
-            _sequence = restored.Motion.LastCommandSequence;
-            _continuation = snapshot.Continuation;
-        }
+        _position = position;
+        _lookState = integrated.After;
+        _forward = integrated.Forward;
+        _motion = default;
+        _controller = Tune(_spatial.DefaultCharacterControllerConfig(), tuning);
+        _sequence = 0;
+        _continuation = null;
         _planarIntent = Vector2.Zero;
         _input.Clear();
         _jumpHeld = _jumpPressed = false;
@@ -530,7 +511,6 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     private static float DegreesToRadians(float degrees) => degrees * (MathF.PI / 180f);
     private static bool Finite(Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
     private static LoadingBayCharacterContinuationSnapshot Copy(CharacterContinuationCheckpoint checkpoint) => new(checkpoint.SourceSessionIdentity, checkpoint.SourceGeneration, checkpoint.SpatialSessionFingerprint, checkpoint.ContentAuthorityHash, checkpoint.ConfigFingerprint, checkpoint.Config, checkpoint.Motion);
-    private static CharacterContinuationCheckpoint Checkpoint(LoadingBayCharacterContinuationSnapshot checkpoint) => new(checkpoint.SourceSessionIdentity, checkpoint.SourceGeneration, checkpoint.SpatialSessionFingerprint, checkpoint.ContentAuthorityHash, checkpoint.ConfigFingerprint, checkpoint.Config, checkpoint.Motion);
 
     private static void ValidatePublishedVoxelScene(VoxelAssetSpatialPublishLeaseReceipt receipt)
     {

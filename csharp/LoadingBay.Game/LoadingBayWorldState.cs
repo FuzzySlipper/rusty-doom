@@ -82,7 +82,8 @@ internal sealed class LoadingBayWorldState
         LoadingBayE1M1SemanticCatalog.Hazards.OrderBy(value => value.EntityId)
             .Select(value => new LoadingBayHazardSnapshot(value.EntityId, Hazard(value.EntityId).ReadyAtStep)).ToArray());
 
-    internal bool TryRestore(LoadingBayWorldSnapshot snapshot)
+    /// <summary>Validates a world DTO without touching live components.</summary>
+    internal bool Validate(LoadingBayWorldSnapshot snapshot)
     {
         HashSet<ulong> doors = LoadingBayE1M1SemanticCatalog.Doors.Select(value => value.EntityId).ToHashSet();
         HashSet<ulong> floors = LoadingBayE1M1SemanticCatalog.Floors.Select(value => value.EntityId).ToHashSet();
@@ -95,12 +96,17 @@ internal sealed class LoadingBayWorldState
             || snapshot.Floors.Any(value => value.State is LoadingBayFloorState.Armed or LoadingBayFloorState.Lowered ? value.DueStep != 0 : value.DueStep == 0)
             || snapshot.Lifts.Any(value => value.State == LoadingBayLiftState.Raised ? value.DueStep != 0 : value.DueStep == 0)) return false;
         if (snapshot.Barrels.Any(value => value.Health < 0 || value.Health > LoadingBayE1M1SemanticCatalog.Barrels.Single(definition => definition.EntityId == value.EntityId).MaximumHealth || (value.Exploded && value.Health != 0))) return false;
+        return true;
+    }
+
+    /// <summary>Applies a validated world DTO to live components.</summary>
+    internal void Apply(LoadingBayWorldSnapshot snapshot)
+    {
         foreach (LoadingBayDoorSnapshot value in snapshot.Doors) { LoadingBayDoorStateComponent state = Door(value.EntityId); state.State = value.State; state.DueStep = value.DueStep; }
         foreach (LoadingBayFloorSnapshot value in snapshot.Floors) { LoadingBayFloorStateComponent state = Floor(value.EntityId); state.State = value.State; state.DueStep = value.DueStep; }
         foreach (LoadingBayLiftSnapshot value in snapshot.Lifts) { LoadingBayLiftStateComponent state = Lift(value.EntityId); state.State = value.State; state.DueStep = value.DueStep; }
         foreach (LoadingBayBarrelSnapshot value in snapshot.Barrels) { LoadingBayBarrelStateComponent state = Barrel(value.EntityId); state.Health = value.Health; state.Exploded = value.Exploded; }
         foreach (LoadingBayHazardSnapshot cooldown in snapshot.Hazards) Hazard(cooldown.EntityId).ReadyAtStep = cooldown.ReadyAtStep;
-        return true;
     }
 
     internal bool HazardReady(ulong hazardEntityId, ulong tick)

@@ -83,8 +83,10 @@ internal sealed record LoadingBayEnemyAttackPlan(ulong EnemyEntityId, LoadingBay
 internal sealed record LoadingBayCharacterContinuationSnapshot(ulong SourceSessionIdentity, ulong SourceGeneration, ulong SpatialSessionFingerprint, ulong ContentAuthorityHash, ulong ConfigFingerprint, CharacterControllerConfig Config, CharacterMotion Motion);
 /// <summary>Canonical pose and look plus an optional post-step continuation. Null means the snapshot predates the first admitted character step.</summary>
 internal sealed record LoadingBayPlayerSnapshot(Vector3 Position, LookState Look, LoadingBayCharacterContinuationSnapshot? Continuation);
+/// <summary>Canonical pose and look for save payloads. Live Engine motion and continuation stay out of saves.</summary>
+internal sealed record LoadingBayPlayerPose(Vector3 Position, LookState Look);
 internal sealed record LoadingBayWeaponCooldownSnapshot(string WeaponId, ulong ReadyAtTick);
-internal sealed record LoadingBaySnapshot(string ContentIdentity, long Health, long Armor, LoadingBayArmorProtection ArmorProtection, ulong Bullets, ulong Shells, string[] OwnedWeapons, string? EquippedWeapon, LoadingBayWeaponCooldownSnapshot[] WeaponCooldowns, LoadingBayPlayerSnapshot Player, LoadingBayPickupSnapshot[] Pickups, string[] Secrets, bool Complete, LoadingBayNamedState[] Doors, LoadingBayActorSnapshot[] Actors, LoadingBayEncounterSnapshot[] Encounters, LoadingBayWorldSnapshot World);
+internal sealed record LoadingBaySnapshot(string ContentIdentity, Mechanics.StatsComponentSnapshot PlayerVitals, LoadingBayArmorProtection ArmorProtection, ulong Bullets, ulong Shells, string[] OwnedWeapons, string? EquippedWeapon, LoadingBayWeaponCooldownSnapshot[] WeaponCooldowns, LoadingBayPlayerPose Player, LoadingBayPickupSnapshot[] Pickups, string[] Secrets, bool Complete, LoadingBayNamedState[] Doors, LoadingBayActorSnapshot[] Actors, LoadingBayEncounterSnapshot[] Encounters, LoadingBayWorldSnapshot World);
 internal readonly record struct LoadingBayNamedState(string Id, bool Value);
 internal sealed record LoadingBayActorSnapshot(ulong EntityId, int Health, LoadingBayEnemyPosture Posture, bool Visible, ulong ReadyAtTick);
 internal sealed record LoadingBayEncounterSnapshot(ulong EntityId, bool Activated, bool Cleared);

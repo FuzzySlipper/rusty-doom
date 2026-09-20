@@ -3,6 +3,7 @@ using LoadingBay.Game;
 using Rusty.Engine;
 using Rusty.Engine.Entities;
 using Rusty.Engine.Persistence;
+using Mechanics = Rusty.Engine.Mechanics;
 
 PlayerInputExercise.Run();
 StudyDoorExercise.Run();
@@ -129,9 +130,9 @@ Require(spawnTuning.AuthoredPlayerPosition == new Vector3(114f, 9.5f, 78f)
     && MathF.Abs(spawnTuning.InitialEngineCenter.Y + spawnTuning.EyeOffsetFromCenter - (spawnTuning.AuthoredPlayerPosition.Y + spawnTuning.AuthoredBaseEyeHeight)) < .0001f,
     "E1M1 authored-base to Engine-center spawn conversion drifted");
 LoadingBaySnapshot preFirstStep = state.Capture("doom-e1m1");
-Require(preFirstStep.Player.Continuation is null && state.Restore(preFirstStep, "doom-e1m1").Accepted
-    && state.Capture("doom-e1m1").Player.Continuation is null,
-    "pre-first-step snapshot did not retain its explicit no-continuation state");
+Require(preFirstStep.Player.Position == LoadingBayTuning.E1M1.InitialPosition && state.Restore(preFirstStep, "doom-e1m1").Accepted
+    && state.Capture("doom-e1m1").Player == preFirstStep.Player,
+    "pre-first-step snapshot did not retain its spawn pose through restore");
 state.Update(Update(step: 1));
 Require(state.Readout().Player.Value == 1, "E1M1 did not retain canonical player identity 1 after entity bootstrap");
 Require(LoadingBayTuning.E1M1.MaximumSpatialEntityBindings == 94 && LoadingBayE1M1SemanticCatalog.Floors.Single().PlatformBoundsMin != LoadingBayE1M1SemanticCatalog.Floors.Single().BoundsMin
@@ -155,6 +156,11 @@ Require(lowered.World.Doors.Single(door => door.EntityId == 141).State == Loadin
 Require(state.Restore(worldStart, "doom-e1m1").Accepted
     && state.Capture("doom-e1m1").World.Doors.Single(door => door.EntityId == 141).State == LoadingBayDoorState.Opening,
     "world snapshot restore did not rebuild semantic in-flight state");
+state.Update(Update(step: 59));
+state.Update(Update(step: 66));
+Require(state.Capture("doom-e1m1").World.Doors.Single(door => door.EntityId == 141).State == LoadingBayDoorState.Open
+    && state.Capture("doom-e1m1").World.Floors.Single(floor => floor.EntityId == 146).State == LoadingBayFloorState.Lowered,
+    "restored in-flight transitions did not settle on the resumed timeline");
 Require(!state.Restore(worldStart with { World = worldStart.World with { Floors = [worldStart.World.Floors[0] with { State = LoadingBayFloorState.Lowered, DueStep = 1 }] } }, "doom-e1m1").Accepted,
     "world snapshot accepted an impossible settled floor due step");
 Require(state.DamageCanonicalBarrel(60, 20, 60).Accepted && state.Capture("doom-e1m1").World.Barrels.Single(barrel => barrel.EntityId == 60).Exploded,
@@ -191,6 +197,22 @@ using (var direct = new LoadingBaySession())
         && direct.Readout().Facts.OfType<BarrelExplosionFact>().Count(fact => fact.BarrelEntityId == 60) == 1,
         "headless barrel damage exploded the same barrel twice");
     Require(!direct.DamageCanonicalBarrel(999, 10, 205).Accepted, "headless barrel damage accepted an unknown barrel");
+    LoadingBaySnapshot directValid = direct.Capture("doom-e1m1");
+    Mechanics.StatCapture[] hostileStats = directValid.PlayerVitals.Stats
+        .Select(stat => stat.Id == LoadingBayStatIds.HealthMax.Value ? stat with { Maximum = -1 } : stat).ToArray();
+    LoadingBaySnapshot hostileVitals = directValid with { PlayerVitals = new Mechanics.StatsComponentSnapshot(hostileStats, directValid.PlayerVitals.Tracks) };
+    long beforeHostile = direct.Readout().Health;
+    ulong beforeHostileBullets = direct.Readout().Bullets;
+    Require(!direct.Restore(hostileVitals, "doom-e1m1").Accepted
+        && direct.Readout().Health == beforeHostile && direct.Readout().Bullets == beforeHostileBullets,
+        "hostile vitals maximum was accepted or mutated state");
+    LoadingBaySnapshot directCooldown = direct.Capture("doom-e1m1");
+    using (var resumed = new LoadingBaySession())
+    {
+        Require(resumed.Restore(directCooldown, "doom-e1m1").Accepted
+            && resumed.Readout().WeaponCooldowns.Any(cooldown => cooldown.WeaponId == LoadingBayDefinitions.Pistol.Id)
+            && !resumed.SettleWeaponFire(directPlan!, []).Accepted, "weapon cooldown did not survive restore onto the resumed timeline");
+    }
 }
 Require(state.DeveloperSetTrack(1, "health", 99, "canonical-pickup").Accepted, "exercise could not establish a health-bonus delta");
 Require(state.CollectCanonicalPickup(78).Accepted && state.Readout().Health == 100, "canonical health pickup did not use generated E1M1 semantics");
@@ -287,8 +309,13 @@ state.Dispose();
 var persistence = new InMemoryPersistenceService(); using var persisted = new LoadingBaySession(persistence); persisted.Update(Update(step: 7)); persisted.ApplyDamage("player", 12, "persistence"); long savedHealth = persisted.Readout().Health;
 Require(persisted.Save("e1m1").Accepted, "Engine ProductStateStore did not save"); persisted.ApplyDamage("player", 20, "mutation"); Require(persisted.Load("e1m1").Accepted && persisted.Readout().Health == savedHealth, "Engine ProductStateStore did not restore");
 persistence.Seed("loading-bay", "corrupt", [0xff]); long beforeCorrupt = persisted.Readout().Health; bool corruptRejected = false; try { persisted.Load("corrupt"); } catch (Exception) { corruptRejected = true; }
-Require(corruptRejected && persisted.Readout().Health == beforeCorrupt, "corrupt persistence mutated state"); persistence.Seed("loading-bay", "old", BitConverter.GetBytes(1u)); bool oldRejected = false; try { persisted.Load("old"); } catch (InvalidOperationException) { oldRejected = true; }
-Require(oldRejected && persisted.Readout().Health == beforeCorrupt, "old schema was accepted or mutated state"); Console.WriteLine("Loading Bay lifecycle exercise passed.");
+Require(corruptRejected && persisted.Readout().Health == beforeCorrupt, "corrupt persistence mutated state");
+persistence.Seed("loading-bay", "shapeless", System.Text.Encoding.UTF8.GetBytes("{\"ContentIdentity\":\"doom-e1m1\"}"));
+long beforeShapeless = persisted.Readout().Health;
+ulong beforeShapelessBullets = persisted.Readout().Bullets;
+Require(!persisted.Load("shapeless").Accepted, "shapeless JSON was accepted");
+Require(persisted.Readout().Health == beforeShapeless && persisted.Readout().Bullets == beforeShapelessBullets, "shapeless JSON mutated state");
+Console.WriteLine("Loading Bay lifecycle exercise passed.");
 
 static ProductUpdate Update(ulong step = 1, uint admittedSteps = 1) => new(new ProductUpdateFacts(ProductUpdateMode.Demand, ProductLifecycleState.Running, 1, 1, 0, step, 0, admittedSteps, 0, 0), ReadOnlySpan<ProductInputEvent>.Empty);
 static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
