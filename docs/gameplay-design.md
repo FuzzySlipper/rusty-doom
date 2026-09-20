@@ -1,6 +1,6 @@
 # Loading Bay gameplay design
 
-Status: established by task #8377 for campaign #8376; updated as owners land.
+Status: established by task #8377 for campaign #8376; landed owners recorded by #8378.
 Read with `AGENTS.md`. Exact Engine SDK/runtime pair belongs in machine
 config/Den, not in normative prose — this document names capabilities, not
 revisions.
@@ -10,20 +10,24 @@ RPG framework, no reusable kit, and no traversal-certification campaign. This
 document records the one canonical entity/state graph, the authored-vs-runtime
 identity rule, the game-domain owners, direct trusted mutation, explicit
 current save capture, separate Engine realizations, and preserved source
-provenance. Later tasks (#8378–#8381) migrate callers toward it; the survey
-notes below name what is still true on disk until they land.
+provenance. Task #8378 landed the entity-ownership half; the notes below
+record the landed shape and what remains for #8379–#8381.
 
 ## Canonical entity/state graph
 
 One graph. `LoadingBaySession` (`csharp/LoadingBay.Game/LoadingBaySession.cs`)
 is the admitted-step product root. It owns:
 
-- the `EntityStore` (`_entities`), the `InventoryStore` (`_inventory`), the
+- the `EntityStore` (`_entities`), the authored-to-runtime map
+  (`LoadingBayEntityMap`), the `InventoryStore` (`_inventory`), the
   `SimulationScheduler` (`_scheduler`), and `LoadingBayWorldState` (`_world`);
-- live player vitality as `Mechanics.Track` health/armor plus
-  `LoadingBayArmorProtection` (`_health`, `_armor`, `_armorProtection`);
-- pickup lifecycle (`_pickupStates`), enemy vitality/posture (`_actors`),
-  weapon cooldowns (`_weaponReadyAt`), secrets (`_secrets`), completion
+- live player vitality as an attached Engine `StatsComponent`
+  (`LoadingBayStats.ForPlayer`) plus `LoadingBayArmorProtection`
+  (`_armorProtection`); enemy vitality/posture in attached per-enemy
+  `StatsComponent`/`LoadingBayEnemyStateComponent`; pickup lifecycle in
+  attached `LoadingBayPickupStateComponent`; door/lift/floor/barrel/hazard
+  progression in attached world-state components;
+- weapon cooldowns (`_weaponReadyAt`), secrets (`_secrets`), completion
   (`_complete`), and the bounded fact journal (`_journal`);
 - Engine realizations through `LoadingBayEngineServices` (`_engineServices`)
   and persistence through `ProductStateStore<LoadingBaySnapshot>` (`_store`).
@@ -41,30 +45,28 @@ Authored E1M1 identity is the catalog `EntityId` (for example pickup, enemy,
 door, floor, lift, barrel, hazard, encounter IDs in
 `E1M1SemanticCatalog.g.cs`). Runtime identity is the `EntityStore` `EntityId`.
 
-Current survey: `LoadingBaySession.BootstrapCanonicalEntities`
-(`LoadingBaySession.cs:814-821`) creates every number sequentially and throws
-when `entity.Value != expected`; the constructor pins `_player = new
-EntityId(1)` (`LoadingBaySession.cs:60`). That assertion couples allocation
-order to authored numbering.
-
-Target: an explicit authored-E1M1-identity to runtime-entity mapping with
-creation-time kind metadata (`EntityTypeId`). Indices may locate canonical
-objects but must not mirror mutable authority. All adapters, save, and debug
-lookups distinguish authored IDs used by Engine spatial facts from actual
-`EntityStore` IDs, and demonstrate that authored IDs resolve correctly even
-when runtime allocation order differs. No generic ECS framework.
+Landed (#8378): `LoadingBayEntityMap`
+(`csharp/LoadingBay.Game/LoadingBayEntityMap.cs`) is the only path from an
+authored catalog identity to the live runtime entity. Bootstrap creates one
+entity per canonical authored identity with creation-time kind metadata
+(`EntityTypeId`: player, enemy, pickup, encounter, barrel, hazard, door,
+floor, lift, secret, exit, world-object) and records the mapping; no code
+asserts `EntityId.Value` equals the authored number. The lifecycle exercise
+proves resolution under reversed allocation order. Engine spatial,
+perception, and trigger facts keep using authored identities by Engine
+authority and are never translated by the map. No generic ECS framework.
 
 ## Game-domain owners
 
-Current owners (migrated in place by #8378–#8379):
+Owners as landed by #8378 (#8379 owns the interaction-plumbing row):
 
-| Concern | Current owner | Target |
-| --- | --- | --- |
-| Player/enemy/pickup/world-object state | Separate fields/dictionaries in `LoadingBaySession` (`_health`, `_armor`, `_pickupStates`, `_actors`, `_weaponReadyAt`, `_secrets`) plus snapshot-record dictionaries in `LoadingBayWorldState` | Concrete facades/components over canonical entities; live health/armor/enemy vitality in Engine `StatsComponent`/`Track`; existing Engine inventory/equipment attached to the same canonical player entity; small class components for enemy posture/readiness, pickup lifecycle, and door/lift/floor/barrel state |
-| Combat and world interactions | `LoadingBaySession` policy mixed with prepare/settle receipts; `LoadingBayEngineServices.Update` positional delegate list (`LoadingBayEngineServices.cs:87-105`); `LoadingBayWorldServices` coordinators | Small named game-domain owners for combat and world interactions using safe Engine queries and canonical state; explicit cohesive dependencies replacing the ~20-delegate list (never a universal interface with the same twenty methods, a generic bus, or task-specific Engine API) |
-| Doors | Canonical `LoadingBayWorldState` door map **and** a second freeform session ledger `_doors`/`SetDoor` (`LoadingBaySession.cs:32,406-410`) | Canonical door operations own supported behavior; the named-door dictionary/generic switch path is removed where canonical operations cover it; real callers migrate rather than leave two truths |
-| Pickups/doors in fixtures | Fixture-only manual keys (`_manualPickupKeys`) deliberately separate from canonical `_pickupStates` | Fixture shortcuts never become production authority |
-| Reads | `LoadingBayWorldState.Capture()` allocations serving live reads (`LoadingBaySession.cs:442,452,462,525`); `LoadingBayEngineServices.CapturePlayer()` per update | Ordinary reads use live typed state; `Capture` stays at save/diagnostic boundaries |
+| Concern | Landed owner |
+| --- | --- |
+| Player/enemy/pickup/world-object state | Attached components over canonical entities (`StatsComponent` vitality via `LoadingBayStats`; `LoadingBayEnemyStateComponent`; `LoadingBayPickupStateComponent`; door/lift/floor/barrel/hazard components owned by `LoadingBayWorldState`); Engine inventory/equipment keyed to the same canonical player entity |
+| Combat and world interactions | `LoadingBaySession` policy mixed with prepare/settle receipts; `LoadingBayEngineServices.Update` positional delegate list (`LoadingBayEngineServices.cs:84-105`); `LoadingBayWorldServices` coordinators → #8379: small named owners with explicit cohesive dependencies (never a universal interface with the same twenty methods, a generic bus, or task-specific Engine API) |
+| Doors | Canonical `LoadingBayWorldState` door operations own supported behavior; the former freeform session ledger is removed and `SwitchActivated` resolves labels to canonical activation; named-door save shape is a derived read-only projection |
+| Pickups/doors in fixtures | Fixture-only manual keys (`_manualPickupKeys`) deliberately separate from canonical components |
+| Reads | Live typed reads (`WorldState.DoorState/FloorState/LiftState`, component reads); `Capture` stays at save/diagnostic boundaries |
 
 Armor protection policy and Doom pickup caps are preserved; the game does not
 become a generic RPG. Static generated catalog definitions and native
@@ -79,11 +81,12 @@ HUD/audio/debug — not mandatory replay acceptance. A legitimate
 query-then-apply split with concrete meaning may remain; names alone are not
 defects.
 
-Current ceremony to remove:
+Remaining ceremony (#8379 owns all three; #8378 already removed the named-door
+ledger and the `Capture`-shaped live reads):
 
 - `LoadingBayEngineServices.Update` receiving ~20 `Action`/`Func` delegates
   for pickups, hazards, doors, combat, and world reads
-  (`LoadingBayEngineServices.cs:87-105`), with prepare/settle receipts split
+  (`LoadingBayEngineServices.cs:84-105`), with prepare/settle receipts split
   across session and coordinators;
 - `LoadingBayWorldState.DamageBarrel` cloning the whole barrel map before the
   chain (`LoadingBayWorldState.cs:126-152`) instead of a bounded work queue

@@ -46,20 +46,39 @@ ContentReferenceInfo trustedEntry = LoadingBayAdmittedContent.RequireSingle(new[
 Require(trustedEntry.Path == "doom-e1m1/doom-e1m1.voxel.json" && trustedEntry.ByteLength == 100, "admission trust did not accept a path-matched Engine content entry regardless of hash");
 using (var supportWorld = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
 {
-    EntityId movingLift = supportWorld.Create();
+    LoadingBayEntityMap supportMap = LoadingBayEntityMap.Bootstrap(supportWorld);
+    EntityId movingLift = supportMap.Runtime(147);
     Transform advancedLiftTransform = new(new Vector3(112f, 6f, 76f), Quaternion.Identity, Vector3.One);
     supportWorld.Set(movingLift, EngineComponentTypes.Transform, advancedLiftTransform);
     supportWorld.Set(movingLift, EngineComponentTypes.Kinematic, new Kinematic(new Vector3(10f, 2f, 6f), new Vector3(0f, -1f, 0f)));
     supportWorld.Set(movingLift, EngineComponentTypes.SpatialCollider, new SpatialCollider(new Vector3(-10f, -2f, -6f), new Vector3(10f, 2f, 6f), 2, uint.MaxValue, true, false, false));
     CharacterSupport continuation = LoadingBayWorldInteractionCoordinator.ResolvePlatformSupport(
-        true, movingLift.Value, new HashSet<ulong> { movingLift.Value }, supportWorld);
+        true, 147, new HashSet<ulong> { 147 }, supportWorld, supportMap);
     CharacterObstacle obstacle = LoadingBayWorldInteractionCoordinator.ProjectPlatformObstacles(
-        new HashSet<ulong> { movingLift.Value }, supportWorld).Single();
+        new HashSet<ulong> { 147 }, supportWorld, supportMap).Single();
     Require(continuation.Present && continuation.Lifecycle == CharacterSupportLifecycle.Active
         && continuation.Entity == movingLift.Value && continuation.Transform == advancedLiftTransform
         && obstacle.Entity == movingLift.Value && obstacle.Transform == advancedLiftTransform
         && obstacle.LinearVelocity == new Vector3(0f, -1f, 0f),
         "E1M1 platform carry did not supply the post-motion Engine support continuation");
+}
+using (var shuffledWorld = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
+{
+    List<ulong> reverse = [];
+    for (ulong authored = LoadingBayE1M1SemanticCatalog.CanonicalEntityCount; authored >= 1; authored--) reverse.Add(authored);
+    LoadingBayEntityMap shuffled = LoadingBayEntityMap.Bootstrap(shuffledWorld, reverse);
+    Require(shuffled.Runtime(LoadingBayEntityMap.PlayerAuthoredId).Value != LoadingBayEntityMap.PlayerAuthoredId,
+        "reordered entity bootstrap did not actually differ in runtime allocation");
+    Require(shuffledWorld.GetTypeId(shuffled.Runtime(LoadingBayEntityMap.PlayerAuthoredId)).Value == LoadingBayEntityKinds.Player
+        && shuffledWorld.GetTypeId(shuffled.Runtime(141)).Value == LoadingBayEntityKinds.Door
+        && shuffledWorld.GetTypeId(shuffled.Runtime(78)).Value == LoadingBayEntityKinds.Pickup
+        && shuffledWorld.GetTypeId(shuffled.Runtime(2)).Value == LoadingBayEntityKinds.Enemy
+        && shuffledWorld.GetTypeId(shuffled.Runtime(145)).Value == LoadingBayEntityKinds.WorldObject,
+        "authored E1M1 identity did not resolve its runtime entity and kind after reordered allocation");
+    HashSet<ulong> allocated = [];
+    for (ulong authored = 1; authored <= LoadingBayE1M1SemanticCatalog.CanonicalEntityCount; authored++) allocated.Add(shuffled.Runtime(authored).Value);
+    Require(allocated.Count == (int)LoadingBayE1M1SemanticCatalog.CanonicalEntityCount && !shuffled.TryRuntime(999, out _),
+        "authored E1M1 mapping did not stay bijective over the canonical identities");
 }
 var product = new LoadingBayProduct(() =>
 {
@@ -95,9 +114,10 @@ var realSessions = new List<LoadingBaySession>();
 using (var realProduct = new LoadingBayProduct(() => { var session = new LoadingBaySession(); realSessions.Add(session); return session; }))
 {
     realProduct.Start(); realProduct.Update(Update(step: 9)); realSessions[0].ApplyDamage("player", 15, "restart-proof");
+    long staleHealth = realSessions[0].Readout().Health;
     realProduct.Restart();
     LoadingBayReadout fresh = realSessions[1].Readout();
-    Require(realSessions[0].Readout().Health < fresh.Health && fresh.Generation == 0 && fresh.Facts.Length == 1, "restart retained stale gameplay state, facts, or generation");
+    Require(staleHealth < fresh.Health && fresh.Generation == 0 && fresh.Facts.Length == 1, "restart retained stale gameplay state, facts, or generation");
 }
 
 LoadingBaySession state = new();

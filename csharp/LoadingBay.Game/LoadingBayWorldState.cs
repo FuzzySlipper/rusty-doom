@@ -1,4 +1,5 @@
 using System.Numerics;
+using Rusty.Engine.Entities;
 
 namespace LoadingBay.Game;
 
@@ -15,49 +16,107 @@ internal sealed record LoadingBayWorldSnapshot(LoadingBayDoorSnapshot[] Doors, L
 internal sealed record WorldInteractionFact(string Family, ulong EntityId, string State, ulong Tick, ulong DueStep) : LoadingBayFact;
 internal sealed record BarrelExplosionFact(ulong BarrelEntityId, int Damage, double Radius, ulong Tick, bool Chained) : LoadingBayFact;
 
-/// <summary>Product policy only: state transitions, due steps, and canonical E1M1 values remain explicit and inspectable.</summary>
+/// <summary>
+/// Product policy only: state transitions, due steps, and canonical E1M1 values remain explicit and inspectable.
+/// Live progression lives in small class components over canonical entities; snapshot records exist only at
+/// save/diagnostic boundaries.
+/// </summary>
 internal sealed class LoadingBayWorldState
 {
-    private readonly Dictionary<ulong, LoadingBayDoorSnapshot> _doors = [];
-    private readonly Dictionary<ulong, LoadingBayFloorSnapshot> _floors = [];
-    private readonly Dictionary<ulong, LoadingBayLiftSnapshot> _lifts = [];
-    private readonly Dictionary<ulong, LoadingBayBarrelSnapshot> _barrels = [];
-    private readonly Dictionary<ulong, ulong> _hazardReadyAt = [];
+    private readonly EntityStore _entities;
+    private readonly LoadingBayEntityMap _entityMap;
 
-    internal LoadingBayWorldState()
+    internal LoadingBayWorldState(EntityStore entities, LoadingBayEntityMap entityMap)
     {
-        foreach (LoadingBayE1M1DoorDefinition door in LoadingBayE1M1SemanticCatalog.Doors) _doors.Add(door.EntityId, new(door.EntityId, LoadingBayDoorState.Closed, 0));
-        foreach (LoadingBayE1M1FloorDefinition floor in LoadingBayE1M1SemanticCatalog.Floors) _floors.Add(floor.EntityId, new(floor.EntityId, LoadingBayFloorState.Armed, 0));
-        foreach (LoadingBayE1M1LiftDefinition lift in LoadingBayE1M1SemanticCatalog.Lifts) _lifts.Add(lift.EntityId, new(lift.EntityId, LoadingBayLiftState.Raised, 0));
-        foreach (LoadingBayE1M1BarrelDefinition barrel in LoadingBayE1M1SemanticCatalog.Barrels) _barrels.Add(barrel.EntityId, new(barrel.EntityId, barrel.MaximumHealth, false));
-        foreach (LoadingBayE1M1HazardDefinition hazard in LoadingBayE1M1SemanticCatalog.Hazards) _hazardReadyAt.Add(hazard.EntityId, 0);
+        _entities = entities ?? throw new ArgumentNullException(nameof(entities));
+        _entityMap = entityMap ?? throw new ArgumentNullException(nameof(entityMap));
+        foreach (LoadingBayE1M1DoorDefinition door in LoadingBayE1M1SemanticCatalog.Doors)
+            _entities.Add(_entityMap.Runtime(door.EntityId), new LoadingBayDoorStateComponent(LoadingBayDoorState.Closed, 0));
+        foreach (LoadingBayE1M1FloorDefinition floor in LoadingBayE1M1SemanticCatalog.Floors)
+            _entities.Add(_entityMap.Runtime(floor.EntityId), new LoadingBayFloorStateComponent(LoadingBayFloorState.Armed, 0));
+        foreach (LoadingBayE1M1LiftDefinition lift in LoadingBayE1M1SemanticCatalog.Lifts)
+            _entities.Add(_entityMap.Runtime(lift.EntityId), new LoadingBayLiftStateComponent(LoadingBayLiftState.Raised, 0));
+        foreach (LoadingBayE1M1BarrelDefinition barrel in LoadingBayE1M1SemanticCatalog.Barrels)
+            _entities.Add(_entityMap.Runtime(barrel.EntityId), new LoadingBayBarrelStateComponent(barrel.MaximumHealth, false));
+        foreach (LoadingBayE1M1HazardDefinition hazard in LoadingBayE1M1SemanticCatalog.Hazards)
+            _entities.Add(_entityMap.Runtime(hazard.EntityId), new LoadingBayHazardStateComponent(0));
+    }
+
+    private LoadingBayDoorStateComponent Door(ulong entityId) => _entities.Get<LoadingBayDoorStateComponent>(_entityMap.Runtime(entityId));
+    private LoadingBayFloorStateComponent Floor(ulong entityId) => _entities.Get<LoadingBayFloorStateComponent>(_entityMap.Runtime(entityId));
+    private LoadingBayLiftStateComponent Lift(ulong entityId) => _entities.Get<LoadingBayLiftStateComponent>(_entityMap.Runtime(entityId));
+    private LoadingBayBarrelStateComponent Barrel(ulong entityId) => _entities.Get<LoadingBayBarrelStateComponent>(_entityMap.Runtime(entityId));
+    private LoadingBayHazardStateComponent Hazard(ulong entityId) => _entities.Get<LoadingBayHazardStateComponent>(_entityMap.Runtime(entityId));
+
+    /// <summary>Live single-entity reads for ordinary gameplay; Capture stays at save/diagnostic boundaries.</summary>
+    internal LoadingBayDoorSnapshot DoorState(ulong entityId)
+    {
+        LoadingBayE1M1DoorDefinition _ = LoadingBayE1M1SemanticCatalog.Doors.Single(value => value.EntityId == entityId);
+        LoadingBayDoorStateComponent state = Door(entityId);
+        return new(entityId, state.State, state.DueStep);
+    }
+
+    internal LoadingBayFloorSnapshot FloorState(ulong entityId)
+    {
+        LoadingBayE1M1FloorDefinition _ = LoadingBayE1M1SemanticCatalog.Floors.Single(value => value.EntityId == entityId);
+        LoadingBayFloorStateComponent state = Floor(entityId);
+        return new(entityId, state.State, state.DueStep);
+    }
+
+    internal LoadingBayLiftSnapshot LiftState(ulong entityId)
+    {
+        LoadingBayE1M1LiftDefinition _ = LoadingBayE1M1SemanticCatalog.Lifts.Single(value => value.EntityId == entityId);
+        LoadingBayLiftStateComponent state = Lift(entityId);
+        return new(entityId, state.State, state.DueStep);
     }
 
     internal LoadingBayWorldSnapshot Capture() => new(
-        _doors.Values.OrderBy(value => value.EntityId).ToArray(), _floors.Values.OrderBy(value => value.EntityId).ToArray(),
-        _lifts.Values.OrderBy(value => value.EntityId).ToArray(), _barrels.Values.OrderBy(value => value.EntityId).ToArray(),
-        _hazardReadyAt.OrderBy(value => value.Key).Select(value => new LoadingBayHazardSnapshot(value.Key, value.Value)).ToArray());
+        LoadingBayE1M1SemanticCatalog.Doors.OrderBy(value => value.EntityId)
+            .Select(value => new LoadingBayDoorSnapshot(value.EntityId, Door(value.EntityId).State, Door(value.EntityId).DueStep)).ToArray(),
+        LoadingBayE1M1SemanticCatalog.Floors.OrderBy(value => value.EntityId)
+            .Select(value => new LoadingBayFloorSnapshot(value.EntityId, Floor(value.EntityId).State, Floor(value.EntityId).DueStep)).ToArray(),
+        LoadingBayE1M1SemanticCatalog.Lifts.OrderBy(value => value.EntityId)
+            .Select(value => new LoadingBayLiftSnapshot(value.EntityId, Lift(value.EntityId).State, Lift(value.EntityId).DueStep)).ToArray(),
+        LoadingBayE1M1SemanticCatalog.Barrels.OrderBy(value => value.EntityId)
+            .Select(value => new LoadingBayBarrelSnapshot(value.EntityId, Barrel(value.EntityId).Health, Barrel(value.EntityId).Exploded)).ToArray(),
+        LoadingBayE1M1SemanticCatalog.Hazards.OrderBy(value => value.EntityId)
+            .Select(value => new LoadingBayHazardSnapshot(value.EntityId, Hazard(value.EntityId).ReadyAtStep)).ToArray());
 
     internal bool TryRestore(LoadingBayWorldSnapshot snapshot)
     {
-        if (!Same(snapshot.Doors, _doors.Keys, value => value.EntityId) || !Same(snapshot.Floors, _floors.Keys, value => value.EntityId) || !Same(snapshot.Lifts, _lifts.Keys, value => value.EntityId) || !Same(snapshot.Barrels, _barrels.Keys, value => value.EntityId) || snapshot.Hazards.Length != _hazardReadyAt.Count || snapshot.Hazards.Select(value => value.EntityId).Distinct().Count() != snapshot.Hazards.Length || snapshot.Hazards.Any(value => !_hazardReadyAt.ContainsKey(value.EntityId))) return false;
+        HashSet<ulong> doors = LoadingBayE1M1SemanticCatalog.Doors.Select(value => value.EntityId).ToHashSet();
+        HashSet<ulong> floors = LoadingBayE1M1SemanticCatalog.Floors.Select(value => value.EntityId).ToHashSet();
+        HashSet<ulong> lifts = LoadingBayE1M1SemanticCatalog.Lifts.Select(value => value.EntityId).ToHashSet();
+        HashSet<ulong> barrels = LoadingBayE1M1SemanticCatalog.Barrels.Select(value => value.EntityId).ToHashSet();
+        HashSet<ulong> hazards = LoadingBayE1M1SemanticCatalog.Hazards.Select(value => value.EntityId).ToHashSet();
+        if (!Same(snapshot.Doors, doors, value => value.EntityId) || !Same(snapshot.Floors, floors, value => value.EntityId) || !Same(snapshot.Lifts, lifts, value => value.EntityId) || !Same(snapshot.Barrels, barrels, value => value.EntityId) || snapshot.Hazards.Length != hazards.Count || snapshot.Hazards.Select(value => value.EntityId).Distinct().Count() != snapshot.Hazards.Length || snapshot.Hazards.Any(value => !hazards.Contains(value.EntityId))) return false;
         if (snapshot.Doors.Any(value => !Enum.IsDefined(value.State)) || snapshot.Floors.Any(value => !Enum.IsDefined(value.State)) || snapshot.Lifts.Any(value => !Enum.IsDefined(value.State))) return false;
         if (snapshot.Doors.Any(value => value.State == LoadingBayDoorState.Closed ? value.DueStep != 0 : value.DueStep == 0)
             || snapshot.Floors.Any(value => value.State is LoadingBayFloorState.Armed or LoadingBayFloorState.Lowered ? value.DueStep != 0 : value.DueStep == 0)
             || snapshot.Lifts.Any(value => value.State == LoadingBayLiftState.Raised ? value.DueStep != 0 : value.DueStep == 0)) return false;
         if (snapshot.Barrels.Any(value => value.Health < 0 || value.Health > LoadingBayE1M1SemanticCatalog.Barrels.Single(definition => definition.EntityId == value.EntityId).MaximumHealth || (value.Exploded && value.Health != 0))) return false;
-        Replace(_doors, snapshot.Doors, value => value.EntityId); Replace(_floors, snapshot.Floors, value => value.EntityId); Replace(_lifts, snapshot.Lifts, value => value.EntityId); Replace(_barrels, snapshot.Barrels, value => value.EntityId);
-        foreach (LoadingBayHazardSnapshot cooldown in snapshot.Hazards) _hazardReadyAt[cooldown.EntityId] = cooldown.ReadyAtStep;
+        foreach (LoadingBayDoorSnapshot value in snapshot.Doors) { LoadingBayDoorStateComponent state = Door(value.EntityId); state.State = value.State; state.DueStep = value.DueStep; }
+        foreach (LoadingBayFloorSnapshot value in snapshot.Floors) { LoadingBayFloorStateComponent state = Floor(value.EntityId); state.State = value.State; state.DueStep = value.DueStep; }
+        foreach (LoadingBayLiftSnapshot value in snapshot.Lifts) { LoadingBayLiftStateComponent state = Lift(value.EntityId); state.State = value.State; state.DueStep = value.DueStep; }
+        foreach (LoadingBayBarrelSnapshot value in snapshot.Barrels) { LoadingBayBarrelStateComponent state = Barrel(value.EntityId); state.Health = value.Health; state.Exploded = value.Exploded; }
+        foreach (LoadingBayHazardSnapshot cooldown in snapshot.Hazards) Hazard(cooldown.EntityId).ReadyAtStep = cooldown.ReadyAtStep;
         return true;
     }
 
-    internal bool HazardReady(ulong hazardEntityId, ulong tick) => _hazardReadyAt.TryGetValue(hazardEntityId, out ulong due) && tick >= due;
+    internal bool HazardReady(ulong hazardEntityId, ulong tick)
+    {
+        if (LoadingBayEntityMap.KindFor(hazardEntityId) != LoadingBayEntityKinds.Hazard
+            || !_entityMap.TryRuntime(hazardEntityId, out EntityId entity))
+            return false;
+        ulong due = _entities.Get<LoadingBayHazardStateComponent>(entity).ReadyAtStep;
+        return tick >= due;
+    }
     internal LoadingBayE1M1HazardDefinition ApplyHazard(ulong hazardEntityId, ulong tick, Action<int, string> damage, Action<LoadingBayFact> record)
     {
         LoadingBayE1M1HazardDefinition hazard = LoadingBayE1M1SemanticCatalog.Hazards.Single(value => value.EntityId == hazardEntityId);
         if (!HazardReady(hazardEntityId, tick)) throw new InvalidOperationException("Hazard cooldown is not ready.");
         ulong due = checked(tick + (ulong)hazard.CooldownTicks);
-        _hazardReadyAt[hazardEntityId] = due;
+        Hazard(hazardEntityId).ReadyAtStep = due;
         damage(hazard.Damage, $"hazard.{hazard.Label}");
         record(new WorldInteractionFact("hazard", hazard.EntityId, "cooldown", tick, due));
         return hazard;
@@ -66,60 +125,83 @@ internal sealed class LoadingBayWorldState
     internal LoadingBayDoorSnapshot ActivateDoor(ulong entityId, ulong tick, Action<LoadingBayFact> record)
     {
         LoadingBayE1M1DoorDefinition definition = LoadingBayE1M1SemanticCatalog.Doors.Single(value => value.EntityId == entityId);
-        LoadingBayDoorSnapshot state = _doors[entityId];
-        if (state.State is LoadingBayDoorState.Opening or LoadingBayDoorState.Open) return state;
-        state = new(entityId, LoadingBayDoorState.Opening, checked(tick + (ulong)definition.MotionDurationTicks)); _doors[entityId] = state;
-        record(new WorldInteractionFact("door", entityId, "opening", tick, state.DueStep)); return state;
+        LoadingBayDoorStateComponent state = Door(entityId);
+        if (state.State is LoadingBayDoorState.Opening or LoadingBayDoorState.Open) return new(entityId, state.State, state.DueStep);
+        state.State = LoadingBayDoorState.Opening;
+        state.DueStep = checked(tick + (ulong)definition.MotionDurationTicks);
+        record(new WorldInteractionFact("door", entityId, "opening", tick, state.DueStep));
+        return new(entityId, state.State, state.DueStep);
     }
 
     internal LoadingBayFloorSnapshot ActivateFloor(ulong entityId, ulong tick, Action<LoadingBayFact> record)
     {
         LoadingBayE1M1FloorDefinition definition = LoadingBayE1M1SemanticCatalog.Floors.Single(value => value.EntityId == entityId);
-        LoadingBayFloorSnapshot state = _floors[entityId];
-        if (state.State != LoadingBayFloorState.Armed) return state;
-        state = new(entityId, LoadingBayFloorState.Lowering, checked(tick + (ulong)definition.MotionDurationTicks)); _floors[entityId] = state;
-        record(new WorldInteractionFact("floor", entityId, "lowering", tick, state.DueStep)); return state;
+        LoadingBayFloorStateComponent state = Floor(entityId);
+        if (state.State != LoadingBayFloorState.Armed) return new(entityId, state.State, state.DueStep);
+        state.State = LoadingBayFloorState.Lowering;
+        state.DueStep = checked(tick + (ulong)definition.MotionDurationTicks);
+        record(new WorldInteractionFact("floor", entityId, "lowering", tick, state.DueStep));
+        return new(entityId, state.State, state.DueStep);
     }
 
     internal LoadingBayLiftSnapshot ActivateLift(ulong entityId, ulong tick, Action<LoadingBayFact> record)
     {
         LoadingBayE1M1LiftDefinition definition = LoadingBayE1M1SemanticCatalog.Lifts.Single(value => value.EntityId == entityId);
-        LoadingBayLiftSnapshot state = _lifts[entityId];
-        if (state.State is LoadingBayLiftState.Lowering or LoadingBayLiftState.Waiting) return state;
-        state = new(entityId, LoadingBayLiftState.Lowering, checked(tick + (ulong)definition.MotionDurationTicks)); _lifts[entityId] = state;
-        record(new WorldInteractionFact("lift", entityId, "lowering", tick, state.DueStep)); return state;
+        LoadingBayLiftStateComponent state = Lift(entityId);
+        if (state.State is LoadingBayLiftState.Lowering or LoadingBayLiftState.Waiting) return new(entityId, state.State, state.DueStep);
+        state.State = LoadingBayLiftState.Lowering;
+        state.DueStep = checked(tick + (ulong)definition.MotionDurationTicks);
+        record(new WorldInteractionFact("lift", entityId, "lowering", tick, state.DueStep));
+        return new(entityId, state.State, state.DueStep);
     }
 
     internal void Advance(ulong tick, Action<LoadingBayFact> record)
     {
-        foreach (LoadingBayDoorSnapshot state in _doors.Values.Where(value => value.DueStep != 0 && value.DueStep <= tick).ToArray())
+        foreach (LoadingBayDoorSnapshot state in LoadingBayE1M1SemanticCatalog.Doors
+            .Select(value => new LoadingBayDoorSnapshot(value.EntityId, Door(value.EntityId).State, Door(value.EntityId).DueStep))
+            .Where(value => value.DueStep != 0 && value.DueStep <= tick).ToArray())
         {
             LoadingBayE1M1DoorDefinition definition = LoadingBayE1M1SemanticCatalog.Doors.Single(value => value.EntityId == state.EntityId);
-            LoadingBayDoorSnapshot next = state.State switch
+            LoadingBayDoorStateComponent live = Door(state.EntityId);
+            LoadingBayDoorState next = state.State switch
             {
-                LoadingBayDoorState.Opening => new(state.EntityId, LoadingBayDoorState.Open, checked(tick + (ulong)definition.AutoCloseAfterTicks)),
-                LoadingBayDoorState.Open => new(state.EntityId, LoadingBayDoorState.Closing, checked(tick + (ulong)definition.MotionDurationTicks)),
-                LoadingBayDoorState.Closing => new(state.EntityId, LoadingBayDoorState.Closed, 0),
-                _ => state,
+                LoadingBayDoorState.Opening => LoadingBayDoorState.Open,
+                LoadingBayDoorState.Open => LoadingBayDoorState.Closing,
+                LoadingBayDoorState.Closing => LoadingBayDoorState.Closed,
+                _ => state.State,
             };
-            _doors[state.EntityId] = next; record(new WorldInteractionFact("door", state.EntityId, next.State.ToString().ToLowerInvariant(), tick, next.DueStep));
+            ulong due = state.State switch
+            {
+                LoadingBayDoorState.Opening => checked(tick + (ulong)definition.AutoCloseAfterTicks),
+                LoadingBayDoorState.Open => checked(tick + (ulong)definition.MotionDurationTicks),
+                _ => 0UL,
+            };
+            live.State = next; live.DueStep = due;
+            record(new WorldInteractionFact("door", state.EntityId, next.ToString().ToLowerInvariant(), tick, due));
         }
-        foreach (LoadingBayFloorSnapshot state in _floors.Values.Where(value => value.DueStep != 0 && value.DueStep <= tick).ToArray())
+        foreach (LoadingBayFloorSnapshot state in LoadingBayE1M1SemanticCatalog.Floors
+            .Select(value => new LoadingBayFloorSnapshot(value.EntityId, Floor(value.EntityId).State, Floor(value.EntityId).DueStep))
+            .Where(value => value.DueStep != 0 && value.DueStep <= tick).ToArray())
         {
-            LoadingBayFloorSnapshot next = new(state.EntityId, LoadingBayFloorState.Lowered, 0); _floors[state.EntityId] = next;
+            LoadingBayFloorStateComponent live = Floor(state.EntityId);
+            live.State = LoadingBayFloorState.Lowered; live.DueStep = 0;
             record(new WorldInteractionFact("floor", state.EntityId, "lowered", tick, 0));
         }
-        foreach (LoadingBayLiftSnapshot state in _lifts.Values.Where(value => value.DueStep != 0 && value.DueStep <= tick).ToArray())
+        foreach (LoadingBayLiftSnapshot state in LoadingBayE1M1SemanticCatalog.Lifts
+            .Select(value => new LoadingBayLiftSnapshot(value.EntityId, Lift(value.EntityId).State, Lift(value.EntityId).DueStep))
+            .Where(value => value.DueStep != 0 && value.DueStep <= tick).ToArray())
         {
             LoadingBayE1M1LiftDefinition definition = LoadingBayE1M1SemanticCatalog.Lifts.Single(value => value.EntityId == state.EntityId);
-            LoadingBayLiftSnapshot next = state.State switch
+            LoadingBayLiftStateComponent live = Lift(state.EntityId);
+            (LoadingBayLiftState next, ulong due) = state.State switch
             {
-                LoadingBayLiftState.Lowering => new(state.EntityId, LoadingBayLiftState.Waiting, checked(tick + (ulong)definition.LoweredWaitTicks)),
-                LoadingBayLiftState.Waiting => new(state.EntityId, LoadingBayLiftState.Raising, checked(tick + (ulong)definition.MotionDurationTicks)),
-                LoadingBayLiftState.Raising => new(state.EntityId, LoadingBayLiftState.Raised, 0),
-                _ => state,
+                LoadingBayLiftState.Lowering => (LoadingBayLiftState.Waiting, checked(tick + (ulong)definition.LoweredWaitTicks)),
+                LoadingBayLiftState.Waiting => (LoadingBayLiftState.Raising, checked(tick + (ulong)definition.MotionDurationTicks)),
+                LoadingBayLiftState.Raising => (LoadingBayLiftState.Raised, 0UL),
+                _ => (state.State, state.DueStep),
             };
-            _lifts[state.EntityId] = next; record(new WorldInteractionFact("lift", state.EntityId, next.State.ToString().ToLowerInvariant(), tick, next.DueStep));
+            live.State = next; live.DueStep = due;
+            record(new WorldInteractionFact("lift", state.EntityId, next.ToString().ToLowerInvariant(), tick, due));
         }
     }
 
@@ -127,9 +209,10 @@ internal sealed class LoadingBayWorldState
     {
         if (damage <= 0) return [];
         ArgumentNullException.ThrowIfNull(occluded);
-        // Build all damage waves and all Engine line-of-effect queries against a detached candidate.
-        // A failed query therefore cannot leave one barrel committed while later members of its chain are unresolved.
-        Dictionary<ulong, LoadingBayBarrelSnapshot> staged = _barrels.ToDictionary(value => value.Key, value => value.Value);
+        // Local staging only: a failed Engine line-of-effect query cannot leave one barrel committed
+        // while later members of its chain are unresolved. The bounded chain rework belongs to task #8379.
+        Dictionary<ulong, LoadingBayBarrelSnapshot> staged = LoadingBayE1M1SemanticCatalog.Barrels
+            .ToDictionary(value => value.EntityId, value => new LoadingBayBarrelSnapshot(value.EntityId, Barrel(value.EntityId).Health, Barrel(value.EntityId).Exploded));
         Queue<(ulong Id, int Damage, bool Chained)> pending = new(); pending.Enqueue((entityId, damage, false)); List<(LoadingBayE1M1BarrelDefinition Barrel, bool Chained)> exploded = [];
         while (pending.TryDequeue(out (ulong Id, int Damage, bool Chained) item))
         {
@@ -146,16 +229,21 @@ internal sealed class LoadingBayWorldState
                 if (scaled > 0) pending.Enqueue((candidate.EntityId, scaled, true));
             }
         }
-        _barrels.Clear(); foreach ((ulong id, LoadingBayBarrelSnapshot state) in staged) _barrels.Add(id, state);
+        foreach ((ulong id, LoadingBayBarrelSnapshot state) in staged)
+        {
+            LoadingBayBarrelStateComponent live = Barrel(id);
+            live.Health = state.Health; live.Exploded = state.Exploded;
+        }
         foreach ((LoadingBayE1M1BarrelDefinition barrel, bool chained) in exploded) record(new BarrelExplosionFact(barrel.EntityId, barrel.Damage, barrel.Radius, tick, chained));
         return exploded.Select(value => value.Barrel).ToArray();
     }
 
     /// <summary>Semantic continuations only; Engine scheduler handles are deliberately not part of product persistence.</summary>
-    internal IEnumerable<ulong> DueSteps() => _doors.Values.Concat<object>(_floors.Values).Concat(_lifts.Values)
-        .Select(value => value switch { LoadingBayDoorSnapshot door => door.DueStep, LoadingBayFloorSnapshot floor => floor.DueStep, LoadingBayLiftSnapshot lift => lift.DueStep, _ => 0UL })
+    internal IEnumerable<ulong> DueSteps() => LoadingBayE1M1SemanticCatalog.Doors
+        .Select(value => Door(value.EntityId).DueStep)
+        .Concat(LoadingBayE1M1SemanticCatalog.Floors.Select(value => Floor(value.EntityId).DueStep))
+        .Concat(LoadingBayE1M1SemanticCatalog.Lifts.Select(value => Lift(value.EntityId).DueStep))
         .Where(value => value != 0).Distinct();
 
     private static bool Same<T>(IReadOnlyCollection<T> values, ICollection<ulong> keys, Func<T, ulong> id) => values.Count == keys.Count && values.Select(id).Distinct().Count() == values.Count && values.All(value => keys.Contains(id(value)));
-    private static void Replace<T>(Dictionary<ulong, T> destination, IEnumerable<T> values, Func<T, ulong> id) { foreach (T value in values) destination[id(value)] = value; }
 }
