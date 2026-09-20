@@ -189,7 +189,7 @@ for (const section of ["dependencies", "devDependencies"]) {
 const gameProjectPath = resolve(repoRoot, "csharp/LoadingBay.Game/LoadingBay.Game.csproj");
 const gameProject = readFileSync(gameProjectPath, "utf8");
 for (const [label, marker] of [
-  ["packaged Rusty.Engine SDK", '<PackageReference Include="Rusty.Engine" Version="0.1.0-dev.79e11693bbad"'],
+  ["packaged Rusty.Engine SDK", '<PackageReference Include="Rusty.Engine" Version="0.1.0-dev.681ec653ab6a"'],
   ["explicit product entry type", "<RustyEngineProductEntryType>LoadingBay.Game.LoadingBayProduct</RustyEngineProductEntryType>"],
   ["Angular staged UI root", "<RustyEngineProductUiRoot>$(MSBuildThisFileDirectory)../../dist/apps/loading-bay/browser</RustyEngineProductUiRoot>"],
   ["E1M1 content root", "<RustyEngineProductContentRoot>$(MSBuildThisFileDirectory)../../content</RustyEngineProductContentRoot>"],

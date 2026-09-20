@@ -10,13 +10,13 @@ namespace LoadingBay.Game;
 internal sealed class LoadingBaySnapshotCodec : IProductStateCodec<LoadingBaySnapshot>
 {
     internal const uint CurrentSchema = 8;
-    public uint SchemaVersion => CurrentSchema;
 
     public void Encode(in LoadingBaySnapshot state, IBufferWriter<byte> destination)
     {
         using var stream = new MemoryStream();
         using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
         {
+            writer.Write(CurrentSchema);
             writer.Write(state.ContentIdentity); writer.Write(state.Health); writer.Write(state.Armor); writer.Write((int)state.ArmorProtection.Mode); writer.Write(state.ArmorProtection.AbsorptionDivisor); writer.Write(state.Bullets); writer.Write(state.Shells); writer.Write(state.Complete);
             Write(writer, state.OwnedWeapons); writer.Write(state.EquippedWeapon is not null); if (state.EquippedWeapon is not null) writer.Write(state.EquippedWeapon);
             Write(writer, state.WeaponCooldowns); Write(writer, state.Player);
@@ -28,6 +28,7 @@ internal sealed class LoadingBaySnapshotCodec : IProductStateCodec<LoadingBaySna
     public LoadingBaySnapshot Decode(ReadOnlySpan<byte> payload)
     {
         using var reader = new BinaryReader(new MemoryStream(payload.ToArray()), Encoding.UTF8, leaveOpen: false);
+        if (reader.ReadUInt32() != CurrentSchema) throw new InvalidOperationException("Unsupported Loading Bay save format.");
         string identity = reader.ReadString(); long health = reader.ReadInt64(); long armor = reader.ReadInt64(); LoadingBayArmorProtection protection = new((LoadingBayArmorProtectionMode)reader.ReadInt32(), reader.ReadInt32()); ulong bullets = reader.ReadUInt64(); ulong shells = reader.ReadUInt64(); bool complete = reader.ReadBoolean();
         string[] weapons = Read(reader); string? equipped = reader.ReadBoolean() ? reader.ReadString() : null;
         LoadingBayWeaponCooldownSnapshot[] cooldowns = ReadCooldowns(reader); LoadingBayPlayerSnapshot player = ReadPlayer(reader);

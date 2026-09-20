@@ -237,8 +237,8 @@ state.Dispose();
 
 var persistence = new InMemoryPersistenceService(); using var persisted = new LoadingBaySession(persistence); persisted.Update(Update(step: 7)); persisted.ApplyDamage("player", 12, "persistence"); long savedHealth = persisted.Readout().Health;
 Require(persisted.Save("e1m1").Accepted, "Engine ProductStateStore did not save"); persisted.ApplyDamage("player", 20, "mutation"); Require(persisted.Load("e1m1").Accepted && persisted.Readout().Health == savedHealth, "Engine ProductStateStore did not restore");
-persistence.Seed("loading-bay", "corrupt", LoadingBaySnapshotCodec.CurrentSchema, [0xff]); long beforeCorrupt = persisted.Readout().Health; bool corruptRejected = false; try { persisted.Load("corrupt"); } catch (Exception) { corruptRejected = true; }
-Require(corruptRejected && persisted.Readout().Health == beforeCorrupt, "corrupt persistence mutated state"); persistence.Seed("loading-bay", "old", 1, []); bool oldRejected = false; try { persisted.Load("old"); } catch (InvalidOperationException) { oldRejected = true; }
+persistence.Seed("loading-bay", "corrupt", [0xff]); long beforeCorrupt = persisted.Readout().Health; bool corruptRejected = false; try { persisted.Load("corrupt"); } catch (Exception) { corruptRejected = true; }
+Require(corruptRejected && persisted.Readout().Health == beforeCorrupt, "corrupt persistence mutated state"); persistence.Seed("loading-bay", "old", BitConverter.GetBytes(1u)); bool oldRejected = false; try { persisted.Load("old"); } catch (InvalidOperationException) { oldRejected = true; }
 Require(oldRejected && persisted.Readout().Health == beforeCorrupt, "old schema was accepted or mutated state"); Console.WriteLine("Loading Bay lifecycle exercise passed.");
 
 static ProductUpdate Update(ulong step = 1, uint admittedSteps = 1) => new(new ProductUpdateFacts(ProductUpdateMode.Demand, ProductLifecycleState.Running, 1, 1, 0, step, 0, admittedSteps, 0, 0), ReadOnlySpan<ProductInputEvent>.Empty);
@@ -269,12 +269,12 @@ file class RecordingSession : ILoadingBaySession
 file sealed class ThrowingDisposeSession : RecordingSession { public override void Dispose() { base.Dispose(); throw new InvalidOperationException("expected old-session disposal failure"); } }
 file sealed class InMemoryPersistenceService : IPersistenceService
 {
-    private sealed record Saved(uint SchemaVersion, ulong Revision, byte[] Payload); private readonly Dictionary<ulong, string> _scopes = []; private readonly Dictionary<ulong, Saved> _blobs = []; private readonly Dictionary<(string Scope, string Key), Saved> _saved = []; private ulong _next = 1;
+    private sealed record Saved(ulong Revision, byte[] Payload); private readonly Dictionary<ulong, string> _scopes = []; private readonly Dictionary<ulong, Saved> _blobs = []; private readonly Dictionary<(string Scope, string Key), Saved> _saved = []; private ulong _next = 1;
     public PersistenceStore OpenStore(PersistenceOpenRequest request) { ulong handle = _next++; _scopes.Add(handle, request.Scope); return new(new PersistenceStoreHandle(handle), () => _scopes.Remove(handle)); }
-    public PersistenceSaveReceipt Save(PersistenceSaveRequest request) { var key = (_scopes[request.Store.Handle.Value], request.Key); _saved.TryGetValue(key, out Saved? old); ulong revision = (old?.Revision ?? 0) + 1; _saved[key] = new(request.SchemaVersion, revision, request.Payload.ToArray()); return new(revision, request.SchemaVersion); }
-    public PersistenceBlob Load(PersistenceLoadRequest request) { _saved.TryGetValue((_scopes[request.Store.Handle.Value], request.Key), out Saved? saved); ulong handle = _next++; _blobs.Add(handle, saved ?? new(0, 0, [])); return new(new PersistenceBlobHandle(handle), () => _blobs.Remove(handle)); }
-    public PersistenceBlobInfo DescribeBlob(PersistenceBlob blob) { Saved saved = _blobs[blob.Handle.Value]; return new(saved.Revision != 0, saved.SchemaVersion, saved.Revision, (nuint)saved.Payload.Length); }
+    public PersistenceSaveReceipt Save(PersistenceSaveRequest request) { var key = (_scopes[request.Store.Handle.Value], request.Key); _saved.TryGetValue(key, out Saved? old); ulong revision = (old?.Revision ?? 0) + 1; _saved[key] = new(revision, request.Payload.ToArray()); return new(PersistenceSaveOutcome.Saved, revision); }
+    public PersistenceBlob Load(PersistenceLoadRequest request) { _saved.TryGetValue((_scopes[request.Store.Handle.Value], request.Key), out Saved? saved); ulong handle = _next++; _blobs.Add(handle, saved ?? new(0, [])); return new(new PersistenceBlobHandle(handle), () => _blobs.Remove(handle)); }
+    public PersistenceBlobInfo DescribeBlob(PersistenceBlob blob) { Saved saved = _blobs[blob.Handle.Value]; return new(saved.Revision != 0, saved.Revision, (nuint)saved.Payload.Length); }
     public void CopyBlob(PersistenceCopyBlobRequest request) => _blobs[request.Blob.Handle.Value].Payload.CopyTo(request.Destination.Span);
     public ReadOnlyMemory<byte> ReadBlobBytes(PersistenceBlob blob) => _blobs[blob.Handle.Value].Payload;
-    public void Seed(string scope, string key, uint schema, byte[] payload) => _saved[(scope, key)] = new(schema, 1, payload);
+    public void Seed(string scope, string key, byte[] payload) => _saved[(scope, key)] = new(1, payload);
 }

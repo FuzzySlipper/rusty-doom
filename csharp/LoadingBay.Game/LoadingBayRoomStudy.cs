@@ -1,13 +1,22 @@
 using System.Numerics;
 using Rusty.Engine;
+using Rusty.Engine.Debugging;
 using Rusty.Engine.Entities;
 using Rusty.Engine.Implicit;
 
 namespace LoadingBay.Game;
 
 /// <summary>Authored DC level with retained geometry and recipe-owned gameplay.</summary>
-internal sealed class LoadingBayRoomStudy : ILoadingBaySession
+internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpatialObservationSession
 {
+    private const int SpatialMapMaximumRadius = 15;
+    private const double SpatialMapHalfCell = .5d;
+    private const int SpatialMapMaximumAnnotations = 128;
+    private const double SpatialMapFloorClearance = .05d;
+    private const double SpatialMapCeilingClearance = .05d;
+    private const double SpatialMapNavigationBelowSupport = .05d;
+    private const uint SpatialMapDoorCollisionGroup = 1;
+    private const uint SpatialMapDoorCollisionMask = uint.MaxValue;
     private LoadingBayStudyAudit? _studyAudit;
     private string? _geometryAudit;
     internal string GeometryAudit
@@ -240,6 +249,138 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession
         (ulong)_gameplay.Bullets, (ulong)_gameplay.Shells, [], null, [], _player.Capture(), [], [], _gameplay.Complete, 0, _tuning, [], 0);
     public LoadingBayReceipt DeveloperSetTrack(ulong generation, string track, int value, string correlation)
         => new(_gameplay.SetTrack(track, value), "recipe.track", correlation);
+
+    public DebugCommandResult ReadSpatialMap(string format, int radius, double cellSize)
+    {
+        Vector3 playerPosition = _player.Position;
+        double supportY = playerPosition.Y - (_tuning.StandingCharacterHeight * .5d);
+        return CaptureSpatialMap(format, playerPosition.X, playerPosition.Z, supportY, radius, cellSize);
+    }
+
+    public DebugCommandResult ReadSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
+        => CaptureSpatialMap(format, centerX, centerZ, supportY, radius, cellSize);
+
+    private DebugCommandResult CaptureSpatialMap(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
+    {
+        if (!TryMapFormat(format, out bool json))
+            return InvalidSpatialMapArguments("Format must be ascii or json.");
+        if (radius < 0 || radius > SpatialMapMaximumRadius)
+            return InvalidSpatialMapArguments($"Radius must be between 0 and {SpatialMapMaximumRadius} cells.");
+        if (!double.IsFinite(cellSize) || cellSize <= 0d)
+            return InvalidSpatialMapArguments("Cell size must be finite and greater than zero.");
+        if (!double.IsFinite(centerX) || !double.IsFinite(centerZ) || !double.IsFinite(supportY))
+            return InvalidSpatialMapArguments("Center and supportY must be finite.");
+
+        double originX = centerX - ((radius + SpatialMapHalfCell) * cellSize);
+        double originZ = centerZ - ((radius + SpatialMapHalfCell) * cellSize);
+        double collisionMinimumY = supportY + SpatialMapFloorClearance;
+        double collisionMaximumY = supportY + _tuning.StandingCharacterHeight - SpatialMapCeilingClearance;
+        double navigationMinimumY = supportY - SpatialMapNavigationBelowSupport;
+        double navigationMaximumY = supportY + _tuning.MaximumStepHeight;
+        if (!FitsSinglePrecision(originX) || !FitsSinglePrecision(originZ) || !FitsSinglePrecision(supportY)
+            || !double.IsFinite(collisionMinimumY) || !double.IsFinite(collisionMaximumY)
+            || !double.IsFinite(navigationMinimumY) || !double.IsFinite(navigationMaximumY))
+            return InvalidSpatialMapArguments("Map geometry is outside the supported finite world range.");
+
+        uint dimension = checked((uint)(radius * 2 + 1));
+        try
+        {
+            SpatialMapRequest request = new(
+                _player.Session,
+                new Vector3((float)originX, 0f, (float)originZ),
+                cellSize,
+                dimension,
+                dimension,
+                collisionMinimumY,
+                collisionMaximumY,
+                navigationMinimumY,
+                navigationMaximumY,
+                SpatialMapDoorColliders());
+            SpatialMapSnapshot snapshot = SpatialMapSnapshot.Capture(
+                _engine.Spatial,
+                request,
+                new SpatialMapObservation(
+                    $"generation={_facts.Generation};step={_facts.SimulationStep}",
+                    _player.Position,
+                    _player.Forward),
+                SpatialMapAnnotations(),
+                SpatialMapMaximumAnnotations);
+            return DebugCommandResult.Success(json ? snapshot.ToJson() : snapshot.ToAscii());
+        }
+        catch (ArgumentException error)
+        {
+            return InvalidSpatialMapArguments(error.Message);
+        }
+        catch (OverflowException error)
+        {
+            return InvalidSpatialMapArguments(error.Message);
+        }
+        catch (InvalidOperationException error)
+        {
+            return DebugCommandResult.Failure(DebugCommandStatus.Failed, $"Spatial map capture failed: {error.Message}");
+        }
+    }
+
+    private SpatialEntityCollider[] SpatialMapDoorColliders()
+    {
+        SpatialEntityCollider[] colliders = new SpatialEntityCollider[_doors.Length];
+        for (int index = 0; index < _doors.Length; index++)
+        {
+            CharacterObstacle obstacle = _doors[index].Obstacle;
+            Vector3 translation = obstacle.Transform.Translation;
+            colliders[index] = new SpatialEntityCollider(
+                obstacle.Entity,
+                obstacle.BoundsMin + translation,
+                obstacle.BoundsMax + translation,
+                SpatialMapDoorCollisionGroup,
+                SpatialMapDoorCollisionMask,
+                obstacle.CollisionEnabled,
+                true,
+                false);
+        }
+        return colliders;
+    }
+
+    private SpatialMapAnnotation[] SpatialMapAnnotations()
+    {
+        List<SpatialMapAnnotation> annotations = new(_doors.Length + _gameplay.Enemies.Length + _gameplay.Pickups.Length + 1);
+        foreach (LoadingBayStudyDoor door in _doors)
+        {
+            CharacterObstacle obstacle = door.Obstacle;
+            // Keep the doorway annotation at the passage even when its slab rises out of the slice.
+            Vector3 position = (obstacle.BoundsMin + obstacle.BoundsMax) * .5f;
+            string state = !door.Opening ? "closed" : door.Height >= LoadingBayStudyDoor.Travel ? "open" : "opening";
+            state = FormattableString.Invariant($"{state};raised={door.Height:G9}");
+            annotations.Add(new($"door:{door.Definition.Entity}", door.Definition.SurfaceName + " doorway", "door", state, position));
+        }
+        foreach (RecipeEnemy actor in _gameplay.Enemies)
+        {
+            string label = actor.Imp ? "imp" : "trooper";
+            string state = $"health={actor.Health};awake={actor.Awake.ToString().ToLowerInvariant()}";
+            annotations.Add(new($"actor:{actor.Id}", label, "hostile", state, actor.Position));
+        }
+        foreach (RecipePickup pickup in _gameplay.Pickups)
+        {
+            if (_gameplay.IsCollected(pickup.Id)) continue;
+            annotations.Add(new($"pickup:{pickup.Id}", pickup.Kind.ToString(), "pickup", "available", pickup.Position));
+        }
+        annotations.Add(new("exit:terminal", "southern terminal", "exit", _gameplay.Complete ? "complete" : "available", LoadingBayRecipeGameplay.ExitPosition));
+        return annotations.ToArray();
+    }
+
+    private static bool TryMapFormat(string format, out bool json)
+    {
+        json = false;
+        if (string.Equals(format, "ascii", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(format, "json", StringComparison.OrdinalIgnoreCase)) { json = true; return true; }
+        return false;
+    }
+
+    private static bool FitsSinglePrecision(double value)
+        => double.IsFinite(value) && value >= float.MinValue && value <= float.MaxValue;
+
+    private static DebugCommandResult InvalidSpatialMapArguments(string message)
+        => DebugCommandResult.Failure(DebugCommandStatus.InvalidArguments, message);
 
     public void Dispose()
     {

@@ -80,6 +80,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     internal bool DamageFlash => _time < _damageUntil;
     internal int Kills => Enemies.Count(e => e.Health <= 0);
     internal int Collected => _collected.Count;
+    internal bool IsCollected(ulong pickupId) => _collected.Contains(pickupId);
     internal string Describe() => $"weapon={Weapon};shells={Shells};fireballs={_fireballs.Count};actors=" + string.Join('|', Enemies.Select(e => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{e.Id}:{e.Health}@{e.Position.X:R},{e.Position.Y:R},{e.Position.Z:R}")));
     internal string Weapon => SelectedWeapon.ToString();
     internal string Message { get; private set; } = "Find supplies. Reach the southern terminal. E opens doors.";

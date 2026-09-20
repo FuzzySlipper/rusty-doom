@@ -36,7 +36,8 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(context);
         _entityWorldDebug = CreateEntityStoreDebugModule();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt,
+            () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
 
         if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
         {
@@ -113,7 +114,8 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
         _entityWorldDebug = CreateEntityStoreDebugModule();
         _session = _sessionFactory();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt,
+            () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
         AdoptDebugWorld(_session);
     }
 
@@ -430,6 +432,16 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             return DebugCommandResult.Failure(DebugCommandStatus.Failed, receipt.Code);
         return DebugCommandResult.Success($"{track}={value};code={receipt.Code}");
     }
+
+    private DebugCommandResult DebugSpatialMap(string format, int radius, double cellSize)
+        => _session is ILoadingBaySpatialObservationSession observation
+            ? observation.ReadSpatialMap(format, radius, cellSize)
+            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Spatial map is unavailable for this Loading Bay session.");
+
+    private DebugCommandResult DebugSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
+        => _session is ILoadingBaySpatialObservationSession observation
+            ? observation.ReadSpatialMapAt(format, centerX, centerZ, supportY, radius, cellSize)
+            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Spatial map is unavailable for this Loading Bay session.");
 
     private void RetainRetirementFailure(Exception failure)
     {
