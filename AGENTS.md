@@ -20,7 +20,7 @@ Loading Bay is an ordinary C# product using the packaged Rusty Engine SDK. Doom 
 ## Review
 
 - Per-task persistent review uses `docs/agent-review/` packets (policy: `[doc: rusty-doom/agent-review-workflow]`).
-- Three lanes run on every task: Engine reuse, Existing product reuse, Runtime trust (temporary counterbalance until campaign #8376 lands). Pick optional lanes to a total of three to four reviewers whose questions can disagree.
+- Three lanes run on every task: Engine reuse, Existing product reuse, Runtime trust. Pick optional lanes to a total of three to four reviewers whose questions can disagree.
 - `subagent_review` for fresh-context adversarial/requirement lanes; `subagent_audit` for lanes needing the change's rationale. Open one reviewer per lane in one message and keep working; `send_message` the same reviewer for revision rounds.
 
 ## Proof
