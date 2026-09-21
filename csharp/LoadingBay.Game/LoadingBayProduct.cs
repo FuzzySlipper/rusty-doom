@@ -36,7 +36,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(context);
         _entityWorldDebug = CreateEntityStoreDebugModule();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt,
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation,
             () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
 
         if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
@@ -114,7 +114,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
         _entityWorldDebug = CreateEntityStoreDebugModule();
         _session = _sessionFactory();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt,
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation,
             () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
         AdoptDebugWorld(_session);
     }
@@ -442,6 +442,11 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         => _session is ILoadingBaySpatialObservationSession observation
             ? observation.ReadSpatialMapAt(format, centerX, centerZ, supportY, radius, cellSize)
             : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Spatial map is unavailable for this Loading Bay session.");
+
+    private DebugCommandResult DebugCombatObservation()
+        => _session is ILoadingBaySpatialObservationSession observation
+            ? observation.ReadCombatObservation()
+            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Combat observation is unavailable for this Loading Bay session.");
 
     private void RetainRetirementFailure(Exception failure)
     {

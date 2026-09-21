@@ -11,12 +11,14 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
     private readonly Func<string, int, DebugCommandResult> _setTrack;
     private readonly Func<string, int, double, DebugCommandResult> _spatialMap;
     private readonly Func<string, double, double, double, int, double, DebugCommandResult> _spatialMapAt;
+    private readonly Func<DebugCommandResult> _combatObservation;
 
     public LoadingBayLiveDebugModule(
         Func<string> readout,
         Func<string, int, DebugCommandResult> setTrack,
         Func<string, int, double, DebugCommandResult> spatialMap,
         Func<string, double, double, double, int, double, DebugCommandResult> spatialMapAt,
+        Func<DebugCommandResult> combatObservation,
         Func<string>? geometryAudit = null,
         Func<bool, string>? diagnostics = null)
     {
@@ -26,6 +28,7 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
         _setTrack = setTrack ?? throw new ArgumentNullException(nameof(setTrack));
         _spatialMap = spatialMap ?? throw new ArgumentNullException(nameof(spatialMap));
         _spatialMapAt = spatialMapAt ?? throw new ArgumentNullException(nameof(spatialMapAt));
+        _combatObservation = combatObservation ?? throw new ArgumentNullException(nameof(combatObservation));
     }
 
     [DebugCommand("loading-bay.diagnostics", Description = "Enable or disable continuous HUD diagnostics (4 Hz); default is disabled.")]
@@ -46,6 +49,9 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
     [DebugCommand("spatial.map-at", Description = "Captures the live omniscient X/Z map at an explicit center and support height. Format is ascii or json; radius and cellSize are explicit.")]
     public DebugCommandResult SpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
         => _spatialMapAt(format, centerX, centerZ, supportY, radius, cellSize);
+
+    [DebugCommand("combat.observe", Description = "Captures compact, read-only RoomStudy player, nearby hostile, and door combat facts.")]
+    public DebugCommandResult CombatObserve() => _combatObservation();
 
     private string AuditPart(bool continuity)
     {

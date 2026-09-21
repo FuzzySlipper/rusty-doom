@@ -75,6 +75,12 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     internal bool Complete { get; private set; }
     internal bool Dead => Health <= 0;
     internal bool WeaponFlash => FlashFrame is not null;
+    internal bool WeaponReady => !Dead && !Complete && _time >= _readyAt;
+    internal RecipeAimHit ObserveAimHit()
+    {
+        SpatialHit hit = CastWeaponRay(SelectedWeapon, _player.Forward, CombatColliders());
+        return new(hit.Present, hit.Kind.ToString(), hit.Entity, hit.Distance, WeaponRange(SelectedWeapon));
+    }
     private string WeaponFrame => LoadingBayRecipeAnimation.At(LoadingBayRecipeAnimation.Frames(SelectedWeapon), _time - _weaponStarted) ?? LoadingBayRecipeAnimation.Idle(SelectedWeapon);
     private string? FlashFrame => _firingWeapon == RecipeWeapon.Fist ? null : LoadingBayRecipeAnimation.At(_firingWeapon == RecipeWeapon.Shotgun ? LoadingBayRecipeAnimation.ShotgunFlash : LoadingBayRecipeAnimation.PistolFlash, _time - _weaponStarted - LoadingBayRecipeAnimation.FireDelay(_firingWeapon));
     internal bool DamageFlash => _time < _damageUntil;
@@ -249,7 +255,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
         {
             Vector3 direction = _player.Forward;
             if (pellets > 1) direction = Vector3.Transform(direction, Quaternion.CreateFromAxisAngle(Vector3.UnitY, (i - 3) * .018f));
-            var hit = _engine.Spatial.CastRay(new(_player.Session, Eye, direction, fist ? PunchReach : 70, new(1, uint.MaxValue), colliders, new ulong[] { 1 }, colliders));
+            SpatialHit hit = CastWeaponRay(weapon, direction, colliders);
             if (!hit.Present || hit.Kind != SpatialHitKind.Entity) continue;
             var enemy = Enemies.FirstOrDefault(e => e.Id == hit.Entity && e.Health > 0);
             if (enemy is null) continue;
@@ -263,6 +269,9 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     }
 
     private Vector3 Eye => _player.Position + Vector3.UnitY * _player.Tuning.EyeOffsetFromCenter;
+    private SpatialHit CastWeaponRay(RecipeWeapon weapon, Vector3 direction, SpatialEntityCollider[] colliders)
+        => _engine.Spatial.CastRay(new(_player.Session, Eye, direction, WeaponRange(weapon), new(1, uint.MaxValue), colliders, new ulong[] { 1 }, colliders));
+    private static double WeaponRange(RecipeWeapon weapon) => weapon == RecipeWeapon.Fist ? PunchReach : 70d;
     private SpatialEntityCollider[] CombatColliders() => Enemies.Where(e => e.Health > 0).Select(e => new SpatialEntityCollider(e.Id, e.Position - new Vector3(.4f, 0, .4f), e.Position + new Vector3(.4f, 1.75f, .4f), 1, uint.MaxValue, true, false, false))
         .Concat(_doors.Select(d => new SpatialEntityCollider(d.Definition.Entity, d.Definition.Min + d.Placement.Translation, d.Definition.Max + d.Placement.Translation, 1, uint.MaxValue, true, true, false))).ToArray();
     private void AdvanceEnemies()
@@ -402,3 +411,5 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     public void Dispose()
     { foreach (var ball in _fireballs) ball.Body.Dispose(); _projectileWorld.Dispose(); foreach (var sprite in _sprites.Values) sprite.Dispose(); foreach (var texture in _textures.Values) texture.Dispose(); }
 }
+
+internal readonly record struct RecipeAimHit(bool Present, string Kind, ulong Entity, double Distance, double Range);

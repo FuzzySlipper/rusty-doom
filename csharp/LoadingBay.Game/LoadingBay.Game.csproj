@@ -38,6 +38,7 @@
     <RustyEngineProductInputMapping Include="player.jump" Intent="player.jump" Trigger="key:space:pressed" />
     <RustyEngineProductInputMapping Include="player.use" Intent="player.use" Trigger="key:key-e:pressed" />
     <RustyEngineProductInputMapping Include="player.fire" Intent="player.fire" Trigger="pointer-button:primary:pressed" />
+    <RustyEngineProductInputMapping Include="player.fire.ctrl" Intent="player.fire" Trigger="key:control-left:pressed" />
     <RustyEngineProductInputMapping Include="player.look.x" Intent="player.look.x" Trigger="pointer-axis:x" />
     <RustyEngineProductInputMapping Include="player.look.y" Intent="player.look.y" Trigger="pointer-axis:y" />
     <RustyEngineProductInputIntent Include="player.move.analog-x" Value="axis" />

@@ -51,7 +51,15 @@ internal sealed record LoadingBayTuning(
     internal float AirAcceleration { get; init; } = 10f;
     internal float ControllerStickDeadzone { get; init; } = .15f;
     internal float ControllerLookDegreesPerSecond { get; init; } = 108f;
+    internal const float KeyboardLookDegreesPerSecond = 120f;
+    internal const float KeyboardPrecisionLookMultiplier = .2f;
     internal const ControllerButton FireControllerButton = ControllerButton.Button7;
+    internal const KeyboardControl FireKeyboardControl = KeyboardControl.ControlLeft;
+    internal const KeyboardControl PrecisionLookKeyboardControl = KeyboardControl.ShiftLeft;
+    internal const KeyboardControl LookLeftKeyboardControl = KeyboardControl.KeyJ;
+    internal const KeyboardControl LookRightKeyboardControl = KeyboardControl.KeyL;
+    internal const KeyboardControl LookUpKeyboardControl = KeyboardControl.KeyI;
+    internal const KeyboardControl LookDownKeyboardControl = KeyboardControl.KeyK;
 
     internal LookConfig PointerLook => new(
         LookDegreesPerUnit * MathF.PI / 180f, LookDegreesPerUnit * MathF.PI / 180f,

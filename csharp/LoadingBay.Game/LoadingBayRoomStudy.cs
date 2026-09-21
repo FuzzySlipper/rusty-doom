@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text.Json;
 using Rusty.Engine;
 using Rusty.Engine.Debugging;
 using Rusty.Engine.Entities;
@@ -17,6 +18,9 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     private const double SpatialMapNavigationBelowSupport = .05d;
     private const uint SpatialMapDoorCollisionGroup = 1;
     private const uint SpatialMapDoorCollisionMask = uint.MaxValue;
+    private const float CombatObservationRange = 64f;
+    private const float RadiansToDegrees = 180f / MathF.PI;
+    private static readonly JsonSerializerOptions CombatObservationJson = new(JsonSerializerDefaults.Web);
     private LoadingBayStudyAudit? _studyAudit;
     private string? _geometryAudit;
     internal string GeometryAudit
@@ -261,6 +265,66 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     public DebugCommandResult ReadSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
         => CaptureSpatialMap(format, centerX, centerZ, supportY, radius, cellSize);
 
+    public DebugCommandResult ReadCombatObservation()
+    {
+        try
+        {
+            Vector3 playerPosition = _player.Position;
+            Vector3 eye = playerPosition + (Vector3.UnitY * _tuning.EyeOffsetFromCenter);
+            RecipeEnemy[] enemies = _gameplay.Enemies
+                .Where(enemy => enemy.Health > 0 && Vector3.Distance(playerPosition, enemy.Position) <= CombatObservationRange)
+                .OrderBy(enemy => Vector3.DistanceSquared(playerPosition, enemy.Position))
+                .ToArray();
+            Dictionary<ulong, bool> lineOfSight = QueryEnemyLineOfSight(enemies);
+            LoadingBayPlayerSnapshot player = _player.Capture();
+            RecipeAimHit aimHit = _gameplay.ObserveAimHit();
+            Vector3 forward = _player.Forward;
+            Vector3 planarForward = Vector3.Normalize(new Vector3(forward.X, 0f, forward.Z));
+            Vector3 right = new(-planarForward.Z, 0f, planarForward.X);
+
+            var observation = new
+            {
+                stamp = new { generation = _facts.Generation, step = _facts.SimulationStep },
+                controls = new
+                {
+                    move = "WASD",
+                    yaw = new { left = "J", right = "L", degreesPerSecond = LoadingBayTuning.KeyboardLookDegreesPerSecond, positive = "right" },
+                    pitch = new { up = "I", down = "K", degreesPerSecond = LoadingBayTuning.KeyboardLookDegreesPerSecond, positive = "up" },
+                    precisionLook = new { key = "ShiftLeft", multiplier = LoadingBayTuning.KeyboardPrecisionLookMultiplier, degreesPerSecond = LoadingBayTuning.KeyboardLookDegreesPerSecond * LoadingBayTuning.KeyboardPrecisionLookMultiplier },
+                    fire = "ControlLeft",
+                    useKey = "E",
+                    bearingDegrees = "positive right",
+                    aimPitchErrorDegrees = "positive means aim up"
+                },
+                player = new
+                {
+                    position = VectorValue(playerPosition),
+                    yawDegrees = player.Look.YawRadians * RadiansToDegrees,
+                    pitchDegrees = player.Look.PitchRadians * RadiansToDegrees,
+                    health = _gameplay.Health,
+                    dead = _gameplay.Dead,
+                    ammo = new { bullets = _gameplay.Bullets, shells = _gameplay.Shells },
+                    weapon = _gameplay.Weapon,
+                    weaponReady = _gameplay.WeaponReady,
+                    aimHit = new { present = aimHit.Present, kind = aimHit.Kind, entity = aimHit.Entity, distance = aimHit.Distance, range = aimHit.Range },
+                    kills = _gameplay.Kills
+                },
+                enemies = enemies.Select(enemy => EnemyObservation(enemy, eye, planarForward, right, lineOfSight[enemy.Id])).ToArray(),
+                doors = _doors.Select(door => new
+                {
+                    id = door.Definition.Entity,
+                    state = DoorState(door),
+                    raised = door.Height
+                }).ToArray()
+            };
+            return DebugCommandResult.Success(JsonSerializer.Serialize(observation, CombatObservationJson));
+        }
+        catch (InvalidOperationException error)
+        {
+            return DebugCommandResult.Failure(DebugCommandStatus.Failed, $"Combat observation failed: {error.Message}");
+        }
+    }
+
     private DebugCommandResult CaptureSpatialMap(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
     {
         if (!TryMapFormat(format, out bool json))
@@ -341,6 +405,56 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
         }
         return colliders;
     }
+
+    private Dictionary<ulong, bool> QueryEnemyLineOfSight(RecipeEnemy[] enemies)
+    {
+        if (enemies.Length == 0) return [];
+        Vector3 eye = _player.Position + (Vector3.UnitY * _tuning.EyeOffsetFromCenter);
+        SpatialEntityCollider[] doors = SpatialMapDoorColliders();
+        Dictionary<ulong, bool> result = new(enemies.Length);
+        foreach (RecipeEnemy enemy in enemies)
+        {
+            Vector3 target = enemy.Position + (Vector3.UnitY * .875f);
+            SpatialHit hit = _engine.Spatial.CastSegment(new SpatialSegmentCastRequest(
+                _player.Session,
+                eye,
+                target,
+                new SpatialQueryFilter(1, uint.MaxValue),
+                doors,
+                ReadOnlyMemory<ulong>.Empty,
+                doors));
+            result.Add(enemy.Id, !hit.Present);
+        }
+        return result;
+    }
+
+    private object EnemyObservation(RecipeEnemy enemy, Vector3 eye, Vector3 planarForward, Vector3 right, bool lineOfSight)
+    {
+        Vector3 target = enemy.Position + (Vector3.UnitY * .875f);
+        Vector3 offset = target - eye;
+        float horizontalDistance = MathF.Sqrt((offset.X * offset.X) + (offset.Z * offset.Z));
+        float distance = offset.Length();
+        float bearingDegrees = MathF.Atan2(Vector3.Dot(offset, right), Vector3.Dot(offset, planarForward)) * RadiansToDegrees;
+        float targetPitch = MathF.Atan2(offset.Y, horizontalDistance);
+        float currentPitch = MathF.Asin(Math.Clamp(_player.Forward.Y, -1f, 1f));
+        return new
+        {
+            id = enemy.Id,
+            kind = enemy.Imp ? "imp" : "trooper",
+            position = VectorValue(enemy.Position),
+            health = enemy.Health,
+            awake = enemy.Awake,
+            distance,
+            bearingDegrees,
+            aimPitchErrorDegrees = (targetPitch - currentPitch) * RadiansToDegrees,
+            lineOfSight
+        };
+    }
+
+    private static string DoorState(LoadingBayStudyDoor door)
+        => !door.Opening ? "closed" : door.Height >= LoadingBayStudyDoor.Travel ? "open" : "opening";
+
+    private static object VectorValue(Vector3 value) => new { x = value.X, y = value.Y, z = value.Z };
 
     private SpatialMapAnnotation[] SpatialMapAnnotations()
     {

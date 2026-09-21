@@ -489,7 +489,7 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
       </details>
 
       <div class="controls-hint">
-        WASD MOVE · MOUSE LOOK · CLICK FIRE · E USE · R RESTART · 1 FIST · 2 PISTOL · 3 SHOTGUN
+        WASD MOVE · MOUSE LOOK · J/L TURN · I/K PITCH · SHIFT PRECISION · CLICK/CTRL FIRE · E USE · R RESTART · 1 FIST · 2 PISTOL · 3 SHOTGUN
       </div>
       @if (statusText(); as text) {
         <div class="status-message" [class.dead]="snapshot().dead">

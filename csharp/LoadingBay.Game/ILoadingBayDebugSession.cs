@@ -18,4 +18,6 @@ internal interface ILoadingBaySpatialObservationSession
     DebugCommandResult ReadSpatialMap(string format, int radius, double cellSize);
 
     DebugCommandResult ReadSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize);
+
+    DebugCommandResult ReadCombatObservation();
 }

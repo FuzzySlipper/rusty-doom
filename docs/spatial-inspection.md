@@ -31,3 +31,24 @@ and report its open/closed state and raised height. Actor annotations report
 health and awake state; uncollected pickups and the terminal exit are also included.
 ASCII emits a legend, while JSON carries the same geometry, revisions, cells, and
 annotations in structured form. Live-debug responses are bounded to 64 KiB.
+
+## Room Study combat observation
+
+`combat.observe` takes no arguments and returns a compact read-only JSON snapshot
+for the active Room Study encounter. It includes a simulation `stamp`, keyboard
+control metadata, player pose/vitals/ammunition/current weapon/readiness/kills and
+the current weapon aim ray, then nearby living enemies and door state. Each enemy
+includes its identity, position, health/awake state, distance, relative bearing,
+aim pitch error, and line of sight. Positive bearing is right; a positive pitch
+error means aim up.
+
+The command reports J/L yaw and I/K pitch at 120 degrees per second; left Shift
+multiplies that rate by 0.2 (24 degrees per second); left Control fires. These are
+ordinary gameplay inputs, not debug movement or firing commands.
+
+Enemy line of sight uses the Engine's `Spatial.CastSegment` with the current door
+colliders. That is the Engine's full collision query, so the result accounts for
+voxels, retained static meshes, and doors just as a blocked weapon ray does.
+The Engine Perception path currently omits retained static-mesh occlusion; its
+owning correction is tracked by task #8385. The product therefore does not
+reinterpret geometry or synthesize visibility locally.

@@ -18,7 +18,7 @@ Engine contributors may explicitly select a source override with `./scripts/run-
 
 ## Controls
 
-Click the canvas to capture the mouse; Escape releases it. WASD moves, mouse movement looks, Space jumps, E uses, and a primary click fires.
+Click the canvas to capture the mouse; Escape releases it. WASD moves, mouse movement looks, Space jumps, E uses, and a primary click fires. Browser automation can use J/L to turn and I/K to pitch at 120 degrees per second; hold left Shift for precision look at 24 degrees per second. Left Control fires.
 
 Standard gamepads (including the Wolf tester) use the left stick to move, right stick to look, A to jump, X to use, and a right-trigger press to fire. Sticks have a 15% radial dead zone and proportional movement; right-stick look reaches 108 degrees per second. Release controls to stop, then press again to resume. Gameplay input state clears on focus loss and restore.
 
@@ -53,6 +53,7 @@ Browser-facing work still needs focused visible evidence of the affected canvas/
 - [C# migration map](docs/code-migration-map.md)
 - [E1M1 gameplay ledger](docs/doom-e1m1-gameplay-ledger.md)
 - [Presentation frame](docs/presentation-frame.md)
+- [Spatial and combat inspection](docs/spatial-inspection.md)
 - [Source provenance](docs/source-provenance.md)
 
 ## Optional spawn-room construction study
