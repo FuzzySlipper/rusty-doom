@@ -1,6 +1,7 @@
 using System.Numerics;
 using Rusty.Engine;
 using Rusty.Engine.Input;
+using Rusty.Engine.Interaction;
 
 namespace LoadingBay.Game;
 
@@ -60,6 +61,12 @@ internal sealed record LoadingBayTuning(
     internal const KeyboardControl LookRightKeyboardControl = KeyboardControl.KeyL;
     internal const KeyboardControl LookUpKeyboardControl = KeyboardControl.KeyI;
     internal const KeyboardControl LookDownKeyboardControl = KeyboardControl.KeyK;
+    internal static AimAssistConfig GamepadAimAssist { get; } = new(
+        SlowdownAngleRadians: .26f,
+        MinimumLookScale: .42f,
+        TrackingRadiansPerSecond: .9f,
+        ShotConeRadians: .18f,
+        MaximumShotCorrectionRadians: .08f);
 
     internal LookConfig PointerLook => new(
         LookDegreesPerUnit * MathF.PI / 180f, LookDegreesPerUnit * MathF.PI / 180f,

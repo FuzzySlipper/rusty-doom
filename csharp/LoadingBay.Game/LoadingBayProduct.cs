@@ -301,6 +301,8 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         ArgumentNullException.ThrowIfNull(registrar);
         registrar.Register(_liveDebug);
         registrar.Register(_entityWorldDebug);
+        if (_session is ILoadingBayInteractionDebugSession interaction)
+            registrar.Register(interaction.InteractionDebugModule);
     }
 
     private static ILoadingBaySession CreateSession(

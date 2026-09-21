@@ -427,12 +427,14 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         ProductUpdate update,
         LoadingBayTuning tuning,
         Func<ulong, bool, ulong, LoadingBayCharacterStepEnvironment> prepareCharacterStep,
-        Action<ulong> reconcileAdmittedMovementStep, bool movementEnabled = true)
+        Action<ulong> reconcileAdmittedMovementStep,
+        bool movementEnabled = true,
+        Func<Vector2, float, bool, Vector2>? adjustGamepadLook = null)
     {
         ThrowIfDisposed();
         if (_camera is null) throw new InvalidOperationException("Loading Bay's E1M1 camera is not active.");
         if (!_voxelPublished) throw new InvalidOperationException("Loading Bay's E1M1 voxel scene is not staged.");
-        LoadingBaySemanticInput input = ApplyInput(update);
+        LoadingBaySemanticInput input = ApplyInput(update, adjustGamepadLook);
         if (update.Facts.AdmittedStepCount > 0 && double.IsFinite(update.Facts.FixedDeltaSeconds) && update.Facts.FixedDeltaSeconds > 0d && update.Facts.FixedDeltaSeconds <= float.MaxValue)
         {
             float delta = (float)update.Facts.FixedDeltaSeconds;
@@ -472,17 +474,19 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    private LoadingBaySemanticInput ApplyInput(ProductUpdate update)
+    private LoadingBaySemanticInput ApplyInput(
+        ProductUpdate update,
+        Func<Vector2, float, bool, Vector2>? adjustGamepadLook)
     {
         float simulationSeconds = (float)(update.Facts.AdmittedStepCount * update.Facts.FixedDeltaSeconds);
-        LoadingBayPlayerInputFrame frame = _input.Consume(update.Input, simulationSeconds, _lookState);
+        LoadingBayPlayerInputFrame frame = _input.Consume(update.Input, simulationSeconds, _lookState, adjustGamepadLook);
         if (frame.Cleared) _jumpPressed = false;
         _lookState = frame.Look.After;
         _forward = frame.Look.Forward;
         _planarIntent = frame.Controls.Movement;
         _jumpPressed |= frame.Controls.JumpPressed;
         _jumpHeld = frame.Controls.JumpHeld;
-        return new LoadingBaySemanticInput(frame.Controls.UsePressed, frame.FireRequested);
+        return new LoadingBaySemanticInput(frame.Controls.UsePressed, frame.FireRequested, frame.GamepadAimActive);
     }
 
     private CameraDescriptor CameraDescriptor(LoadingBayTuning tuning) => new(
@@ -528,7 +532,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     }
 }
 
-internal readonly record struct LoadingBaySemanticInput(bool UseRequested, bool FireRequested);
+internal readonly record struct LoadingBaySemanticInput(bool UseRequested, bool FireRequested, bool GamepadAimActive);
 
 /// <summary>Derives every per-step Spatial tick from the one host-admitted update fact.</summary>
 internal static class LoadingBayAdmittedStepTicks

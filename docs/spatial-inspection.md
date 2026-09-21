@@ -42,6 +42,15 @@ includes its identity, position, health/awake state, distance, relative bearing,
 aim pitch error, and line of sight. Positive bearing is right; a positive pitch
 error means aim up.
 
+The observation also reports gamepad-assist activation, selected enemy, applied
+look scale and correction, plus fresh raw and assisted ray previews. These previews
+remain observations: the delayed weapon discharge refreshes candidates and sends
+only its returned direction through the ordinary `Spatial.CastRay`, so it cannot
+hit through geometry. `interaction.help` explains the shared object-use path;
+`interaction.inspect` lists current door/exit candidates and their rejection
+facts, and `interaction.use <id> <revision>` invokes the same product action as
+E/controller X after a fresh reach, visibility, availability, and revision check.
+
 The command reports J/L yaw and I/K pitch at 120 degrees per second; left Shift
 multiplies that rate by 0.2 (24 degrees per second); left Control fires. These are
 ordinary gameplay inputs, not debug movement or firing commands.

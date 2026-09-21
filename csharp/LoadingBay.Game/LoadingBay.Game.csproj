@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Rusty.Engine" Version="0.1.0-dev.681ec653ab6a" ExcludeAssets="$(RustyEnginePackageExcludeAssets)" />
+    <PackageReference Include="Rusty.Engine" Version="0.1.0-dev.e3602a0882ee" ExcludeAssets="$(RustyEnginePackageExcludeAssets)" />
     <RustyEngineProductInputIntent Include="player.move.forward" Value="digital" />
     <RustyEngineProductInputIntent Include="player.move.left" Value="digital" />
     <RustyEngineProductInputIntent Include="player.move.backward" Value="digital" />

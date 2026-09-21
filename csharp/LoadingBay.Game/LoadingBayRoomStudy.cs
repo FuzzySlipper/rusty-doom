@@ -4,11 +4,12 @@ using Rusty.Engine;
 using Rusty.Engine.Debugging;
 using Rusty.Engine.Entities;
 using Rusty.Engine.Implicit;
+using Rusty.Engine.Interaction;
 
 namespace LoadingBay.Game;
 
 /// <summary>Authored DC level with retained geometry and recipe-owned gameplay.</summary>
-internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpatialObservationSession
+internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpatialObservationSession, ILoadingBayInteractionDebugSession, IWorldInteractionScene
 {
     private const int SpatialMapMaximumRadius = 15;
     private const double SpatialMapHalfCell = .5d;
@@ -19,6 +20,10 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     private const uint SpatialMapDoorCollisionGroup = 1;
     private const uint SpatialMapDoorCollisionMask = uint.MaxValue;
     private const float CombatObservationRange = 64f;
+    private const float InteractionAcquireAngleRadians = .32f;
+    private const float InteractionReleaseAngleRadians = .48f;
+    private const float InteractionMaximumDistance = LoadingBayStudyDoor.UseDistance;
+    private const ulong ExitInteractionEntity = 33000;
     private const float RadiansToDegrees = 180f / MathF.PI;
     private static readonly JsonSerializerOptions CombatObservationJson = new(JsonSerializerDefaults.Web);
     private LoadingBayStudyAudit? _studyAudit;
@@ -54,6 +59,11 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     private readonly UiStream _hud = null!;
     private ulong _hudSequence;
     private readonly LoadingBayRecipeGameplay _gameplay = null!;
+    private readonly AimAssist _gamepadAim = new();
+    private readonly WorldInteraction _worldInteraction = null!;
+    private readonly InteractionDebugModule _interactionDebug = null!;
+    private AimAssistReadout? _aimReadout;
+    private ulong _interactionIncarnation = 1;
     private ulong _publishedRevision = ulong.MaxValue;
     private bool _diagnostics;
     private double _diagnosticElapsed;
@@ -121,6 +131,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             var instances = _meshes.Select((_, i) => i).Where(i => !_doorIndices.Contains(i)).Select(i => new StaticMeshInstance((ulong)i + 10000, (ulong)i + 10000, _placements[i])).ToArray();
             _player.PublishRoomMeshes(assets, instances);
             _gameplay = new(engine, _player, _doors);
+            _worldInteraction = new WorldInteraction(this);
+            _interactionDebug = new InteractionDebugModule(_worldInteraction);
             _hud = engine.Ui.OpenStream(new UiStreamRequest("loading-bay.hud", "loading-bay.hud.snapshot.v1"));
         }
         catch
@@ -155,17 +167,15 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                 _doorObstacles[i] = _doors[i].Obstacle;
             }
             return new(default, _doorObstacles);
-        }, tick => _gameplay.Advance(deltaSeconds, tick), !_gameplay.Dead && !_gameplay.Complete);
+        }, tick => _gameplay.Advance(deltaSeconds, tick), !_gameplay.Dead && !_gameplay.Complete,
+            adjustGamepadLook: ApplyGamepadAimAssistance);
+        _ = _worldInteraction.Update();
         foreach (var key in update.Input)
             if (key.Kind == InputEventKind.Key && key.Edge == InputEdge.Pressed)
             { if (key.Keyboard == KeyboardControl.Digit1) _gameplay.SelectWeapon(RecipeWeapon.Fist); if (key.Keyboard == KeyboardControl.Digit2) _gameplay.SelectWeapon(RecipeWeapon.Pistol); if (key.Keyboard == KeyboardControl.Digit3) _gameplay.SelectWeapon(RecipeWeapon.Shotgun); }
-        if (input.FireRequested) _gameplay.Fire();
+        if (input.FireRequested) _gameplay.Fire(CorrectShotDirection);
         if (input.UseRequested && !_gameplay.Dead)
-        {
-            Vector3 position = _player.Capture().Position;
-            foreach (LoadingBayStudyDoor doorState in _doors) if (doorState.Use(position)) break;
-            _gameplay.Use();
-        }
+            _ = _worldInteraction.UseFocused();
         if (moved)
         {
             for (int i = 0; i < _doors.Length; i++)
@@ -194,6 +204,7 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             _placements[_doorIndices[i]] = _placements[_doorIndices[i]] with { Translation = Vector3.Zero };
         }
         _gameplay.Restart();
+        _interactionIncarnation = checked(_interactionIncarnation + 1);
         Publish();
     }
     public void Attach() => Publish();
@@ -255,6 +266,97 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     public LoadingBayReceipt DeveloperSetTrack(ulong generation, string track, int value, string correlation)
         => new(_gameplay.SetTrack(track, value), "recipe.track", correlation);
 
+    public IDebugCommandModule InteractionDebugModule => _interactionDebug;
+
+    public InteractionSceneSnapshot ReadInteraction()
+    {
+        Vector3 player = _player.Position;
+        Vector3 eye = player + (Vector3.UnitY * _tuning.EyeOffsetFromCenter);
+        InteractionQuery query = new(eye, _player.Forward,
+            InteractionAcquireAngleRadians, InteractionReleaseAngleRadians,
+            InteractionMaximumDistance, InteractionMaximumDistance,
+            DistanceOrigin: player);
+        SpatialEntityCollider[] colliders = _gameplay.CombatColliders();
+        List<InteractionCandidate> candidates = [];
+        foreach (LoadingBayStudyDoor door in _doors)
+        {
+            Vector3 minimum = door.Definition.Min + door.Placement.Translation;
+            Vector3 maximum = door.Definition.Max + door.Placement.Translation;
+            Vector3 point = Vector3.Clamp(player, minimum, maximum);
+            InteractionVisibility visibility = InteractionVisibilityQuery.Cast(_engine.Spatial, _player.Session, eye, point,
+                new SpatialQueryFilter(1, uint.MaxValue), colliders, new[] { door.Definition.Entity });
+            candidates.Add(new InteractionCandidate(new InteractionTarget(door.Definition.Entity, InteractionRevision), door.Definition.SurfaceName,
+                point, LoadingBayStudyDoor.UseDistance, visibility,
+                door.Opening ? InteractionAvailability.Unavailable : InteractionAvailability.Available));
+        }
+        Vector3 exitPoint = LoadingBayRecipeGameplay.ExitPosition + Vector3.UnitY;
+        InteractionVisibility exitVisibility = InteractionVisibilityQuery.Cast(_engine.Spatial, _player.Session, eye, exitPoint,
+            new SpatialQueryFilter(1, uint.MaxValue), colliders, ReadOnlyMemory<ulong>.Empty);
+        candidates.Add(new InteractionCandidate(new InteractionTarget(ExitInteractionEntity, InteractionRevision), "hangar-exit", exitPoint,
+            LoadingBayStudyDoor.UseDistance, exitVisibility,
+            _gameplay.Complete ? InteractionAvailability.Unavailable : InteractionAvailability.Available));
+        string stamp = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"generation:{_facts.Generation};step:{_facts.SimulationStep};gameplay:{_gameplay.Revision}");
+        return new(query, candidates.ToArray(), stamp, "use");
+    }
+
+    public InteractionActionResult UseInteraction(InteractionTarget target)
+    {
+        LoadingBayStudyDoor? door = _doors.SingleOrDefault(value => value.Definition.Entity == target.Id);
+        if (door is not null)
+        {
+            bool opened = door.Use(_player.Position);
+            if (opened) _gameplay.Use();
+            return new(opened, opened ? "Door opening." : "Door is unavailable.");
+        }
+        if (target.Id != ExitInteractionEntity) return new(false, "Unknown interaction target.");
+        bool complete = _gameplay.Complete;
+        _gameplay.Use();
+        return new(!complete && _gameplay.Complete,
+            _gameplay.Complete ? "Hangar exit completed." : "Move closer to the hangar exit.");
+    }
+
+    private Vector2 ApplyGamepadAimAssistance(Vector2 lookDelta, float simulationSeconds, bool gamepadActive)
+    {
+        AimAssistConfig config = lookDelta.LengthSquared() > 0f
+            ? LoadingBayTuning.GamepadAimAssist
+            : LoadingBayTuning.GamepadAimAssist with { TrackingRadiansPerSecond = 0f };
+        _aimReadout = _gamepadAim.Update(AimCandidates(), AimQuery(), lookDelta, simulationSeconds, config, gamepadActive);
+        return _aimReadout.LookDeltaRadians;
+    }
+
+    private Vector3 CorrectShotDirection(Vector3 direction)
+    {
+        bool active = _aimReadout?.Active ?? false;
+        return _gamepadAim.CorrectShot(direction, AimCandidates(), AimQuery(), LoadingBayTuning.GamepadAimAssist, active).Direction;
+    }
+
+    private InteractionQuery AimQuery()
+    {
+        Vector3 player = _player.Position;
+        return new(player + (Vector3.UnitY * _tuning.EyeOffsetFromCenter), _player.Forward,
+            LoadingBayTuning.GamepadAimAssist.SlowdownAngleRadians,
+            LoadingBayTuning.GamepadAimAssist.SlowdownAngleRadians * 1.5f,
+            _gameplay.CurrentWeaponRange, _gameplay.CurrentWeaponRange,
+            DistanceOrigin: player);
+    }
+
+    private InteractionCandidate[] AimCandidates()
+    {
+        Vector3 eye = _player.Position + (Vector3.UnitY * _tuning.EyeOffsetFromCenter);
+        SpatialEntityCollider[] colliders = _gameplay.CombatColliders();
+        return _gameplay.Enemies.Where(enemy => enemy.Health > 0).Select(enemy =>
+        {
+            Vector3 point = enemy.Position + new Vector3(0f, .85f, 0f);
+            InteractionVisibility visibility = InteractionVisibilityQuery.Cast(_engine.Spatial, _player.Session, eye, point,
+                new SpatialQueryFilter(1, uint.MaxValue), colliders, new[] { 1UL, enemy.Id });
+            return new InteractionCandidate(new InteractionTarget(enemy.Id, InteractionRevision), $"enemy-{enemy.Id}", point,
+                _gameplay.CurrentWeaponRange, visibility, InteractionAvailability.Available);
+        }).ToArray();
+    }
+
+    private ulong InteractionRevision => checked(_facts.Generation + _interactionIncarnation);
+
     public DebugCommandResult ReadSpatialMap(string format, int radius, double cellSize)
     {
         Vector3 playerPosition = _player.Position;
@@ -277,8 +379,18 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                 .ToArray();
             Dictionary<ulong, bool> lineOfSight = QueryEnemyLineOfSight(enemies);
             LoadingBayPlayerSnapshot player = _player.Capture();
-            RecipeAimHit aimHit = _gameplay.ObserveAimHit();
             Vector3 forward = _player.Forward;
+            RecipeAimHit rawAimHit = _gameplay.ObserveAimHit(forward);
+            AimShotReadout shot = _gamepadAim.CorrectShot(forward, AimCandidates(), AimQuery(),
+                LoadingBayTuning.GamepadAimAssist, _aimReadout?.Active ?? false);
+            RecipeAimHit assistedAimHit = _gameplay.ObserveAimHit(shot.Direction);
+            WorldInteractionReadout interaction = _worldInteraction.Inspect();
+            object? aimTarget = _aimReadout?.Focus.Selected is {} selectedAim
+                ? new { id = selectedAim.Id, revision = selectedAim.Revision }
+                : null;
+            object? shotTarget = shot.Target is {} selectedShot
+                ? new { id = selectedShot.Id, revision = selectedShot.Revision }
+                : null;
             Vector3 planarForward = Vector3.Normalize(new Vector3(forward.X, 0f, forward.Z));
             Vector3 right = new(-planarForward.Z, 0f, planarForward.X);
 
@@ -293,6 +405,7 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     precisionLook = new { key = "ShiftLeft", multiplier = LoadingBayTuning.KeyboardPrecisionLookMultiplier, degreesPerSecond = LoadingBayTuning.KeyboardLookDegreesPerSecond * LoadingBayTuning.KeyboardPrecisionLookMultiplier },
                     fire = "ControlLeft",
                     useKey = "E",
+                    gamepad = new { look = "right-stick", fire = "RT", use = "X", aimAssist = "last gamepad input; neutral stick retains focus without tracking" },
                     bearingDegrees = "positive right",
                     aimPitchErrorDegrees = "positive means aim up"
                 },
@@ -306,7 +419,25 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     ammo = new { bullets = _gameplay.Bullets, shells = _gameplay.Shells },
                     weapon = _gameplay.Weapon,
                     weaponReady = _gameplay.WeaponReady,
-                    aimHit = new { present = aimHit.Present, kind = aimHit.Kind, entity = aimHit.Entity, distance = aimHit.Distance, range = aimHit.Range },
+                    aimHit = new { present = rawAimHit.Present, kind = rawAimHit.Kind, entity = rawAimHit.Entity, distance = rawAimHit.Distance, range = rawAimHit.Range },
+                    aimAssist = new
+                    {
+                        active = _aimReadout?.Active ?? false,
+                        target = aimTarget,
+                        slowdownScale = _aimReadout?.SlowdownScale ?? 1f,
+                        appliedLookScale = _aimReadout?.AppliedLookScale ?? Vector2.One,
+                        correctionRadians = _aimReadout?.CorrectionRadians ?? Vector2.Zero,
+                        shot = new
+                        {
+                            assisted = shot.Assisted,
+                            target = shotTarget,
+                            correctionRadians = shot.CorrectionRadians,
+                            rawDirection = VectorValue(forward),
+                            assistedDirection = VectorValue(shot.Direction),
+                            rawHit = new { present = rawAimHit.Present, kind = rawAimHit.Kind, entity = rawAimHit.Entity, distance = rawAimHit.Distance },
+                            assistedHit = new { present = assistedAimHit.Present, kind = assistedAimHit.Kind, entity = assistedAimHit.Entity, distance = assistedAimHit.Distance }
+                        }
+                    },
                     kills = _gameplay.Kills
                 },
                 enemies = enemies.Select(enemy => EnemyObservation(enemy, eye, planarForward, right, lineOfSight[enemy.Id])).ToArray(),
@@ -315,7 +446,16 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     id = door.Definition.Entity,
                     state = DoorState(door),
                     raised = door.Height
-                }).ToArray()
+                }).ToArray(),
+                interaction = new
+                {
+                    selected = interaction.Focus.Selected is {} selectedInteraction
+                        ? new { id = selectedInteraction.Id, revision = selectedInteraction.Revision }
+                        : null,
+                    reason = interaction.Focus.Reason.ToString(),
+                    stamp = interaction.Scene.Stamp,
+                    targetedUseEnabled = interaction.TargetedUseEnabled
+                }
             };
             return DebugCommandResult.Success(JsonSerializer.Serialize(observation, CombatObservationJson));
         }

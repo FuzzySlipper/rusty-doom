@@ -70,6 +70,20 @@ internal static class PlayerInputExercise
         Require(Read(fire).FireRequested, "controller fire did not rearm after release");
         Require(!Read(Event(InputEventKind.PointerButton, InputEdge.Pressed) with { PointerButton = PointerButton.Primary },
             Event(InputEventKind.Clear)).FireRequested, "focus clear retained pending fire");
+
+        var gamepadAim = new LoadingBayPlayerInput(LoadingBayTuning.E1M1);
+        bool aimActive = false;
+        Vector2 aimDelta = default;
+        LoadingBayPlayerInputFrame assistedLook = gamepadAim.Consume([Event(InputEventKind.ControllerAxis, axis: ControllerAxis.Axis2, x: 1f)], 1f / 60f, default,
+            (delta, _, active) => { aimDelta = delta; aimActive = active; return Vector2.Zero; });
+        Require(aimActive && aimDelta.X > 0f && assistedLook.Look.After.YawRadians == 0f,
+            "gamepad aim seam did not receive the shaped controller delta before look integration");
+        _ = gamepadAim.Consume([Event(InputEventKind.ControllerAxis, axis: ControllerAxis.Axis2, x: 0f)], 1f / 60f, default,
+            (_, _, active) => { aimActive = active; return Vector2.Zero; });
+        Require(aimActive, "neutral gamepad look unexpectedly cleared the selected gamepad aim mode");
+        _ = gamepadAim.Consume([Event(InputEventKind.Key, InputEdge.Pressed, KeyboardControl.KeyJ)], 1f / 60f, default,
+            (_, _, active) => { aimActive = active; return Vector2.Zero; });
+        Require(!aimActive, "keyboard look did not clear the selected gamepad aim mode");
     }
 
     private static ProductInputEvent Event(InputEventKind kind, InputEdge edge = InputEdge.None,

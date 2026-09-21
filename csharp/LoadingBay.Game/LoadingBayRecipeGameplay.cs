@@ -76,9 +76,9 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     internal bool Dead => Health <= 0;
     internal bool WeaponFlash => FlashFrame is not null;
     internal bool WeaponReady => !Dead && !Complete && _time >= _readyAt;
-    internal RecipeAimHit ObserveAimHit()
+    internal RecipeAimHit ObserveAimHit(Vector3? direction = null)
     {
-        SpatialHit hit = CastWeaponRay(SelectedWeapon, _player.Forward, CombatColliders());
+        SpatialHit hit = CastWeaponRay(SelectedWeapon, direction ?? _player.Forward, CombatColliders());
         return new(hit.Present, hit.Kind.ToString(), hit.Entity, hit.Distance, WeaponRange(SelectedWeapon));
     }
     private string WeaponFrame => LoadingBayRecipeAnimation.At(LoadingBayRecipeAnimation.Frames(SelectedWeapon), _time - _weaponStarted) ?? LoadingBayRecipeAnimation.Idle(SelectedWeapon);
@@ -235,11 +235,14 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
 
     internal void SelectWeapon(RecipeWeapon weapon)
     { if (_time < _readyAt || (weapon == RecipeWeapon.Shotgun && !HasShotgun)) return; SelectedWeapon = weapon; _weaponStarted = double.NegativeInfinity; _revision++; GeometryDirty = true; }
-    internal void Fire()
+    private Func<Vector3, Vector3>? _correctShotDirection;
+
+    internal void Fire(Func<Vector3, Vector3>? correctShotDirection = null)
     {
         if (Dead || Complete || _time < _readyAt) return;
         if ((SelectedWeapon == RecipeWeapon.Shotgun && Shells == 0) || (SelectedWeapon == RecipeWeapon.Pistol && Bullets == 0)) { Say("Out of ammo. 1 fist / 2 pistol / 3 shotgun."); return; }
         _firingWeapon = SelectedWeapon;
+        _correctShotDirection = correctShotDirection;
         _weaponStarted = _time; _weaponPending = true;
         _readyAt = _time + LoadingBayRecipeAnimation.Duration(LoadingBayRecipeAnimation.Frames(SelectedWeapon));
         GeometryDirty = true;
@@ -253,7 +256,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
         int pellets = shotgun ? 7 : 1;
         for (int i = 0; i < pellets; i++)
         {
-            Vector3 direction = _player.Forward;
+            Vector3 direction = _correctShotDirection?.Invoke(_player.Forward) ?? _player.Forward;
             if (pellets > 1) direction = Vector3.Transform(direction, Quaternion.CreateFromAxisAngle(Vector3.UnitY, (i - 3) * .018f));
             SpatialHit hit = CastWeaponRay(weapon, direction, colliders);
             if (!hit.Present || hit.Kind != SpatialHitKind.Entity) continue;
@@ -272,7 +275,8 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     private SpatialHit CastWeaponRay(RecipeWeapon weapon, Vector3 direction, SpatialEntityCollider[] colliders)
         => _engine.Spatial.CastRay(new(_player.Session, Eye, direction, WeaponRange(weapon), new(1, uint.MaxValue), colliders, new ulong[] { 1 }, colliders));
     private static double WeaponRange(RecipeWeapon weapon) => weapon == RecipeWeapon.Fist ? PunchReach : 70d;
-    private SpatialEntityCollider[] CombatColliders() => Enemies.Where(e => e.Health > 0).Select(e => new SpatialEntityCollider(e.Id, e.Position - new Vector3(.4f, 0, .4f), e.Position + new Vector3(.4f, 1.75f, .4f), 1, uint.MaxValue, true, false, false))
+    internal float CurrentWeaponRange => (float)WeaponRange(SelectedWeapon);
+    internal SpatialEntityCollider[] CombatColliders() => Enemies.Where(e => e.Health > 0).Select(e => new SpatialEntityCollider(e.Id, e.Position - new Vector3(.4f, 0, .4f), e.Position + new Vector3(.4f, 1.75f, .4f), 1, uint.MaxValue, true, false, false))
         .Concat(_doors.Select(d => new SpatialEntityCollider(d.Definition.Entity, d.Definition.Min + d.Placement.Translation, d.Definition.Max + d.Placement.Translation, 1, uint.MaxValue, true, true, false))).ToArray();
     private void AdvanceEnemies()
     {

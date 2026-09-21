@@ -21,3 +21,9 @@ internal interface ILoadingBaySpatialObservationSession
 
     DebugCommandResult ReadCombatObservation();
 }
+
+/// <summary>Exposes the Engine-owned interaction command surface over the session's ordinary use handler.</summary>
+internal interface ILoadingBayInteractionDebugSession
+{
+    IDebugCommandModule InteractionDebugModule { get; }
+}
