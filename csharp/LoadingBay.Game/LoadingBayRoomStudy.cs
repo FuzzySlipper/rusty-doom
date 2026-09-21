@@ -405,7 +405,7 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     precisionLook = new { key = "ShiftLeft", multiplier = LoadingBayTuning.KeyboardPrecisionLookMultiplier, degreesPerSecond = LoadingBayTuning.KeyboardLookDegreesPerSecond * LoadingBayTuning.KeyboardPrecisionLookMultiplier },
                     fire = "ControlLeft",
                     useKey = "E",
-                    gamepad = new { look = "right-stick", fire = "RT", use = "X", aimAssist = "last gamepad input; neutral stick retains focus without tracking" },
+                    gamepad = new { look = "right-stick", fire = "RT", use = "X", aimAssist = "right-stick, RT, or X selects mode; neutral stick retains focus without tracking" },
                     bearingDegrees = "positive right",
                     aimPitchErrorDegrees = "positive means aim up"
                 },
