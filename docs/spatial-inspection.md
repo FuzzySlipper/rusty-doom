@@ -58,6 +58,6 @@ ordinary gameplay inputs, not debug movement or firing commands.
 Enemy line of sight uses the Engine's `Spatial.CastSegment` with the current door
 colliders. That is the Engine's full collision query, so the result accounts for
 voxels, retained static meshes, and doors just as a blocked weapon ray does.
-The Engine Perception path currently omits retained static-mesh occlusion; its
-owning correction is tracked by task #8385. The product therefore does not
-reinterpret geometry or synthesize visibility locally.
+Shared Engine Perception also includes retained static-mesh occlusion following
+task #8385. Doom's direct weapon/LOS ray composition remains valid; the product
+does not reinterpret geometry or synthesize visibility locally.
