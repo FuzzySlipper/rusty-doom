@@ -425,8 +425,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                         active = _aimReadout?.Active ?? false,
                         target = aimTarget,
                         slowdownScale = _aimReadout?.SlowdownScale ?? 1f,
-                        appliedLookScale = _aimReadout?.AppliedLookScale ?? Vector2.One,
-                        correctionRadians = _aimReadout?.CorrectionRadians ?? Vector2.Zero,
+                        appliedLookScale = Vector2Value(_aimReadout?.AppliedLookScale ?? Vector2.One),
+                        correctionRadians = Vector2Value(_aimReadout?.CorrectionRadians ?? Vector2.Zero),
                         shot = new
                         {
                             assisted = shot.Assisted,
@@ -595,6 +595,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
         => !door.Opening ? "closed" : door.Height >= LoadingBayStudyDoor.Travel ? "open" : "opening";
 
     private static object VectorValue(Vector3 value) => new { x = value.X, y = value.Y, z = value.Z };
+
+    private static object Vector2Value(Vector2 value) => new { x = value.X, y = value.Y };
 
     private SpatialMapAnnotation[] SpatialMapAnnotations()
     {
