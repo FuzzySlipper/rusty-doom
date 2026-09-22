@@ -23,9 +23,20 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     private const float InteractionAcquireAngleRadians = .32f;
     private const float InteractionReleaseAngleRadians = .48f;
     private const float InteractionMaximumDistance = LoadingBayStudyDoor.UseDistance;
+    private const ulong NavigationGridId = 1;
+    private const double NavigationCellSize = .5d;
+    private const uint NavigationChunkSize = 8;
+    private const uint NavigationMaximumStepCells = 1;
+    private const double NavigationMaximumSlopeDegrees = 45d;
+    private const uint NavigationMaximumCells = 65_536;
+    private const float NavigationMaximumStepUnits = 1f;
+    private const uint NavigationMaximumVisited = 32_768;
+    private static readonly Vector3 NavigationWorldMinimum = new(-64f, -6f, -48f);
+    private static readonly Vector3 NavigationWorldMaximum = new(80f, 9f, 48f);
     private const ulong ExitInteractionEntity = 33000;
     private const float RadiansToDegrees = 180f / MathF.PI;
     private static readonly JsonSerializerOptions CombatObservationJson = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions NavigationJson = new(JsonSerializerDefaults.Web);
     private LoadingBayStudyAudit? _studyAudit;
     private string? _geometryAudit;
     internal string GeometryAudit
@@ -62,6 +73,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     private readonly AimAssist _gamepadAim = new();
     private readonly WorldInteraction _worldInteraction = null!;
     private readonly InteractionDebugModule _interactionDebug = null!;
+    private readonly LoadingBayNavigationVisits _navigationVisits = new();
+    private readonly NavigationReplaceReceipt _navigationProjection;
     private AimAssistReadout? _aimReadout;
     private ulong _interactionIncarnation = 1;
     private ulong _publishedRevision = ulong.MaxValue;
@@ -130,6 +143,9 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             var assets = _meshes.Select((mesh, i) => new StaticMeshAsset((ulong)i + 10000, new MeshResourceReference(mesh), 0, 0, 0, 0)).ToArray();
             var instances = _meshes.Select((_, i) => i).Where(i => !_doorIndices.Contains(i)).Select(i => new StaticMeshInstance((ulong)i + 10000, (ulong)i + 10000, _placements[i])).ToArray();
             _player.PublishRoomMeshes(assets, instances);
+            _navigationProjection = _player.ReplaceCollisionNavigation(NavigationWorldMinimum, NavigationWorldMaximum,
+                new CollisionNavigationConfig(NavigationGridId, NavigationCellSize, NavigationChunkSize, NavigationMaximumStepCells,
+                    _tuning.CharacterRadius, _tuning.StandingCharacterHeight, NavigationMaximumSlopeDegrees, NavigationMaximumCells));
             _gameplay = new(engine, _player, _doors);
             _worldInteraction = new WorldInteraction(this);
             _interactionDebug = new InteractionDebugModule(_worldInteraction);
@@ -176,6 +192,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
         if (input.FireRequested) _gameplay.Fire(CorrectShotDirection);
         if (input.UseRequested && !_gameplay.Dead)
             _ = _worldInteraction.UseFocused();
+        _navigationVisits.Observe(LoadingBayNavigationGuidance.Targets(_gameplay, _doors),
+            LoadingBayNavigationGuidance.PlayerFeet(_player.Position, _tuning.StandingCharacterHeight));
         if (moved)
         {
             for (int i = 0; i < _doors.Length; i++)
@@ -204,6 +222,7 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             _placements[_doorIndices[i]] = _placements[_doorIndices[i]] with { Translation = Vector3.Zero };
         }
         _gameplay.Restart();
+        _navigationVisits.Reset();
         _interactionIncarnation = checked(_interactionIncarnation + 1);
         Publish();
     }
@@ -464,6 +483,142 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             return DebugCommandResult.Failure(DebugCommandStatus.Failed, $"Combat observation failed: {error.Message}");
         }
     }
+
+    public DebugCommandResult ReadNavigationTargets()
+    {
+        try
+        {
+            Vector3 position = _player.Position;
+            Vector3 feet = LoadingBayNavigationGuidance.PlayerFeet(position, _tuning.StandingCharacterHeight);
+            LoadingBayNavigationTarget[] targets = LoadingBayNavigationGuidance.Targets(_gameplay, _doors);
+            var observation = new
+            {
+                targets = targets.Select(target =>
+                {
+                    LoadingBayNavigationProgress progress = LoadingBayNavigationGuidance.Progress(target, feet);
+                    return new
+                    {
+                        id = target.Id,
+                        label = target.Label,
+                        kind = target.Kind,
+                        position = VectorValue(target.Position),
+                        available = target.Available,
+                        state = target.State,
+                        requiresUse = target.RequiresUse,
+                        interactionEntity = target.InteractionEntity,
+                        arrived = progress.Arrived,
+                        visited = _navigationVisits.Contains(target.Id),
+                        distanceFromPlayerFeet = progress.Distance
+                    };
+                }).ToArray(),
+                currentRegion = LoadingBayNavigationGuidance.CurrentRegion(feet),
+                source = new { position = VectorValue(position), feet = VectorValue(feet), stamp = new { generation = _facts.Generation, step = _facts.SimulationStep } }
+            };
+            return DebugCommandResult.Success(JsonSerializer.Serialize(observation, NavigationJson));
+        }
+        catch (InvalidOperationException error)
+        {
+            return DebugCommandResult.Failure(DebugCommandStatus.Failed, $"Navigation target capture failed: {error.Message}");
+        }
+    }
+
+    public DebugCommandResult ReadNavigationRoute(string targetId)
+    {
+        LoadingBayNavigationTarget[] targets = LoadingBayNavigationGuidance.Targets(_gameplay, _doors);
+        if (!LoadingBayNavigationGuidance.TryFind(targets, targetId, out LoadingBayNavigationTarget target))
+            return DebugCommandResult.Failure(DebugCommandStatus.InvalidArguments, "Unknown navigation target. Run navigation.targets and use one returned id.");
+
+        try
+        {
+            Vector3 playerPosition = _player.Position;
+            Vector3 from = LoadingBayNavigationGuidance.PlayerFeet(playerPosition, _tuning.StandingCharacterHeight);
+            LoadingBayNavigationProgress progress = LoadingBayNavigationGuidance.Progress(target, from);
+            LoadingBayNavigationTarget routeTarget = target;
+            Vector3 goal = LoadingBayNavigationGuidance.TargetFeet(routeTarget);
+            NavigationStepReceipt route = _engine.Spatial.EvaluateNavigationStep(new NavigationStepRequest(
+                _player.Session, from, goal, NavigationMaximumStepUnits, NavigationMaximumVisited));
+            bool routeAvailable = route.Outcome == NavigationPathOutcome.Reached;
+            LoadingBayStudyDoor? requiredDoor = DoorForTarget(target);
+            bool doorwayStillBlocks = requiredDoor is not null && requiredDoor.Height < LoadingBayStudyDoor.Travel;
+            object? requiredAction = doorwayStillBlocks
+                ? requiredDoor!.Opening
+                    ? new { kind = "wait", label = requiredDoor.Definition.SurfaceName, state = DoorState(requiredDoor) }
+                    : new { kind = "use", key = "E", targetId = requiredDoor.Definition.Entity, label = requiredDoor.Definition.SurfaceName, state = DoorState(requiredDoor) }
+                : null;
+            WorldInteractionReadout interaction = _worldInteraction.Inspect();
+            var nearbyDoors = _doors.Select(door =>
+            {
+                Vector3 center = (door.Definition.Min + door.Definition.Max) * .5f;
+                center.Y = door.Definition.Min.Y + LoadingBayNavigationGuidance.FootClearance;
+                return new
+                {
+                    id = door.Definition.Entity,
+                    label = door.Definition.SurfaceName,
+                    state = DoorState(door),
+                    distanceFromPlayerFeet = Vector3.Distance(from, center)
+                };
+            }).Where(door => door.distanceFromPlayerFeet <= InteractionMaximumDistance).ToArray();
+            var response = new
+            {
+                status = !target.Available ? "target-unavailable" : doorwayStillBlocks ? requiredDoor!.Opening ? "door-opening" : "requires-ordinary-use" : routeAvailable ? "static-route-available" : "route-unavailable",
+                targetId = target.Id,
+                targetLabel = target.Label,
+                routeTargetId = routeTarget.Id,
+                nextWaypoint = routeAvailable ? VectorValue(route.NextWaypoint) : null,
+                waypointDistance = routeAvailable ? Vector3.Distance(from, route.NextWaypoint) : (float?)null,
+                bearingDegrees = routeAvailable ? LoadingBayNavigationGuidance.BearingDegrees(_player.Forward, from, route.NextWaypoint) : (float?)null,
+                bearingConvention = "positive right toward nextWaypoint",
+                distance = progress.Distance,
+                distanceFromPlayerFeet = progress.Distance,
+                distanceMeaning = "player feet to final target feet",
+                targetBearingDegrees = LoadingBayNavigationGuidance.BearingDegrees(_player.Forward, from, LoadingBayNavigationGuidance.TargetFeet(target)),
+                remainingPathLengthEstimate = routeAvailable ? Math.Max(0d, route.PathLen - 1d) * NavigationCellSize : (double?)null,
+                remainingGridPathLengthEstimate = routeAvailable ? Math.Max(0d, route.PathLen - 1d) * NavigationCellSize : (double?)null,
+                pathLengthCells = routeAvailable ? route.PathLen : (uint?)null,
+                arrival = new { arrived = progress.Arrived, visited = _navigationVisits.Contains(target.Id), currentRegion = progress.CurrentRegion },
+                requiredAction,
+                doorGuidance = new
+                {
+                    dynamicObstaclesIncluded = false,
+                    warning = "static route; doors require ordinary use",
+                    nearbyDoors,
+                    interaction = new
+                    {
+                        selected = interaction.Focus.Selected is {} selected ? new { id = selected.Id, revision = selected.Revision } : null,
+                        reason = interaction.Focus.Reason.ToString(),
+                        targetedUseEnabled = interaction.TargetedUseEnabled
+                    }
+                },
+                source = new
+                {
+                    position = VectorValue(playerPosition),
+                    feet = VectorValue(from),
+                    stamp = new { generation = _facts.Generation, step = _facts.SimulationStep }
+                },
+                engine = new
+                {
+                    outcome = route.Outcome.ToString(),
+                    routeReached = route.Reached != 0,
+                    routeReachedMeaning = "path-query result only; player arrival is arrival.arrived",
+                    visited = route.Visited,
+                    navigationRevision = route.NavigationRevision,
+                    projectionHash = route.ProjectionHash,
+                    initialNavigationRevision = _navigationProjection.NavigationRevision,
+                    initialProjectionHash = _navigationProjection.ProjectionHash
+                }
+            };
+            return DebugCommandResult.Success(JsonSerializer.Serialize(response, NavigationJson));
+        }
+        catch (InvalidOperationException error)
+        {
+            return DebugCommandResult.Failure(DebugCommandStatus.Failed, $"Navigation route failed: {error.Message}");
+        }
+    }
+
+    private LoadingBayStudyDoor? DoorForTarget(LoadingBayNavigationTarget target)
+        => target.InteractionEntity is ulong entity
+            ? _doors.SingleOrDefault(door => door.Definition.Entity == entity)
+            : null;
 
     private DebugCommandResult CaptureSpatialMap(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
     {

@@ -12,6 +12,8 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
     private readonly Func<string, int, double, DebugCommandResult> _spatialMap;
     private readonly Func<string, double, double, double, int, double, DebugCommandResult> _spatialMapAt;
     private readonly Func<DebugCommandResult> _combatObservation;
+    private readonly Func<DebugCommandResult> _navigationTargets;
+    private readonly Func<string, DebugCommandResult> _navigationRoute;
 
     public LoadingBayLiveDebugModule(
         Func<string> readout,
@@ -19,6 +21,8 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
         Func<string, int, double, DebugCommandResult> spatialMap,
         Func<string, double, double, double, int, double, DebugCommandResult> spatialMapAt,
         Func<DebugCommandResult> combatObservation,
+        Func<DebugCommandResult> navigationTargets,
+        Func<string, DebugCommandResult> navigationRoute,
         Func<string>? geometryAudit = null,
         Func<bool, string>? diagnostics = null)
     {
@@ -29,6 +33,8 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
         _spatialMap = spatialMap ?? throw new ArgumentNullException(nameof(spatialMap));
         _spatialMapAt = spatialMapAt ?? throw new ArgumentNullException(nameof(spatialMapAt));
         _combatObservation = combatObservation ?? throw new ArgumentNullException(nameof(combatObservation));
+        _navigationTargets = navigationTargets ?? throw new ArgumentNullException(nameof(navigationTargets));
+        _navigationRoute = navigationRoute ?? throw new ArgumentNullException(nameof(navigationRoute));
     }
 
     [DebugCommand("loading-bay.diagnostics", Description = "Enable or disable continuous HUD diagnostics (4 Hz); default is disabled.")]
@@ -52,6 +58,12 @@ public sealed class LoadingBayLiveDebugModule : IDebugCommandModule
 
     [DebugCommand("combat.observe", Description = "Captures compact, read-only RoomStudy player, nearby hostile, and door combat facts.")]
     public DebugCommandResult CombatObserve() => _combatObservation();
+
+    [DebugCommand("navigation.targets", Description = "Lists authored RoomStudy navigation destinations and read-only per-run progress facts.")]
+    public DebugCommandResult NavigationTargets() => _navigationTargets();
+
+    [DebugCommand("navigation.route", Description = "Reads an Engine route toward an authored target. It never moves the player; a closed door reports the ordinary use requirement.")]
+    public DebugCommandResult NavigationRoute(string targetId) => _navigationRoute(targetId);
 
     private string AuditPart(bool continuity)
     {

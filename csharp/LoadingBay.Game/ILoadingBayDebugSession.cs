@@ -20,6 +20,10 @@ internal interface ILoadingBaySpatialObservationSession
     DebugCommandResult ReadSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize);
 
     DebugCommandResult ReadCombatObservation();
+
+    DebugCommandResult ReadNavigationTargets();
+
+    DebugCommandResult ReadNavigationRoute(string targetId);
 }
 
 /// <summary>Exposes the Engine-owned interaction command surface over the session's ordinary use handler.</summary>

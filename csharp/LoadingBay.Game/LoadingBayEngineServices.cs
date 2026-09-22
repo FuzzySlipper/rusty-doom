@@ -360,6 +360,14 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         _voxelPublished = true;
     }
 
+    /// <summary>Builds the retained Engine-owned navigation projection from already admitted mesh collision.</summary>
+    internal NavigationReplaceReceipt ReplaceCollisionNavigation(Vector3 worldMin, Vector3 worldMax, CollisionNavigationConfig config)
+    {
+        ThrowIfDisposed();
+        if (!_voxelPublished) throw new InvalidOperationException("Room collision must be staged before navigation is derived.");
+        return _spatial.ReplaceCollisionNavigation(new CollisionNavigationReplaceRequest(_session, worldMin, worldMax, config));
+    }
+
     internal SpatialSession Session => _session;
 
     internal Vector3 Position => _position;

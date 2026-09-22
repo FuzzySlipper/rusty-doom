@@ -24,7 +24,7 @@ Both formats describe the same omniscient Engine spatial read. The map origin is
 lower X/Z corner; columns advance +X and rows advance +Z. Collision uses the active
 player-body interval above the floor and below the ceiling, so floor and ceiling
 surfaces do not obscure a door check. The separate navigation interval may report
-unknown because the Room Study does not retain a navigation projection.
+unknown when it does not have a walkable sample at the requested support.
 
 Door collision uses the current raised slab; doorway annotations stay at the passage
 and report its open/closed state and raised height. Actor annotations report
@@ -61,3 +61,41 @@ voxels, retained static meshes, and doors just as a blocked weapon ray does.
 Shared Engine Perception also includes retained static-mesh occlusion following
 task #8385. Doom's direct weapon/LOS ray composition remains valid; the product
 does not reinterpret geometry or synthesize visibility locally.
+
+## Read-only navigation guidance
+
+Room Study also exposes authored playtest destinations and fresh Engine route
+facts:
+
+```text
+navigation.targets
+navigation.route <id>
+```
+
+`navigation.targets` returns `{ "targets": [...] }` with stable IDs such as
+`pickup-shotgun-west` and `door-north-wing`. Each destination includes its
+authored position, current availability/state, arrival status, and an
+ordinary-run `visited` fact. Pressing `R` starts a new run and clears visits.
+
+`navigation.route` never supplies input or changes the player pose. It asks the
+retained Engine collision-derived projection for the next waypoint from current
+player feet. `bearingDegrees` and `waypointDistance` describe that waypoint;
+positive bearing is right. `targetBearingDegrees` and
+`distanceFromPlayerFeet` separately describe the final authored destination.
+`remainingGridPathLengthEstimate` is a grid estimate, not distance traveled.
+
+The Engine's `routeReached` is a path-query result only. Route status is
+explicitly `static-route-available`: Room Study's moving doors are not in the
+static collision projection. `doorGuidance` reports that limitation plus nearby
+door and interaction facts.
+`arrival.arrived` is the product's feet-to-destination arrival policy and is
+the only arrival claim. When a selected doorway is closed or opening,
+`requiredAction` says to use ordinary `E` or wait for the opening; the command
+cannot open it or move through it. Destinations beyond a door are not inferred blocked by a
+product-side route model.
+
+The initial collision-sampled grid is conservative at some small steps. In the
+#8398 preflight, spawn-to-western-shotgun returned `NoPath` across the physically
+traversable 0.25m west-mouth transition, while spawn-to-north-wing-door had a
+route. Engine follow-up #8399 owns character-step-aware connectivity. `NoPath`
+is a statement about the sampled grid, not proof that the player cannot pass.

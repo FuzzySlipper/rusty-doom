@@ -8,6 +8,7 @@ using Mechanics = Rusty.Engine.Mechanics;
 PlayerInputExercise.Run();
 StudyDoorExercise.Run();
 RecipeAnimationExercise.Run();
+NavigationGuidanceExercise.Run();
 
 var created = new List<RecordingSession>(); int attempts = 0;
 Require(new[]

@@ -36,7 +36,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(context);
         _entityWorldDebug = CreateEntityStoreDebugModule();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation,
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation, DebugNavigationTargets, DebugNavigationRoute,
             () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
 
         if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
@@ -114,7 +114,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
         _entityWorldDebug = CreateEntityStoreDebugModule();
         _session = _sessionFactory();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation,
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation, DebugNavigationTargets, DebugNavigationRoute,
             () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
         AdoptDebugWorld(_session);
     }
@@ -449,6 +449,16 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         => _session is ILoadingBaySpatialObservationSession observation
             ? observation.ReadCombatObservation()
             : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Combat observation is unavailable for this Loading Bay session.");
+
+    private DebugCommandResult DebugNavigationTargets()
+        => _session is ILoadingBaySpatialObservationSession observation
+            ? observation.ReadNavigationTargets()
+            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Navigation targets are unavailable for this Loading Bay session.");
+
+    private DebugCommandResult DebugNavigationRoute(string targetId)
+        => _session is ILoadingBaySpatialObservationSession observation
+            ? observation.ReadNavigationRoute(targetId)
+            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Navigation routes are unavailable for this Loading Bay session.");
 
     private void RetainRetirementFailure(Exception failure)
     {
