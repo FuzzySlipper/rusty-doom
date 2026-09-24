@@ -2,6 +2,12 @@
 
 Loading Bay is an ordinary C# Rusty Engine product for the committed Doom E1M1 Hangar closure. Its normal development lane is the packaged `Rusty.Engine` SDK and the matching `rusty dev` CoreCLR runtime pack. NativeAOT is a separate fidelity/release check, not the edit-run loop.
 
+## Demo
+
+![Room Study scene running in a browser: metal walls and ceiling beams over a recessed blue floor, two supports, a distant hostile, the marine pistol viewmodel, and the player HUD](docs/images/loading-bay-room-study.png)
+
+Played and captured on the browser playtest lane: `bash scripts/run-room-study.sh` serves this scene on port 4395 and the playtest controller drives ordinary keyboard input in the remote browser, then captures a 1280x720 frame. The capture transport is a video stream of the browser window, so the image is not correlated to a specific Engine render submission. See [the room study](docs/room-study.md) and [spatial and combat inspection](docs/spatial-inspection.md).
+
 ## Run the product
 
 The ignored `.runtime/` directory receives the matched SDK feed and runtime pack for the selected development release. It contains Engine artifacts only; the repository does not carry an Engine host, browser shell, generated binding, or source checkout.
