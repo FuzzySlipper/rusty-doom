@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <RustyEngineProductEntryType>AttachmentExample.Product</RustyEngineProductEntryType>
+    <RustyEngineProductId>attachment-example</RustyEngineProductId><RustyEngineProductTitle>Bone attachment consumer</RustyEngineProductTitle>
+    <RustyEngineProductUiRoot>$(MSBuildProjectDirectory)/product-ui</RustyEngineProductUiRoot>
+    <RustyEngineProductContentRoot>$(MSBuildProjectDirectory)/content</RustyEngineProductContentRoot>
+    <RustyEngineProductUiEntry>main.js</RustyEngineProductUiEntry>
+    <RustyEngineProductLifecycleMode>realtime</RustyEngineProductLifecycleMode>
+    <RustyEngineProductFixedStepHz>60</RustyEngineProductFixedStepHz><RustyEngineProductFixedStepMaxCatchUpSteps>4</RustyEngineProductFixedStepMaxCatchUpSteps>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="Rusty.Engine" Version="0.1.0-dev.feec788503fe" /></ItemGroup>
+</Project>
