@@ -30,7 +30,7 @@ public sealed class Product : IEngineProduct
         },new MeshJointAttachment[]{new(2,binding.Joint)}));
         animation=engine.Animation.CreateInstance(new(body,1));
         engine.Animation.SetPlayback(new(animation,AnimationPlaybackKind.Sample,"run",AnimationLoopMode.Repeat,1,1,true,0,false,.5f));
-        string report=JsonSerializer.Serialize(new{joint=binding.Joint,target=binding.TargetId,child=binding.ChildId,position=new[]{binding.Transform.Translation.X,binding.Transform.Translation.Y,binding.Transform.Translation.Z},pose=.5});
+        string report=JsonSerializer.Serialize(new{joint=binding.Joint,target=binding.TargetId,child=binding.ChildId,position=new[]{binding.Transform.Translation.X,binding.Transform.Translation.Y,binding.Transform.Translation.Z},scale=new[]{binding.Transform.Scale.X,binding.Transform.Scale.Y,binding.Transform.Scale.Z},pose=.5});
         if(Environment.GetEnvironmentVariable("PORTABLE_REPORT") is string path) File.WriteAllText(path,report);
         Console.WriteLine("ATTACHMENT_CONSUMED "+report);
     }
