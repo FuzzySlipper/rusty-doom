@@ -67,6 +67,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     internal ulong Revision => _revision;
     internal ulong TriggerPasses { get; private set; }
     internal int Health { get; private set; } = 100;
+    internal object? LastDamage { get; private set; }
     internal int Armor { get; private set; }
     internal int Bullets { get; private set; } = 50;
     internal int Shells { get; private set; }
@@ -174,7 +175,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
                     GeometryDirty = true;
                 }
             if (_overlapping.Contains(32000) && _time >= _nextHazard)
-            { _nextHazard = _time + 1; Damage(5, "Toxic waste! Find the raised walkway."); }
+            { _nextHazard = _time + 1; Damage(5, "Toxic waste! Find the raised walkway.", "hazard"); }
             AdvanceFireballs(seconds);
             if (_time >= _nextEnemy)
             { _nextEnemy = _time + EnemyInterval; AdvanceEnemies(); }
@@ -202,7 +203,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
         _lastShot = _lastDamage = false;
         _weaponStarted = double.NegativeInfinity; _weaponPending = false;
         _publishedWeaponFrame = _publishedFlashFrame = null;
-        Health = 100; Armor = 0; Bullets = 50; Shells = 0;
+        Health = 100; Armor = 0; Bullets = 50; Shells = 0; LastDamage = null;
         HasShotgun = Complete = false; SelectedWeapon = RecipeWeapon.Pistol;
         Message = "Find supplies. Reach the southern terminal. E opens doors.";
         foreach (var enemy in Enemies)
@@ -300,7 +301,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
                     else
                     {
                         var blockers = _doors.Select(d => new SpatialEntityCollider(d.Definition.Entity, d.Definition.Min + d.Placement.Translation, d.Definition.Max + d.Placement.Translation, 1, uint.MaxValue, true, true, false)).ToArray();
-                        if (!_engine.Spatial.CastSegment(new(_player.Session, origin, Eye, new(1, uint.MaxValue), blockers, ReadOnlyMemory<ulong>.Empty, blockers)).Present) Damage(5, "Under fire!");
+                        if (!_engine.Spatial.CastSegment(new(_player.Session, origin, Eye, new(1, uint.MaxValue), blockers, ReadOnlyMemory<ulong>.Empty, blockers)).Present) Damage(5, "Under fire!", "enemy-hitscan");
                     }
                 }
                 continue;
@@ -353,7 +354,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
             var hit = _engine.Spatial.CastCapsule(new(_player.Session, p.Position, .15, .15, next - p.Position, 0, new(1, uint.MaxValue), targets, ReadOnlyMemory<ulong>.Empty));
             if (hit.Present || _time >= p.Expires)
             {
-                if (hit.Present && hit.Kind == SpatialHitKind.Entity && hit.Entity == 1) Damage(8, "Imp fireball!");
+                if (hit.Present && hit.Kind == SpatialHitKind.Entity && hit.Entity == 1) Damage(8, "Imp fireball!", "enemy-projectile");
                 if (hit.Present) _impacts.Add(new(p.Id, p.Position, _time));
                 p.Body.Dispose(); _fireballs.RemoveAt(i);
             }
@@ -367,9 +368,11 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
         if (Vector3.Distance(_player.Position, ExitPosition + Vector3.UnitY) < 2.5f)
         { Complete = true; Say($"Hangar clear — {Kills}/{Enemies.Length} kills, {Collected}/{Pickups.Length} supplies. R to restart."); }
     }
-    private void Damage(int damage, string message)
+    private void Damage(int damage, string message, string source)
     {
+        int before = Health;
         int absorbed = Math.Min(Armor, damage / 3); Armor -= absorbed; Health = Math.Max(0, Health - damage + absorbed);
+        LastDamage = new { source, message, healthLost = before - Health, armorLost = absorbed, simulationSeconds = _time };
         _damageUntil = _time + .2; Say(Dead ? "You died. Press R to restart." : message);
     }
     internal bool SetTrack(string track, int value)

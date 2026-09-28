@@ -4,7 +4,7 @@ Doom consumes Engine time/drawing/observer controls and publishes product facts
 through `PlaytestDebugModule`. Use crew-services `playtest assist SESSION` to
 discover actions and telemetry; no Jev configuration or gameplay script is needed.
 
-Actions: forward/back/left/right, use, attack, fist/pistol/shotgun. Attack timing
+Actions: forward/back/left/right, use, attack, jump, fist/pistol/shotgun. Attack timing
 comes from the current weapon animation, including its full recovery window.
 Availability follows weapon readiness and ammunition. Input goes through the
 ordinary keyboard bindings; look uses the existing Engine Look service and
@@ -18,12 +18,34 @@ suggestions are finite actions for the agent to consider, never an auto follower
 Check player movement, focus and door state after each step; a static path can
 still be obstructed by a closed door.
 
+## Local geometry and traversal
+
+`assist grid` samples retained static collision plus current door collider bounds;
+live enemies and pickups are not included in this occupancy view. It returns
+XYZ cell coordinates as Y slices of packed X rows along Z. The default 9×9×9
+volume uses 0.25-world-unit cells centered on player feet. Choose a larger radius
+or finer cell size when inspecting a bump. This is an explicit read-only query,
+so agents can inspect it while simulation is held.
+
+`assist probe` adds ankle/step/head/floor rays and the latest character-controller
+receipt: grounded state, blocked axes, contact normal/source and step attempt.
+`assist interaction` supplies each door's signed yaw/pitch adjustment and current
+refusal. Door focus points now clamp the eye position to the door surface.
+
+`assist jump-plan` takes world XYZ **feet** coordinates and estimates a bounded
+jump from live tuning. `assist jump` executes ordinary jump and forward controls,
+then reports the observed endpoint and grounded state. It does not teleport or
+guarantee a landing. The compact observation also includes `player.lastDamage`
+(source, health/armor lost and simulation time), distinguishing hazards, enemy
+hitscan and enemy projectiles.
+
 ## Development artifacts
 
-The current working tree uses SDK `0.1.0-dev.playtest-20260928a` and a matching
-local development runtime under `.runtime/playtest-development-20260928g`.
-This is an uncommitted development build, not a published release pair. The
-runtime and SDK were built from the companion Engine checkout. `NuGet.Config`
+The current working tree uses SDK `0.1.0-dev.playtest-20260928b` and a matching
+local development runtime under `.runtime/playtest-development-20260928h`.
+This is a local development pair rather than a published release. The SDK package
+is backed up in the companion Engine repository; the runtime pack is local. Both
+were built from that Engine checkout. `NuGet.Config`
 and `scripts/run-csharp-product.sh` use that local directory; environment overrides
 remain available. Build the UI normally and use `LOADING_BAY_LIVE_DEBUG=1` when
 running the product for these tools. Future clean release publication can replace

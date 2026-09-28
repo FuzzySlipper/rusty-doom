@@ -9,7 +9,7 @@ using Rusty.Engine.Interaction;
 namespace LoadingBay.Game;
 
 /// <summary>Authored DC level with retained geometry and recipe-owned gameplay.</summary>
-internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpatialObservationSession, ILoadingBayInteractionDebugSession, IWorldInteractionScene
+internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpatialObservationSession, ILoadingBayInteractionDebugSession, IWorldInteractionScene
 {
     private const int SpatialMapMaximumRadius = 15;
     private const double SpatialMapHalfCell = .5d;
@@ -301,7 +301,7 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
         {
             Vector3 minimum = door.Definition.Min + door.Placement.Translation;
             Vector3 maximum = door.Definition.Max + door.Placement.Translation;
-            Vector3 point = Vector3.Clamp(player, minimum, maximum);
+            Vector3 point = Vector3.Clamp(eye, minimum, maximum);
             InteractionVisibility visibility = InteractionVisibilityQuery.Cast(_engine.Spatial, _player.Session, eye, point,
                 new SpatialQueryFilter(1, uint.MaxValue), colliders, new[] { door.Definition.Entity });
             candidates.Add(new InteractionCandidate(new InteractionTarget(door.Definition.Entity, InteractionRevision), door.Definition.SurfaceName,
@@ -402,6 +402,7 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             "left" => new(id, "KeyA", PlaytestMovementMs, true, active, reason),
             "right" => new(id, "KeyD", PlaytestMovementMs, true, active, reason),
             "use" => new(id, "KeyE", PlaytestUseMs, false, active, reason),
+            "jump" => InspectJumpAction(active, reason),
             "attack" => new(id, "ControlLeft", LoadingBayRecipeAnimation.Duration(LoadingBayRecipeAnimation.Frames(_gameplay.SelectedWeapon)) * 1000,
                 false, _gameplay.FireUnavailableReason is null, _gameplay.FireUnavailableReason, _gameplay.Weapon),
             "fist" => new(id, "Digit1", PlaytestSelectionMs, false, canSelect, selectionReason),
@@ -474,6 +475,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     yawDegrees = player.Look.YawRadians * RadiansToDegrees,
                     pitchDegrees = player.Look.PitchRadians * RadiansToDegrees,
                     health = _gameplay.Health,
+                    lastDamage = _gameplay.LastDamage,
+                    movement = _player.InspectMovement(),
                     dead = _gameplay.Dead,
                     ammo = new { bullets = _gameplay.Bullets, shells = _gameplay.Shells },
                     weapon = _gameplay.Weapon,

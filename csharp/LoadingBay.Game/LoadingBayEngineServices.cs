@@ -294,6 +294,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     private CharacterControllerConfig _controller;
     private Vector3 _position;
     private CharacterMotion _motion;
+    private CharacterStepReceipt? _lastCharacterStep;
     private LoadingBayCharacterContinuationSnapshot? _continuation;
     private LookState _lookState;
     private Vector3 _forward;
@@ -373,6 +374,24 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     internal Vector3 Position => _position;
     internal Vector3 Forward => _forward;
     internal LoadingBayTuning Tuning => _initialTuning;
+    internal bool Grounded => _motion.Grounded;
+    internal CharacterControllerConfig ControllerConfig => _controller;
+    internal object InspectMovement()
+    {
+        var step = _lastCharacterStep;
+        return new {
+            grounded = _motion.Grounded,
+            velocity = new[] { _motion.ControlledVelocity.X, _motion.ControlledVelocity.Y, _motion.ControlledVelocity.Z },
+            body = new { height = _controller.Shape.StandingHeight, radius = _controller.Shape.Radius, maximumStepHeight = _controller.Surface.MaximumStepHeight },
+            lastStep = step is {} r ? new {
+                sequence = r.CommandSequence, displacement = new[] { r.Displacement.X, r.Displacement.Y, r.Displacement.Z },
+                blockFlags = r.BlockFlags.ToString(), contact = new { present = r.Contact.Present, kind = r.Contact.Kind.ToString(), source = r.Contact.SourceKind.ToString(), entity = r.Contact.SourceEntity.ToString(), normal = new[] { r.Contact.Normal.X, r.Contact.Normal.Y, r.Contact.Normal.Z } },
+                stepAttempted = r.Step.Attempted, stepAccepted = r.Step.Accepted, stepRise = r.Step.Rise,
+                groundPresent = r.Ground.Present, floorProbePresent = r.FloorProbe.Present
+            } : null
+        };
+    }
+
 
     /// <summary>Captures only product-meaningful controller values, never the Engine session or camera handles.</summary>
     internal LoadingBayPlayerSnapshot Capture()
@@ -403,6 +422,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         _planarIntent = Vector2.Zero;
         _input.Clear();
         _jumpHeld = _jumpPressed = false;
+        _lastCharacterStep = null;
         if (_camera is not null) _cameraView.UpdateCamera(new CameraUpdateRequest(_camera, CameraDescriptor(tuning)));
     }
 
@@ -467,6 +487,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
                 CharacterStepReceipt receipt = _spatial.ProposeCharacterStep(new CharacterStepRequest(
                     _session, _position, _motion, environment.Support, environment.Obstacles, ReadOnlyMemory<CharacterMeshInstance>.Empty, _controller,
                     new CharacterControllerCommand(movementEnabled ? _planarIntent : Vector2.Zero, _lookState.YawRadians, movementEnabled && _jumpPressed, movementEnabled && _jumpHeld, false, Vector3.Zero, Vector3.Zero, delta, ++_sequence)));
+                _lastCharacterStep = receipt;
                 _position = receipt.Transform.Translation;
                 _motion = receipt.Motion;
                 _continuation = Copy(_spatial.CaptureCharacterContinuation(new CharacterContinuationCaptureRequest(_session, receipt.Generation)));
