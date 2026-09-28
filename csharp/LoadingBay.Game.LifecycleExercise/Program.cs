@@ -349,6 +349,21 @@ file sealed class InMemoryPersistenceService : IPersistenceService
     private sealed record Saved(ulong Revision, byte[] Payload); private readonly Dictionary<ulong, string> _scopes = []; private readonly Dictionary<ulong, Saved> _blobs = []; private readonly Dictionary<(string Scope, string Key), Saved> _saved = []; private ulong _next = 1;
     public PersistenceStore OpenStore(PersistenceOpenRequest request) { ulong handle = _next++; _scopes.Add(handle, request.Scope); return new(new PersistenceStoreHandle(handle), () => _scopes.Remove(handle)); }
     public PersistenceSaveReceipt Save(PersistenceSaveRequest request) { var key = (_scopes[request.Store.Handle.Value], request.Key); _saved.TryGetValue(key, out Saved? old); ulong revision = (old?.Revision ?? 0) + 1; _saved[key] = new(revision, request.Payload.ToArray()); return new(PersistenceSaveOutcome.Saved, revision); }
+    public PersistenceDeleteReceipt Delete(PersistenceDeleteRequest request)
+    {
+        var key = (_scopes[request.Store.Handle.Value], request.Key);
+        _saved.TryGetValue(key, out Saved? saved);
+        bool matches = request.RevisionGuard switch {
+            PersistenceRevisionGuard.Any => true,
+            PersistenceRevisionGuard.Exact => saved is not null && saved.Revision == request.ExpectedRevision,
+            PersistenceRevisionGuard.Absent => saved is null,
+            _ => false,
+        };
+        if (!matches) return new(PersistenceDeleteOutcome.RevisionConflict, saved?.Revision ?? 0);
+        if (saved is null) return new(PersistenceDeleteOutcome.Missing, 0);
+        _saved.Remove(key);
+        return new(PersistenceDeleteOutcome.Deleted, saved.Revision);
+    }
     public PersistenceBlob Load(PersistenceLoadRequest request) { _saved.TryGetValue((_scopes[request.Store.Handle.Value], request.Key), out Saved? saved); ulong handle = _next++; _blobs.Add(handle, saved ?? new(0, [])); return new(new PersistenceBlobHandle(handle), () => _blobs.Remove(handle)); }
     public PersistenceBlobInfo DescribeBlob(PersistenceBlob blob) { Saved saved = _blobs[blob.Handle.Value]; return new(saved.Revision != 0, saved.Revision, (nuint)saved.Payload.Length); }
     public void CopyBlob(PersistenceCopyBlobRequest request) => _blobs[request.Blob.Handle.Value].Payload.CopyTo(request.Destination.Span);

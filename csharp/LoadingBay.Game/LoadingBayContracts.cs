@@ -19,7 +19,11 @@ internal abstract record LoadingBayPickupPolicy
     internal sealed record SetMinimum(int Value, LoadingBayArmorProtection Protection) : LoadingBayPickupPolicy;
     internal sealed record RestoreArmor(int Amount, int Maximum, bool ConsumeAtCap, LoadingBayArmorProtection Protection) : LoadingBayPickupPolicy;
 }
-internal sealed record LoadingBayItem(string Id, LoadingBayItemKind Kind, Mechanics.ItemDefinition MechanicsDefinition, LoadingBayPickupPolicy? PickupPolicy = null);
+internal sealed record LoadingBayItem(string Id, LoadingBayItemKind Kind, Mechanics.ItemDefinition MechanicsDefinition, LoadingBayPickupPolicy? PickupPolicy = null)
+{
+    // Doom has one fungible stack per item definition, retained across saves.
+    internal Mechanics.InventoryStackId StackId { get; } = Mechanics.InventoryStackId.Parse(Id);
+}
 internal sealed record LoadingBayWeapon(string Id, Mechanics.ItemDefinition MechanicsDefinition);
 internal readonly record struct LoadingBayReceipt(bool Accepted, string Code, string? Correlation);
 internal sealed record LoadingBayPickupSnapshot(ulong EntityId, string ItemId, string ProgramId, LoadingBayPickupLifecycle Lifecycle, string Cause, ulong Tick, ulong TriggerRevision);

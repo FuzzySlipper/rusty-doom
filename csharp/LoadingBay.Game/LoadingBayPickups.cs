@@ -78,7 +78,7 @@ internal sealed class LoadingBayPickups
                 // E1M1's bonus armor preserves an existing green/blue armor class.
                 if (!hadProtection) _combat.ArmorProtection = armorProtection;
             }
-            else _inventory.Grant(_player, item.MechanicsDefinition, quantity);
+            else _inventory.Grant(_player, item.MechanicsDefinition, item.StackId, quantity);
             _manualPickupKeys.Add(pickup);
             Record(new PickupCollectedFact(pickup, item.Id, quantity));
             return Accept("pickup.collected");

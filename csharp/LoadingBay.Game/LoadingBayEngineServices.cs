@@ -406,6 +406,17 @@ internal sealed class LoadingBayPlayerScene : IDisposable
         if (_camera is not null) _cameraView.UpdateCamera(new CameraUpdateRequest(_camera, CameraDescriptor(tuning)));
     }
 
+    internal void InspectLook(double yawDegrees, double pitchDegrees)
+    {
+        var config = new LookConfig(1f, 1f, _initialTuning.PointerLook.MinimumPitchRadians,
+            _initialTuning.PointerLook.MaximumPitchRadians, MathF.Tau, false, false, true);
+        LookReceipt result = Look.IntegrateClamped(new LookRequest(_lookState,
+            new Vector2((float)(yawDegrees * Math.PI / 180), (float)(pitchDegrees * Math.PI / 180)), config));
+        _lookState = result.After;
+        _forward = result.Forward;
+        if (_camera is not null) _cameraView.UpdateCamera(new CameraUpdateRequest(_camera, CameraDescriptor(_initialTuning)));
+    }
+
     internal PerceptionObserver CreatePerceptionObserver(ulong entity, LoadingBayTuning tuning)
     {
         ThrowIfDisposed();
@@ -454,7 +465,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
                 // support transform retained in CharacterMotion and carries the player itself.
                 LoadingBayCharacterStepEnvironment environment = prepareCharacterStep(tick, _motion.SupportEntityPresent, _motion.SupportEntity);
                 CharacterStepReceipt receipt = _spatial.ProposeCharacterStep(new CharacterStepRequest(
-                    _session, _position, _motion, environment.Support, environment.Obstacles, _controller,
+                    _session, _position, _motion, environment.Support, environment.Obstacles, ReadOnlyMemory<CharacterMeshInstance>.Empty, _controller,
                     new CharacterControllerCommand(movementEnabled ? _planarIntent : Vector2.Zero, _lookState.YawRadians, movementEnabled && _jumpPressed, movementEnabled && _jumpHeld, false, Vector3.Zero, Vector3.Zero, delta, ++_sequence)));
                 _position = receipt.Transform.Translation;
                 _motion = receipt.Motion;

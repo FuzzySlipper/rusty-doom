@@ -173,7 +173,7 @@ internal sealed class LoadingBayCombat
         if (_weaponReadyAt.TryGetValue(plan.WeaponId, out ulong readyAt) && plan.Tick < readyAt) return Reject("combat.weapon-cooldown");
         try
         {
-            if (plan.AmmunitionCost > 0) _inventory.Consume(_player, LoadingBayDefinitions.Item(plan.AmmunitionId).MechanicsDefinition, (ulong)plan.AmmunitionCost);
+            if (plan.AmmunitionCost > 0) _inventory.Consume(_player, LoadingBayDefinitions.Item(plan.AmmunitionId).StackId, (ulong)plan.AmmunitionCost);
         }
         catch (Mechanics.MechanicsException) { return Reject("combat.insufficient-ammunition"); }
         _weaponReadyAt[plan.WeaponId] = checked(plan.Tick + (ulong)weapon.CooldownTicks);
@@ -255,7 +255,7 @@ internal sealed class LoadingBayCombat
             {
                 candidate.MaterializeUnique(new Mechanics.ItemState(new EntityId(_entities.NextEntityValue), weapon.MechanicsDefinition), _player);
             }
-            candidate.Grant(_player, starterAmmo.MechanicsDefinition, pickup.StarterAmmunitionQuantity);
+            candidate.Grant(_player, starterAmmo.MechanicsDefinition, starterAmmo.StackId, pickup.StarterAmmunitionQuantity);
             candidate.Validate();
             return true;
         }
@@ -278,7 +278,7 @@ internal sealed class LoadingBayCombat
                 newWeaponEntity = _entities.Create();
                 candidate.MaterializeUnique(new Mechanics.ItemState(newWeaponEntity.Value, weapon.MechanicsDefinition), _player);
             }
-            candidate.Grant(_player, LoadingBayDefinitions.Item(pickup.StarterAmmunitionItemId).MechanicsDefinition, pickup.StarterAmmunitionQuantity);
+            candidate.Grant(_player, LoadingBayDefinitions.Item(pickup.StarterAmmunitionItemId).MechanicsDefinition, LoadingBayDefinitions.Item(pickup.StarterAmmunitionItemId).StackId, pickup.StarterAmmunitionQuantity);
             candidate.Publish();
             Record(new PickupCollectedFact(key, pickup.ItemId, pickup.Quantity));
             Record(new PickupLoadoutChangedFact(pickup.EntityId, pickup.ItemId, pickup.ProgramId, false, newWeaponEntity is null ? "pickup.weapon-ammunition" : "pickup.weapon-acquired"));
@@ -338,15 +338,15 @@ internal sealed class LoadingBayCombat
     internal void SetBulletQuantity(ulong quantity)
     {
         ulong current = BulletQuantity();
-        if (current < quantity) _inventory.Grant(_player, LoadingBayDefinitions.Bullets.MechanicsDefinition, quantity - current);
-        else if (current > quantity) _inventory.Consume(_player, LoadingBayDefinitions.Bullets.MechanicsDefinition, current - quantity);
+        if (current < quantity) _inventory.Grant(_player, LoadingBayDefinitions.Bullets.MechanicsDefinition, LoadingBayDefinitions.Bullets.StackId, quantity - current);
+        else if (current > quantity) _inventory.Consume(_player, LoadingBayDefinitions.Bullets.StackId, current - quantity);
     }
 
     internal void SetShellQuantity(ulong quantity)
     {
         ulong current = ShellQuantity();
-        if (current < quantity) _inventory.Grant(_player, LoadingBayDefinitions.Shells.MechanicsDefinition, quantity - current);
-        else if (current > quantity) _inventory.Consume(_player, LoadingBayDefinitions.Shells.MechanicsDefinition, current - quantity);
+        if (current < quantity) _inventory.Grant(_player, LoadingBayDefinitions.Shells.MechanicsDefinition, LoadingBayDefinitions.Shells.StackId, quantity - current);
+        else if (current > quantity) _inventory.Consume(_player, LoadingBayDefinitions.Shells.StackId, current - quantity);
     }
 
     internal string[] OwnedWeaponIds() => _inventory.View(_player).UniqueItems

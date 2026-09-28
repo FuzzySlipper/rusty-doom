@@ -473,7 +473,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         foreach (LoadingBayE1M1ItemGrant grant in setup.Grants)
         {
             if (LoadingBayDefinitions.Weapons.TryGetValue(grant.ItemId, out LoadingBayWeapon? weapon)) _combat.MaterializeWeapon(weapon);
-            else _inventory.Grant(_player, LoadingBayDefinitions.Item(grant.ItemId).MechanicsDefinition, grant.Quantity);
+            else _inventory.Grant(_player, LoadingBayDefinitions.Item(grant.ItemId).MechanicsDefinition, LoadingBayDefinitions.Item(grant.ItemId).StackId, grant.Quantity);
         }
         _combat.EquipWeapon(setup.EquippedWeaponId);
     }
@@ -580,6 +580,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     }
     private sealed class PersistenceOnlyContext(IPersistenceService persistence) : IEngineContext
     {
+        public IInputService Input => throw new NotSupportedException();
+        public IVideoService Video => throw new NotSupportedException();
+        public IRenderOutputService RenderOutput => throw new NotSupportedException();
         public IDiagnosticsService Diagnostics => throw new NotSupportedException();
         public IDynamicsService Dynamics => throw new NotSupportedException();
         public IMotionService Motion => throw new NotSupportedException();

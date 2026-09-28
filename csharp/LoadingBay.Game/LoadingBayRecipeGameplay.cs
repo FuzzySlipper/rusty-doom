@@ -75,6 +75,9 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     internal bool Complete { get; private set; }
     internal bool Dead => Health <= 0;
     internal bool WeaponFlash => FlashFrame is not null;
+    internal string? FireUnavailableReason => !WeaponReady ? "weapon-not-ready"
+        : (SelectedWeapon == RecipeWeapon.Shotgun && Shells == 0) || (SelectedWeapon == RecipeWeapon.Pistol && Bullets == 0) ? "out-of-ammo" : null;
+    internal double WeaponCooldownMs => Math.Max(0, _readyAt - _time) * 1000;
     internal bool WeaponReady => !Dead && !Complete && _time >= _readyAt;
     internal RecipeAimHit ObserveAimHit(Vector3? direction = null)
     {
@@ -313,7 +316,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
                 float yaw = MathF.Atan2(offset.X, -offset.Z);
                 // This call supplies this actor's motion and sequence. Player continuation is
                 // captured immediately after the player proposal, before this callback runs.
-                var step = _engine.Spatial.ProposeCharacterStep(new(_player.Session, enemy.Position + Vector3.UnitY * .85f, enemy.Motion, default, _doors.Select(d => d.Obstacle).ToArray(), _enemyController,
+                var step = _engine.Spatial.ProposeCharacterStep(new(_player.Session, enemy.Position + Vector3.UnitY * .85f, enemy.Motion, default, _doors.Select(d => d.Obstacle).ToArray(), ReadOnlyMemory<CharacterMeshInstance>.Empty, _enemyController,
                     new(new Vector2(0, 1), yaw, false, false, false, Vector3.Zero, Vector3.Zero, (float)EnemyInterval, ++enemy.Sequence)));
                 enemy.Position = step.Transform.Translation - Vector3.UnitY * .85f; enemy.Motion = step.Motion;
                 GeometryDirty = true;

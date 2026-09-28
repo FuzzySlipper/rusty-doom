@@ -386,14 +386,52 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
     public DebugCommandResult ReadSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
         => CaptureSpatialMap(format, centerX, centerZ, supportY, radius, cellSize);
 
-    public DebugCommandResult ReadCombatObservation()
+    private const double PlaytestMovementMs = 200;
+    private const double PlaytestUseMs = 200;
+    private const double PlaytestSelectionMs = 1000d / 60d;
+    internal PlaytestAction InspectAction(string id)
+    {
+        bool active = !_gameplay.Dead && !_gameplay.Complete;
+        string? reason = active ? null : "player-dead-or-complete";
+        bool canSelect = _gameplay.WeaponReady;
+        string? selectionReason = canSelect ? null : "weapon-not-ready";
+        return id switch
+        {
+            "forward" => new(id, "KeyW", PlaytestMovementMs, true, active, reason),
+            "back" => new(id, "KeyS", PlaytestMovementMs, true, active, reason),
+            "left" => new(id, "KeyA", PlaytestMovementMs, true, active, reason),
+            "right" => new(id, "KeyD", PlaytestMovementMs, true, active, reason),
+            "use" => new(id, "KeyE", PlaytestUseMs, false, active, reason),
+            "attack" => new(id, "ControlLeft", LoadingBayRecipeAnimation.Duration(LoadingBayRecipeAnimation.Frames(_gameplay.SelectedWeapon)) * 1000,
+                false, _gameplay.FireUnavailableReason is null, _gameplay.FireUnavailableReason, _gameplay.Weapon),
+            "fist" => new(id, "Digit1", PlaytestSelectionMs, false, canSelect, selectionReason),
+            "pistol" => new(id, "Digit2", PlaytestSelectionMs, false, canSelect, selectionReason),
+            "shotgun" => new(id, "Digit3", PlaytestSelectionMs, false, canSelect && _gameplay.HasShotgun, !canSelect ? selectionReason : _gameplay.HasShotgun ? null : "requires-shotgun"),
+            _ => new(id, "", 0, false, false, "unknown-action")
+        };
+    }
+
+    internal DebugCommandResult InspectLook(double yaw, double pitch)
+    {
+        if (!double.IsFinite(yaw) || !double.IsFinite(pitch) || Math.Abs(yaw) > 360 || Math.Abs(pitch) > 180)
+            return DebugCommandResult.Failure(DebugCommandStatus.InvalidArguments, "Look degrees exceed bounds.");
+        _player.InspectLook(yaw, pitch);
+        _ = _worldInteraction.Update();
+        return ReadCombatObservation();
+    }
+
+    public DebugCommandResult ReadCombatObservation() => ReadCombatObservation(false);
+
+    internal DebugCommandResult ReadPlaytestObservation() => ReadCombatObservation(true);
+
+    private DebugCommandResult ReadCombatObservation(bool compact)
     {
         try
         {
             Vector3 playerPosition = _player.Position;
             Vector3 eye = playerPosition + (Vector3.UnitY * _tuning.EyeOffsetFromCenter);
             RecipeEnemy[] enemies = _gameplay.Enemies
-                .Where(enemy => enemy.Health > 0 && Vector3.Distance(playerPosition, enemy.Position) <= CombatObservationRange)
+                .Where(enemy => Vector3.Distance(playerPosition, enemy.Position) <= CombatObservationRange)
                 .OrderBy(enemy => Vector3.DistanceSquared(playerPosition, enemy.Position))
                 .ToArray();
             Dictionary<ulong, bool> lineOfSight = QueryEnemyLineOfSight(enemies);
@@ -416,6 +454,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             var observation = new
             {
                 stamp = new { generation = _facts.Generation, step = _facts.SimulationStep },
+                readiness = _gameplay.Dead ? "dead" : _gameplay.Complete ? "complete" : "playing",
+                axes = new { forward = VectorValue(forward), right = VectorValue(right), up = "Y", yaw = "positive right", floorY = playerPosition.Y - _tuning.StandingCharacterHeight * .5f },
                 controls = new
                 {
                     move = "WASD",
@@ -438,8 +478,10 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     ammo = new { bullets = _gameplay.Bullets, shells = _gameplay.Shells },
                     weapon = _gameplay.Weapon,
                     weaponReady = _gameplay.WeaponReady,
+                    weaponCooldownMs = _gameplay.WeaponCooldownMs,
+                    attackUnavailableReason = _gameplay.FireUnavailableReason,
                     aimHit = new { present = rawAimHit.Present, kind = rawAimHit.Kind, entity = rawAimHit.Entity, distance = rawAimHit.Distance, range = rawAimHit.Range },
-                    aimAssist = new
+                    aimAssist = compact ? null : new
                     {
                         active = _aimReadout?.Active ?? false,
                         target = aimTarget,
@@ -460,9 +502,13 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     kills = _gameplay.Kills
                 },
                 enemies = enemies.Select(enemy => EnemyObservation(enemy, eye, planarForward, right, lineOfSight[enemy.Id])).ToArray(),
+                pickups = _gameplay.Pickups.Where(pickup => Vector3.Distance(playerPosition, pickup.Position) <= CombatObservationRange)
+                    .Select(pickup => new { id = pickup.Id, kind = pickup.Kind.ToString(), position = VectorValue(pickup.Position), collected = _gameplay.IsCollected(pickup.Id), distance = Vector3.Distance(playerPosition, pickup.Position) }).ToArray(),
                 doors = _doors.Select(door => new
                 {
                     id = door.Definition.Entity,
+                    label = door.Definition.SurfaceName,
+                    position = VectorValue((door.Definition.Min + door.Definition.Max) * .5f),
                     state = DoorState(door),
                     raised = door.Height
                 }).ToArray(),
@@ -540,12 +586,15 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             bool routeAvailable = route.Outcome == NavigationPathOutcome.Reached;
             LoadingBayStudyDoor? requiredDoor = DoorForTarget(target);
             bool doorwayStillBlocks = requiredDoor is not null && requiredDoor.Height < LoadingBayStudyDoor.Travel;
+            WorldInteractionReadout interaction = _worldInteraction.Inspect();
+            bool useEligibleNow = doorwayStillBlocks && requiredDoor is not null && !requiredDoor.Opening
+                && interaction.TargetedUseEnabled && interaction.Focus.Selected is {} selectedDoor
+                && selectedDoor.Id == requiredDoor.Definition.Entity;
             object? requiredAction = doorwayStillBlocks
                 ? requiredDoor!.Opening
                     ? new { kind = "wait", label = requiredDoor.Definition.SurfaceName, state = DoorState(requiredDoor) }
-                    : new { kind = "use", key = "E", targetId = requiredDoor.Definition.Entity, label = requiredDoor.Definition.SurfaceName, state = DoorState(requiredDoor) }
+                    : new { kind = "use", key = "E", targetId = requiredDoor.Definition.Entity, label = requiredDoor.Definition.SurfaceName, state = DoorState(requiredDoor), eligibleNow = useEligibleNow }
                 : null;
-            WorldInteractionReadout interaction = _worldInteraction.Inspect();
             var nearbyDoors = _doors.Select(door =>
             {
                 Vector3 center = (door.Definition.Min + door.Definition.Max) * .5f;
@@ -558,9 +607,21 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
                     distanceFromPlayerFeet = Vector3.Distance(from, center)
                 };
             }).Where(door => door.distanceFromPlayerFeet <= InteractionMaximumDistance).ToArray();
+            float bearing = LoadingBayNavigationGuidance.BearingDegrees(_player.Forward, from, route.NextWaypoint);
+            object? suggestion = null;
+            if (target.Available && !progress.Arrived && routeAvailable)
+            {
+                suggestion = Math.Abs(bearing) > 5
+                    ? new { op = "look", yaw = Math.Clamp(bearing, -90f, 90f), expected = "face next waypoint" }
+                    : (object)new { op = "act", id = "forward", ms = Math.Clamp(Vector3.Distance(from, route.NextWaypoint) / _tuning.MovementSpeed * 1000, 50, 500), expected = "reduce waypoint distance; reobserve for collision" };
+            }
+            if (doorwayStillBlocks && requiredDoor is not null && (useEligibleNow || requiredDoor.Opening))
+                suggestion = requiredDoor.Opening ? new { op = "advance", ms = 200, expected = "door continues opening" }
+                    : (object)new { op = "act", id = "use", expected = "ordinary focused door activation" };
             var response = new
             {
-                status = !target.Available ? "target-unavailable" : doorwayStillBlocks ? requiredDoor!.Opening ? "door-opening" : "requires-ordinary-use" : routeAvailable ? "static-route-available" : "route-unavailable",
+                suggestion,
+                status = !target.Available ? "target-unavailable" : doorwayStillBlocks && requiredDoor!.Opening ? "door-opening" : useEligibleNow ? "requires-ordinary-use" : routeAvailable ? "static-route-available" : "route-unavailable",
                 targetId = target.Id,
                 targetLabel = target.Label,
                 routeTargetId = routeTarget.Id,
@@ -738,6 +799,8 @@ internal sealed class LoadingBayRoomStudy : ILoadingBaySession, ILoadingBaySpati
             kind = enemy.Imp ? "imp" : "trooper",
             position = VectorValue(enemy.Position),
             health = enemy.Health,
+            alive = enemy.Health > 0,
+            hostile = enemy.Health > 0,
             awake = enemy.Awake,
             distance,
             bearingDegrees,

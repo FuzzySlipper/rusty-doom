@@ -300,6 +300,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(registrar);
         registrar.Register(_liveDebug);
+        if (_session is LoadingBayRoomStudy study)
+            registrar.Register(new PlaytestDebugModule(study.ReadPlaytestObservation, study.InspectAction,
+                new[] { "forward", "back", "left", "right", "use", "attack", "fist", "pistol", "shotgun" }, study.InspectLook));
         registrar.Register(_entityWorldDebug);
         if (_session is ILoadingBayInteractionDebugSession interaction)
             registrar.Register(interaction.InteractionDebugModule);
