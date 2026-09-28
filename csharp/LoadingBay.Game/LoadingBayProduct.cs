@@ -305,6 +305,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             registrar.Register(new PlaytestDebugModule(study.ReadPlaytestObservation, study.InspectAction,
                 new[] { "forward", "back", "left", "right", "use", "attack", "fist", "pistol", "shotgun", "jump" }, study.InspectLook));
             registrar.Register(new SpatialInspectionDebugModule(study.InspectGrid, study.InspectProbe, study.InspectJump));
+            registrar.Register(new SpatialClearanceDebugModule(study.InspectClearance));
         }
         registrar.Register(_entityWorldDebug);
         if (_session is ILoadingBayInteractionDebugSession interaction)

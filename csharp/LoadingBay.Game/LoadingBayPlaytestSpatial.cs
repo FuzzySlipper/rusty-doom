@@ -32,6 +32,18 @@ internal sealed partial class LoadingBayRoomStudy
             movement = _player.InspectMovement(), rays = rays.RootElement }, CombatObservationJson));
     }
 
+    internal DebugCommandResult InspectClearance(double x, double y, double z)
+    {
+        if (!FitsSinglePrecision(x) || !FitsSinglePrecision(y) || !FitsSinglePrecision(z))
+            return DebugCommandResult.Failure(DebugCommandStatus.InvalidArguments, "Target feet must be finite world XYZ.");
+        Vector3 targetFeet = new((float)x, (float)y, (float)z);
+        Vector3 feet = LoadingBayNavigationGuidance.PlayerFeet(_player.Position, _tuning.StandingCharacterHeight);
+        if (Vector3.Distance(feet, targetFeet) > 8)
+            return DebugCommandResult.Failure(DebugCommandStatus.InvalidArguments, "Clearance target must be within 8 world units of player feet.");
+        return DebugCommandResult.Success(SpatialClearanceSnapshot.Capture(_engine.Spatial, _player.Session,
+            _player.Position, targetFeet, _tuning.StandingCharacterHeight, _player.ControllerConfig, SpatialMapDoorColliders()));
+    }
+
     private PlaytestAction InspectJumpAction(bool active, string? reason)
     {
         if (!active) return new("jump", "Space", 0, false, false, reason);

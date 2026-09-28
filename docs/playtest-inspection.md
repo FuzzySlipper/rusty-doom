@@ -41,8 +41,8 @@ hitscan and enemy projectiles.
 
 ## Development artifacts
 
-The current working tree uses SDK `0.1.0-dev.playtest-20260928b` and a matching
-local development runtime under `.runtime/playtest-development-20260928h`.
+The current working tree uses SDK `0.1.0-dev.playtest-20260928c` and a matching
+local development runtime under `.runtime/playtest-development-20260928k`.
 This is a local development pair rather than a published release. The SDK package
 is backed up in the companion Engine repository; the runtime pack is local. Both
 were built from that Engine checkout. `NuGet.Config`
@@ -55,3 +55,11 @@ A browser reconnect retains the shared native game. Restart this owned product
 host for a fresh world; do not infer a reset from a new playtest session. Other
 sessions on the same host share mode, game state and player controls. Inspector
 camera overrides and drawing mode belong to each browser renderer.
+
+`assist clearance` takes a nearby world XYZ target feet position. It inspects the
+actual standing capsule against retained level geometry and current doors,
+returning current/target overlaps, straight sweep contact, and support below the
+target. Enemies/pickups are outside these collider inputs. The query does not
+advance time or predict the controller's full step/jump maneuver. Use contact
+source/normal and the actual post-action movement receipt together when diagnosing
+an edge or selecting a recovery direction.
