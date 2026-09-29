@@ -13,7 +13,6 @@ internal sealed record LoadingBayTuning(
     int MaximumArmor,
     ulong InventorySlots,
     int FactJournalCapacity,
-    uint MaximumPickupBindings,
     Vector3 PlayerPickupHalfExtents,
     string ContentIdentity,
     float MovementSpeed,
@@ -91,7 +90,7 @@ internal sealed record LoadingBayTuning(
     internal float EyeOffsetFromCenter => AuthoredBaseEyeHeight - EngineCenterLift;
 
     internal static LoadingBayTuning E1M1 { get; } = new(
-        100, 200, 0, 200, 10, 32, MaximumPickupBindings: 78, PlayerPickupHalfExtents: new Vector3(.25f, .5f, .25f), ContentIdentity: "doom-e1m1",
+        100, 200, 0, 200, 10, 32, PlayerPickupHalfExtents: new Vector3(.25f, .5f, .25f), ContentIdentity: "doom-e1m1",
         MovementSpeed: 6f,
         // Browser pointer deltas are physical CSS pixels. Keep the sensitivity in
         // authored product tuning so a normal gesture produces a readable turn.

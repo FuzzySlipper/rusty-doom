@@ -158,10 +158,9 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
             _triggerColliders[^1] = new(1, _player.Position - new Vector3(.3f, .9f, .3f), _player.Position + new Vector3(.3f, .9f, .3f), 1, uint.MaxValue, true, false, false);
             var receipt = _engine.Spatial.ReconcileTriggers(new(_player.Session, tick, SpatialTriggerCause.Movement, _triggerColliders));
             TriggerPasses++;
-            for (uint i = 0; i < receipt.FactCount; i++)
+            foreach (var fact in receipt.Facts.Span)
             {
-                var fact = _engine.Spatial.ReadTriggerFactAt(new(_player.Session, i));
-                if (!fact.Present || fact.Subject != 1) continue;
+                if (fact.Subject != 1) continue;
                 if (fact.Enter) _overlapping.Add(fact.Trigger); else _overlapping.Remove(fact.Trigger);
             }
             // Engine facts own membership. Retrying an ineligible pickup lets damage/ammo use

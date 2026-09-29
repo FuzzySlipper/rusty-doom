@@ -77,7 +77,7 @@ internal sealed class LoadingBayHudProjection : IDisposable
         uint programs = value.Array(LoadingBayE1M1SemanticCatalog.ProgramDescriptors.Select(program => value.Object(
             ("id", value.String(program.Id)), ("family", value.String(program.Family.ToString())), ("sourceIndex", value.Number(program.SourceIndex)), ("bindingShape", value.String(program.BindingShape.ToString())))).ToArray());
         uint pickupBindings = value.Array(readout.Pickups.Select(pickup => value.Object(
-            ("entityId", value.Number(pickup.EntityId)), ("item", value.String(pickup.ItemId)), ("program", value.String(pickup.ProgramId)), ("lifecycle", value.String(pickup.Lifecycle.ToString())), ("cause", value.String(pickup.Cause)), ("tick", value.Number(pickup.Tick)), ("triggerRevision", value.Number(pickup.TriggerRevision)))).ToArray());
+            ("entityId", value.Number(pickup.EntityId)), ("item", value.String(pickup.ItemId)), ("program", value.String(pickup.ProgramId)), ("lifecycle", value.String(pickup.Lifecycle.ToString())), ("cause", value.String(pickup.Cause)), ("tick", value.Number(pickup.Tick)))).ToArray());
         uint enemyBindings = value.Array(readout.Enemies.Select(enemy => value.Object(
             ("entityId", value.Number(enemy.EntityId)), ("label", value.String(enemy.Label)), ("health", value.Number(enemy.Health)), ("posture", value.String(enemy.Posture.ToString())), ("visible", value.Bool(enemy.Visible)), ("readyAtTick", value.Number(enemy.ReadyAtTick)), ("dropPickupEntityId", value.Number(enemy.DropPickupEntityId)))).ToArray());
         uint tuning = value.Object(
@@ -98,8 +98,7 @@ internal sealed class LoadingBayHudProjection : IDisposable
             ("initialEngineCenterY", value.Number(readout.Tuning.InitialEngineCenter.Y)),
             ("initialEngineCenterZ", value.Number(readout.Tuning.InitialEngineCenter.Z)),
             ("eyeOffsetFromCenter", value.Number(readout.Tuning.EyeOffsetFromCenter)),
-            ("maximumHealth", value.Number(readout.Tuning.MaximumHealth)),
-            ("maximumPickupBindings", value.Number(readout.Tuning.MaximumPickupBindings)));
+            ("maximumHealth", value.Number(readout.Tuning.MaximumHealth)));
         uint root = value.Object(
             ("content", value.String(readout.Tuning.ContentIdentity)),
             ("projectPath", value.String(projectPath)),
@@ -179,9 +178,9 @@ internal sealed class LoadingBayHudProjection : IDisposable
         SnapshotRestoredFact f => value.Object(("kind", value.String("snapshot.restored")), ("identity", value.String(f.Identity))),
         SemanticInputFact f => value.Object(("kind", value.String("input.semantic")), ("intent", value.String(f.Intent))),
         CanonicalPickupOverlapFact f => value.Object(("kind", value.String("pickup.overlap")), ("pickupEntityId", value.Number(f.PickupEntityId)), ("subjectEntityId", value.Number(f.SubjectEntityId)), ("tick", value.Number(f.Tick)), ("accepted", value.Bool(f.Accepted)), ("code", value.String(f.Code))),
-        CanonicalPickupTriggerStateFact f => value.Object(("kind", value.String("pickup.trigger")), ("pickupEntityId", value.Number(f.PickupEntityId)), ("active", value.Bool(f.Active)), ("revisionBefore", value.Number(f.RevisionBefore)), ("revisionAfter", value.Number(f.RevisionAfter)), ("overlapCount", value.Number(f.OverlapCount)), ("cause", value.String(f.Cause))),
+        CanonicalPickupTriggerStateFact f => value.Object(("kind", value.String("pickup.trigger")), ("pickupEntityId", value.Number(f.PickupEntityId)), ("active", value.Bool(f.Active)), ("overlapCount", value.Number(f.OverlapCount)), ("cause", value.String(f.Cause))),
         PickupLoadoutChangedFact f => value.Object(("kind", value.String("pickup.loadout")), ("pickupEntityId", value.Number(f.PickupEntityId)), ("item", value.String(f.ItemId)), ("program", value.String(f.ProgramId)), ("active", value.Bool(f.Active)), ("code", value.String(f.Code))),
-        PickupLifecycleFact f => value.Object(("kind", value.String("pickup.lifecycle")), ("pickupEntityId", value.Number(f.PickupEntityId)), ("item", value.String(f.ItemId)), ("program", value.String(f.ProgramId)), ("lifecycle", value.String(f.Lifecycle.ToString())), ("cause", value.String(f.Cause)), ("tick", value.Number(f.Tick)), ("triggerRevision", value.Number(f.TriggerRevision))),
+        PickupLifecycleFact f => value.Object(("kind", value.String("pickup.lifecycle")), ("pickupEntityId", value.Number(f.PickupEntityId)), ("item", value.String(f.ItemId)), ("program", value.String(f.ProgramId)), ("lifecycle", value.String(f.Lifecycle.ToString())), ("cause", value.String(f.Cause)), ("tick", value.Number(f.Tick))),
         EnemyPostureChangedFact f => value.Object(("kind", value.String("enemy.posture")), ("enemyEntityId", value.Number(f.EnemyEntityId)), ("posture", value.String(f.Posture.ToString())), ("health", value.Number(f.Health)), ("tick", value.Number(f.Tick)), ("cause", value.String(f.Cause))),
         EnemyHitFact f => value.Object(("kind", value.String("enemy.hit")), ("enemyEntityId", value.Number(f.EnemyEntityId)), ("weapon", value.String(f.WeaponId)), ("damage", value.Number(f.Damage)), ("remainingHealth", value.Number(f.RemainingHealth)), ("tick", value.Number(f.Tick))),
         EnemyDefeatedFact f => value.Object(("kind", value.String("enemy.defeated")), ("enemyEntityId", value.Number(f.EnemyEntityId)), ("dropPickupEntityId", value.Number(f.DropPickupEntityId)), ("tick", value.Number(f.Tick))),

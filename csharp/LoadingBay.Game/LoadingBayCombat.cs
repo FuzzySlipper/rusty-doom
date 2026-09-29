@@ -141,7 +141,6 @@ internal sealed class LoadingBayCombat
             dropState.Lifecycle = LoadingBayPickupLifecycle.Active;
             dropState.Cause = "enemy.drop-materialized";
             dropState.Tick = tick;
-            dropState.TriggerRevision = 0;
             if (MaterializeDrop is not null) Record(MaterializeDrop(defeated.DropPickupEntityId, defeated.Translation, tick));
         }
         foreach (LoadingBayE1M1EncounterDefinition encounter in LoadingBayE1M1SemanticCatalog.Encounters.Where(encounter => _activatedEncounters.Contains(encounter.EntityId) && encounter.Members.Contains(enemyEntityId)))

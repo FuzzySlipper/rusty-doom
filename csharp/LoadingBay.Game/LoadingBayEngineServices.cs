@@ -884,8 +884,6 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         _spatial = engine.Spatial;
         _session = player.Session;
         _pickups = LoadingBayE1M1SemanticCatalog.Pickups;
-        if (_pickups.Length != tuning.MaximumPickupBindings)
-            throw new InvalidOperationException("E1M1 pickup binding count drifted from the named product bound.");
         _playerHalfExtents = tuning.PlayerPickupHalfExtents;
         _player = playerEntity;
         if (_player.Value != 1 || !_entities.IsAlive(_player) || _entities.NextEntityValue <= LoadingBayE1M1SemanticCatalog.CanonicalEntityCount)
@@ -922,9 +920,9 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         ArgumentNullException.ThrowIfNull(pickups);
         _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
         EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement);
-        foreach (SpatialTriggerFactAtReceipt fact in receipt.Facts.Span)
+        foreach (SpatialTriggerFact fact in receipt.Facts.Span)
         {
-            if (!fact.Present || !fact.Enter || fact.Subject != _player.Value || !_pickups.Any(pickup => pickup.EntityId == fact.Trigger)) continue;
+            if (!fact.Enter || fact.Subject != _player.Value || !_pickups.Any(pickup => pickup.EntityId == fact.Trigger)) continue;
             // Collect first and retire the trigger only on success: retiring a registered
             // trigger cannot fail, so there is nothing to undo when collection is refused.
             LoadingBayReceipt outcome = pickups.CollectCanonicalPickup(fact.Trigger);
@@ -932,16 +930,14 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
             LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(fact.Trigger);
             if (!outcome.Accepted)
             {
-                SpatialTriggerReadReceipt observed = _spatial.ReadTrigger(new SpatialTriggerReadRequest(_session, fact.Trigger));
-                record(new PickupLifecycleFact(fact.Trigger, pickup.ItemId, pickup.ProgramId, LoadingBayPickupLifecycle.Active, outcome.Code, fact.Tick, observed.Revision));
+                record(new PickupLifecycleFact(fact.Trigger, pickup.ItemId, pickup.ProgramId, LoadingBayPickupLifecycle.Active, outcome.Code, fact.Tick));
                 continue;
             }
-            SpatialTriggerLifecycleReceipt retired = _spatial.SetTriggerActive(
+            SpatialTriggerLifecycleResult retired = _spatial.SetTriggerActive(
                 new SpatialTriggerSetActiveRequest(_session, fact.Trigger, false, fact.Tick));
             record(new CanonicalPickupTriggerStateFact(
-                fact.Trigger, retired.Active, retired.RevisionBefore, retired.RevisionAfter,
-                retired.RemovedOverlapCount, "pickup.collected"));
-            record(new PickupLifecycleFact(fact.Trigger, pickup.ItemId, pickup.ProgramId, LoadingBayPickupLifecycle.Collected, outcome.Code, fact.Tick, retired.RevisionAfter));
+                fact.Trigger, retired.Active, retired.RemovedOverlapCount, "pickup.collected"));
+            record(new PickupLifecycleFact(fact.Trigger, pickup.ItemId, pickup.ProgramId, LoadingBayPickupLifecycle.Collected, outcome.Code, fact.Tick));
         }
     }
 
@@ -962,8 +958,7 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         SpatialTriggerRestoreReceipt restored = _spatial.RestoreTriggers(new SpatialTriggerRestoreRequest(
             _session, active, ProjectCurrentColliders(player.Position)));
         return _pickups.Select(pickup => new CanonicalPickupTriggerStateFact(
-            pickup.EntityId, active.Contains(pickup.EntityId), restored.RevisionBefore, restored.RevisionAfter,
-            restored.ActiveOverlapCount, "snapshot.restored")).ToArray();
+            pickup.EntityId, active.Contains(pickup.EntityId), restored.ActiveOverlapCount, "snapshot.restored")).ToArray();
     }
 
     internal CanonicalPickupTriggerStateFact MaterializeEnemyDrop(ulong pickupEntityId, Vector3 translation, ulong tick)
@@ -973,8 +968,8 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         if (!pickup.StartsDormant) throw new InvalidOperationException("Only canonical enemy drops may be materialized by enemy defeat.");
         _entities.Set(_entityMap.Runtime(pickupEntityId), EngineComponentTypes.Transform, new Transform(translation, Quaternion.Identity, Vector3.One));
         _pickupTranslations[pickupEntityId] = translation;
-        SpatialTriggerLifecycleReceipt activated = _spatial.SetTriggerActive(new SpatialTriggerSetActiveRequest(_session, pickupEntityId, true, tick));
-        return new CanonicalPickupTriggerStateFact(pickupEntityId, activated.Active, activated.RevisionBefore, activated.RevisionAfter, activated.RemovedOverlapCount, "enemy.drop-materialized");
+        SpatialTriggerLifecycleResult activated = _spatial.SetTriggerActive(new SpatialTriggerSetActiveRequest(_session, pickupEntityId, true, tick));
+        return new CanonicalPickupTriggerStateFact(pickupEntityId, activated.Active, activated.RemovedOverlapCount, "enemy.drop-materialized");
     }
 
     private ReadOnlyMemory<SpatialEntityCollider> ProjectCurrentColliders(Vector3 playerPosition) => _pickups
@@ -1115,9 +1110,9 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         ArgumentNullException.ThrowIfNull(worldPolicy);
         _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
         EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement);
-        foreach (SpatialTriggerFactAtReceipt fact in receipt.Facts.Span)
+        foreach (SpatialTriggerFact fact in receipt.Facts.Span)
         {
-            if (!fact.Present || fact.Subject != _player.Value) continue;
+            if (fact.Subject != _player.Value) continue;
             LoadingBayReceipt result;
             // Facts encode edges only. Continued hazard truth is read below from the active Engine overlap set.
             if (_hazards.Contains(fact.Trigger)) { record(new WorldInteractionFact("hazard-edge", fact.Trigger, fact.Enter ? "enter" : "exit", fact.Tick, 0)); continue; }
@@ -1135,20 +1130,19 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     {
         foreach (ulong trigger in _hazards.OrderBy(value => value))
         {
-            SpatialTriggerReadReceipt state = _spatial.ReadTrigger(new SpatialTriggerReadRequest(_session, trigger));
+            SpatialTriggerReadResult state = _spatial.ReadTrigger(new SpatialTriggerReadRequest(_session, trigger));
             if (!state.Active) throw new InvalidOperationException($"Canonical E1M1 hazard trigger {trigger} was unexpectedly inactive.");
-            bool playerOverlapping = false;
-            for (uint index = 0; index < state.OverlapCount; index++)
-            {
-                SpatialTriggerOverlapAtReceipt overlap = _spatial.ReadTriggerOverlapAt(new SpatialTriggerOverlapAtRequest(_session, trigger, index));
-                if (!overlap.Present || overlap.Trigger != trigger || overlap.Revision != state.Revision)
-                    throw new InvalidOperationException("Engine returned an incoherent E1M1 hazard overlap readback.");
-                if (overlap.Subject == _player.Value) playerOverlapping = true;
-            }
-            if (!playerOverlapping) continue;
+            if (!PlayerOverlaps(state.Subjects.Span)) continue;
             LoadingBayReceipt outcome = worldPolicy.ApplyHazard(trigger, tick);
             record(new WorldInteractionFact("hazard-overlap", trigger, outcome.Code, tick, 0));
         }
+    }
+
+    private bool PlayerOverlaps(ReadOnlySpan<SpatialTriggerOverlapSubject> subjects)
+    {
+        foreach (SpatialTriggerOverlapSubject subject in subjects)
+            if (subject.Subject == _player.Value) return true;
+        return false;
     }
 
     /// <summary>One bounded Engine perception query chooses the authored use target; product policy decides only what that target means.</summary>

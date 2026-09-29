@@ -230,11 +230,11 @@ internal sealed class LoadingBayExitButtonAnimation : IDisposable
     private LoadingBayAnimationReadout Read(bool completionObserved, uint transitionCount)
     {
         AnimationReadout engine = _animation.Read();
-        AnimationRealizationReadout realization = _animation.ReadRealization();
+        AnimationRealizationResult realization = _animation.ReadRealization();
         return new LoadingBayAnimationReadout(
             _cue.Id, true, completionObserved, transitionCount, engine.AdmittedMeshes,
             engine.RetainedInstances, engine.PendingPlaybackCommands,
-            realization.RetainedFactCount, realization.EvictedFactCount);
+            (uint)realization.Facts.Length, realization.EvictedFactCount);
     }
 
     private static void ValidateReadout(LoadingBayAnimationReadout readout)
@@ -297,7 +297,7 @@ internal sealed class LoadingBayExitPresentation : IDisposable
     private readonly IPresentationService _presentation;
     private readonly LoadingBayTuning _tuning;
     private readonly PresentationBillboard _billboard;
-    private PresentationFactsReadout _readout;
+    private PresentationFactsResult _readout;
     private bool _disposed;
 
     internal LoadingBayExitPresentation(IPresentationService presentation, LoadingBayTuning tuning)
@@ -310,7 +310,7 @@ internal sealed class LoadingBayExitPresentation : IDisposable
         Validate(_readout);
     }
 
-    internal PresentationFactsReadout Readout => _readout;
+    internal PresentationFactsResult Readout => _readout;
 
     internal void Update(LoadingBayPerceptionReadout observation)
     {
@@ -356,7 +356,7 @@ internal sealed class LoadingBayExitPresentation : IDisposable
             PresentationBillboardLayer.Occluded, true);
     }
 
-    private static void Validate(PresentationFactsReadout readout)
+    private static void Validate(PresentationFactsResult readout)
     {
         if (readout.ActiveBillboards == 0)
             throw new InvalidOperationException("Engine Presentation did not retain the E1M1 exit billboard.");
@@ -465,7 +465,7 @@ internal readonly record struct LoadingBayAnimationReadout(
 
 internal readonly record struct LoadingBayEngineServiceReadout(
     LoadingBayPerceptionReadout Perception,
-    PresentationFactsReadout Presentation,
+    PresentationFactsResult Presentation,
     LoadingBayAnimationReadout Animation,
     AudioBusReadout Audio,
     LoadingBayVoxelSceneReadout VoxelScene,

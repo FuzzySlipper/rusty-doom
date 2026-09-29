@@ -26,7 +26,7 @@ internal sealed record LoadingBayItem(string Id, LoadingBayItemKind Kind, Mechan
 }
 internal sealed record LoadingBayWeapon(string Id, Mechanics.ItemDefinition MechanicsDefinition);
 internal readonly record struct LoadingBayReceipt(bool Accepted, string Code, string? Correlation);
-internal sealed record LoadingBayPickupSnapshot(ulong EntityId, string ItemId, string ProgramId, LoadingBayPickupLifecycle Lifecycle, string Cause, ulong Tick, ulong TriggerRevision);
+internal sealed record LoadingBayPickupSnapshot(ulong EntityId, string ItemId, string ProgramId, LoadingBayPickupLifecycle Lifecycle, string Cause, ulong Tick);
 internal sealed record LoadingBayEnemyReadout(ulong EntityId, string Label, int Health, LoadingBayEnemyPosture Posture, bool Visible, ulong ReadyAtTick, ulong DropPickupEntityId);
 /// <summary>Copied identity and authored surface values for one Engine-projected E1M1 material.</summary>
 internal sealed record LoadingBayAuthoredMaterialReadout(
@@ -112,9 +112,9 @@ internal sealed record DeveloperTrackChangedFact(string Track, int Value, string
 internal sealed record SnapshotRestoredFact(string Identity) : LoadingBayFact;
 internal sealed record SemanticInputFact(string Intent) : LoadingBayFact;
 internal sealed record CanonicalPickupOverlapFact(ulong PickupEntityId, ulong SubjectEntityId, ulong Tick, bool Accepted, string Code) : LoadingBayFact;
-internal sealed record CanonicalPickupTriggerStateFact(ulong PickupEntityId, bool Active, ulong RevisionBefore, ulong RevisionAfter, uint OverlapCount, string Cause) : LoadingBayFact;
+internal sealed record CanonicalPickupTriggerStateFact(ulong PickupEntityId, bool Active, uint OverlapCount, string Cause) : LoadingBayFact;
 internal sealed record PickupLoadoutChangedFact(ulong PickupEntityId, string ItemId, string ProgramId, bool Active, string Code) : LoadingBayFact;
-internal sealed record PickupLifecycleFact(ulong PickupEntityId, string ItemId, string ProgramId, LoadingBayPickupLifecycle Lifecycle, string Cause, ulong Tick, ulong TriggerRevision) : LoadingBayFact;
+internal sealed record PickupLifecycleFact(ulong PickupEntityId, string ItemId, string ProgramId, LoadingBayPickupLifecycle Lifecycle, string Cause, ulong Tick) : LoadingBayFact;
 internal sealed record EnemyPostureChangedFact(ulong EnemyEntityId, LoadingBayEnemyPosture Posture, int Health, ulong Tick, string Cause) : LoadingBayFact;
 internal sealed record EnemyHitFact(ulong EnemyEntityId, string WeaponId, int Damage, int RemainingHealth, ulong Tick) : LoadingBayFact;
 internal sealed record EnemyDefeatedFact(ulong EnemyEntityId, ulong DropPickupEntityId, ulong Tick) : LoadingBayFact;

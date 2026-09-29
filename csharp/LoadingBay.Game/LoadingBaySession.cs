@@ -63,7 +63,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         {
             EntityId entity = _entityMap.Runtime(pickup.EntityId);
             _entities.Add(entity, new LoadingBayPickupStateComponent(
-                pickup.StartsDormant ? LoadingBayPickupLifecycle.Dormant : LoadingBayPickupLifecycle.Active, "bootstrap", 0, 0));
+                pickup.StartsDormant ? LoadingBayPickupLifecycle.Dormant : LoadingBayPickupLifecycle.Active, "bootstrap", 0));
         }
         foreach (LoadingBayE1M1EnemyDefinition enemy in LoadingBayE1M1SemanticCatalog.Enemies)
         {

@@ -3,18 +3,16 @@ namespace LoadingBay.Game;
 /// <summary>Live pickup lifecycle over one canonical pickup entity.</summary>
 internal sealed class LoadingBayPickupStateComponent
 {
-    internal LoadingBayPickupStateComponent(LoadingBayPickupLifecycle lifecycle, string cause, ulong tick, ulong triggerRevision)
+    internal LoadingBayPickupStateComponent(LoadingBayPickupLifecycle lifecycle, string cause, ulong tick)
     {
         Lifecycle = lifecycle;
         Cause = cause;
         Tick = tick;
-        TriggerRevision = triggerRevision;
     }
 
     internal LoadingBayPickupLifecycle Lifecycle { get; set; }
     internal string Cause { get; set; }
     internal ulong Tick { get; set; }
-    internal ulong TriggerRevision { get; set; }
 }
 
 /// <summary>Live door progression over one canonical door entity.</summary>

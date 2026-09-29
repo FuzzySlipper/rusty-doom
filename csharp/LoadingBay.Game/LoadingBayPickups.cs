@@ -95,7 +95,7 @@ internal sealed class LoadingBayPickups
             ? _combat.CollectWeaponStarter(pickup)
             : CollectPickup(CanonicalPickupKey(entityId), LoadingBayDefinitions.Item(pickup.ItemId), pickup.Quantity);
         _manualPickupKeys.Remove(CanonicalPickupKey(entityId));
-        UpdatePickupState(pickup, outcome.Accepted ? LoadingBayPickupLifecycle.Collected : PickupState(entityId).Lifecycle, outcome.Code, _currentTick(), 0);
+        UpdatePickupState(pickup, outcome.Accepted ? LoadingBayPickupLifecycle.Collected : PickupState(entityId).Lifecycle, outcome.Code, _currentTick());
         return outcome;
     }
 
@@ -114,7 +114,6 @@ internal sealed class LoadingBayPickups
         state.Lifecycle = lifecycle.Lifecycle;
         state.Cause = lifecycle.Cause;
         state.Tick = lifecycle.Tick;
-        state.TriggerRevision = lifecycle.TriggerRevision;
     }
 
     internal void RestorePickups(LoadingBayPickupSnapshot[] pickups)
@@ -125,7 +124,6 @@ internal sealed class LoadingBayPickups
             state.Lifecycle = pickup.Lifecycle;
             state.Cause = pickup.Cause;
             state.Tick = pickup.Tick;
-            state.TriggerRevision = pickup.TriggerRevision;
         }
     }
 
@@ -134,7 +132,7 @@ internal sealed class LoadingBayPickups
         .Select(pickup =>
         {
             LoadingBayPickupStateComponent state = PickupState(pickup.EntityId);
-            return new LoadingBayPickupSnapshot(pickup.EntityId, pickup.ItemId, pickup.ProgramId, state.Lifecycle, state.Cause, state.Tick, state.TriggerRevision);
+            return new LoadingBayPickupSnapshot(pickup.EntityId, pickup.ItemId, pickup.ProgramId, state.Lifecycle, state.Cause, state.Tick);
         }).ToArray();
 
     private bool CanApplyPickup(LoadingBayItem item) => item.PickupPolicy switch
@@ -152,12 +150,11 @@ internal sealed class LoadingBayPickups
         return true;
     }
 
-    private void UpdatePickupState(LoadingBayE1M1PickupPlacement pickup, LoadingBayPickupLifecycle lifecycle, string cause, ulong tick, ulong triggerRevision)
+    private void UpdatePickupState(LoadingBayE1M1PickupPlacement pickup, LoadingBayPickupLifecycle lifecycle, string cause, ulong tick)
     {
         LoadingBayPickupStateComponent state = PickupState(pickup.EntityId);
         state.Lifecycle = lifecycle;
         state.Cause = cause;
         state.Tick = tick;
-        state.TriggerRevision = triggerRevision;
     }
 }

@@ -590,7 +590,7 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
             LoadingBayNavigationProgress progress = LoadingBayNavigationGuidance.Progress(target, from);
             LoadingBayNavigationTarget routeTarget = target;
             Vector3 goal = LoadingBayNavigationGuidance.TargetFeet(routeTarget);
-            NavigationStepReceipt route = _engine.Spatial.EvaluateNavigationStep(new NavigationStepRequest(
+            NavigationStepResult route = _engine.Spatial.EvaluateNavigationStep(new NavigationStepRequest(
                 _player.Session, from, goal, NavigationMaximumStepUnits, NavigationMaximumVisited));
             bool routeAvailable = route.Outcome == NavigationPathOutcome.Reached;
             LoadingBayStudyDoor? requiredDoor = DoorForTarget(target);
@@ -642,9 +642,9 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
                 distanceFromPlayerFeet = progress.Distance,
                 distanceMeaning = "player feet to final target feet",
                 targetBearingDegrees = LoadingBayNavigationGuidance.BearingDegrees(_player.Forward, from, LoadingBayNavigationGuidance.TargetFeet(target)),
-                remainingPathLengthEstimate = routeAvailable ? Math.Max(0d, route.PathLen - 1d) * NavigationCellSize : (double?)null,
-                remainingGridPathLengthEstimate = routeAvailable ? Math.Max(0d, route.PathLen - 1d) * NavigationCellSize : (double?)null,
-                pathLengthCells = routeAvailable ? route.PathLen : (uint?)null,
+                remainingPathLengthEstimate = routeAvailable ? Math.Max(0d, route.Path.Length - 1d) * NavigationCellSize : (double?)null,
+                remainingGridPathLengthEstimate = routeAvailable ? Math.Max(0d, route.Path.Length - 1d) * NavigationCellSize : (double?)null,
+                pathLengthCells = routeAvailable ? (uint)route.Path.Length : (uint?)null,
                 arrival = new { arrived = progress.Arrived, visited = _navigationVisits.Contains(target.Id), currentRegion = progress.CurrentRegion },
                 requiredAction,
                 doorGuidance = new
