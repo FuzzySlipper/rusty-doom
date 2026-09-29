@@ -21,7 +21,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
     internal LoadingBayVoxelScenePresentation(
         IEngineContext engine,
         SpatialSession session,
-        VoxelAssetSpatialPublishLeaseReceipt publishedScene)
+        VoxelAssetSpatialPublishResult publishedScene)
     {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(session);
@@ -39,7 +39,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                 engine.Content.ReadReferenceInfo(catalogContent),
                 LoadingBayAdmittedContent.AssetCatalogPath);
             catalog = engine.AuthoredContent.AdmitCatalogFromContent(new AuthoredCatalogFromContentRequest(catalogContent));
-            AuthoredCatalogReadoutLeaseReceipt catalogReadout = engine.AuthoredContent.ReadCatalog(catalog);
+            AuthoredCatalogReadoutResult catalogReadout = engine.AuthoredContent.ReadCatalog(catalog);
             if (catalogReadout.Materials.Length == 0)
                 throw new InvalidOperationException("Engine did not retain a complete E1M1 authored presentation closure.");
 
@@ -58,7 +58,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                 // retained authored material, texture identity, and canonical voxel-surface
                 // descriptor as one public operation, rather than asking Loading Bay to recreate
                 // those renderer details from readouts.
-                AuthoredMaterialResolutionLeaseReceipt resolvedMaterial = engine.AuthoredContent.ResolveMaterial(
+                AuthoredMaterialResolutionResult resolvedMaterial = engine.AuthoredContent.ResolveMaterial(
                     new AuthoredMaterialResolveRequest(catalog, catalogMaterial.EntryId));
                 AuthoredMaterialReadout material = RequireExactlyOneMaterial(resolvedMaterial.Materials, catalogMaterial.EntryId);
                 if (!material.HasVoxelSurface)
@@ -68,7 +68,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                     throw new InvalidOperationException($"Authored material '{catalogMaterial.EntryId}' has no resolved E1M1 texture mapping.");
 
                 AuthoredAssetReference texture = surface.ResolvedTexture;
-                AuthoredResolvedEntryLeaseReceipt resolvedTexture = engine.AuthoredContent.ResolveReference(
+                AuthoredResolvedEntryResult resolvedTexture = engine.AuthoredContent.ResolveReference(
                     new AuthoredCatalogResolveRequest(
                         catalog,
                         texture.Id,
@@ -115,7 +115,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
             presentation = engine.VoxelScenePresentation.ProjectScene(new ProjectVoxelSceneRequest(session, bindings.ToArray()));
             VoxelScenePresentationReadout presentationReadout = ValidatePresentation(
                 engine.VoxelScenePresentation.RefreshScene(presentation));
-            VoxelSceneMaterialMappingLeaseReceipt mappingReadout = engine.VoxelScenePresentation.ReadMaterialMapping(presentation);
+            VoxelSceneMaterialMappingResult mappingReadout = engine.VoxelScenePresentation.ReadMaterialMapping(presentation);
             ValidateMaterialMapping(mappingReadout, materialHandlesBySlot);
 
             _catalogContent = catalogContent;
@@ -155,7 +155,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayVoxelScenePresentation));
         VoxelScenePresentationReadout presentation = ValidatePresentation(_service.RefreshScene(_presentation));
-        VoxelSceneMaterialMappingLeaseReceipt mapping = _service.ReadMaterialMapping(_presentation);
+        VoxelSceneMaterialMappingResult mapping = _service.ReadMaterialMapping(_presentation);
         ValidateMaterialMapping(mapping, _materialHandlesBySlot);
         _readout = _identity with
         {
@@ -195,7 +195,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    private static Dictionary<string, VoxelAssetSpatialPaletteRow> IndexPalette(VoxelAssetSpatialPublishLeaseReceipt receipt)
+    private static Dictionary<string, VoxelAssetSpatialPaletteRow> IndexPalette(VoxelAssetSpatialPublishResult receipt)
     {
         Dictionary<string, VoxelAssetSpatialPaletteRow> palette = new(StringComparer.Ordinal);
         foreach (VoxelAssetSpatialPaletteRow row in receipt.Palette.Span)
@@ -240,7 +240,7 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         return readout;
     }
 
-    private static void ValidateMaterialMapping(VoxelSceneMaterialMappingLeaseReceipt mapping, IReadOnlyDictionary<uint, ulong> materialHandlesBySlot)
+    private static void ValidateMaterialMapping(VoxelSceneMaterialMappingResult mapping, IReadOnlyDictionary<uint, ulong> materialHandlesBySlot)
     {
         if (mapping.Mappings.Length == 0)
             throw new InvalidOperationException("Engine did not retain an effective E1M1 voxel material mapping.");

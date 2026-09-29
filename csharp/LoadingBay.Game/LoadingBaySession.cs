@@ -603,7 +603,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         public IRandomService Random => throw new NotSupportedException();
         public IVoxelScenePresentationService VoxelScenePresentation => throw new NotSupportedException();
         public IPersistenceService Persistence { get; } = persistence;
-        public IContentStoreService ContentStore => throw new NotSupportedException();
         public IUiService Ui => throw new NotSupportedException();
     }
     private void ThrowIfDisposed() { if (_disposed) throw new ObjectDisposedException(nameof(LoadingBaySession)); }

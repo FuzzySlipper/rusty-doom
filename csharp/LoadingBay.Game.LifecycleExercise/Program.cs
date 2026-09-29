@@ -136,9 +136,9 @@ Require(preFirstStep.Player.Position == LoadingBayTuning.E1M1.InitialPosition &&
     "pre-first-step snapshot did not retain its spawn pose through restore");
 state.Update(Update(step: 1));
 Require(state.Readout().Player.Value == 1, "E1M1 did not retain canonical player identity 1 after entity bootstrap");
-Require(LoadingBayTuning.E1M1.MaximumSpatialEntityBindings == 94 && LoadingBayE1M1SemanticCatalog.Floors.Single().PlatformBoundsMin != LoadingBayE1M1SemanticCatalog.Floors.Single().BoundsMin
+Require(LoadingBayE1M1SemanticCatalog.Floors.Single().PlatformBoundsMin != LoadingBayE1M1SemanticCatalog.Floors.Single().BoundsMin
     && LoadingBayE1M1SemanticCatalog.Lifts.Single().PlatformBoundsMax != LoadingBayE1M1SemanticCatalog.Lifts.Single().BoundsMax,
-    "generated world target platform bounds or shared spatial bound drifted");
+    "generated world target platform bounds drifted");
 Require(state.ApplyCanonicalHazard(137, 1).Accepted && !state.ApplyCanonicalHazard(137, 2).Accepted && state.ApplyCanonicalHazard(137, 56).Accepted, "canonical nukage did not retain its inclusive cooldown boundary");
 Require(state.ActivateCanonicalDoor(141, 1).Accepted, "canonical door did not enter opening state");
 Require(state.ActivateCanonicalFloor(146, 1).Accepted && state.ActivateCanonicalLift(148, 1).Accepted, "canonical floor or lift did not begin lowering");

@@ -99,9 +99,7 @@ internal sealed class LoadingBayHudProjection : IDisposable
             ("initialEngineCenterZ", value.Number(readout.Tuning.InitialEngineCenter.Z)),
             ("eyeOffsetFromCenter", value.Number(readout.Tuning.EyeOffsetFromCenter)),
             ("maximumHealth", value.Number(readout.Tuning.MaximumHealth)),
-            ("maximumPickupBindings", value.Number(readout.Tuning.MaximumPickupBindings)),
-            ("maximumPickupFactReadback", value.Number(readout.Tuning.MaximumPickupFactReadback)),
-            ("maximumSpatialEntityBindings", value.Number(readout.Tuning.MaximumSpatialEntityBindings)));
+            ("maximumPickupBindings", value.Number(readout.Tuning.MaximumPickupBindings)));
         uint root = value.Object(
             ("content", value.String(readout.Tuning.ContentIdentity)),
             ("projectPath", value.String(projectPath)),

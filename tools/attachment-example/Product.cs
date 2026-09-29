@@ -24,10 +24,10 @@ public sealed class Product : IEngineProduct
         CameraQueries.TryLookAtPose(new(4,3,6),new(0,1.5f,0),0,out var pose);
         camera=engine.CameraView.CreateCamera(new(pose,CameraBasisMode.Derived,default,new(CameraProjectionKind.Perspective,50,0,.05f,100),CameraViewports.Full));
         engine.CameraView.SetActiveCamera(camera);
-        engine.Graphics.PublishAttachedSnapshot(new(new AppearanceFact[]{
+        engine.Graphics.PublishChanges(new(new AppearanceFact[]{
             new(1,false,0,new(Vector3.Zero,Quaternion.Identity,Vector3.One),body,true,RenderLayer.Scene),
             new(2,true,1,binding.Transform,child,true,RenderLayer.Scene)
-        },new MeshJointAttachment[]{new(2,binding.Joint)}));
+        },ReadOnlyMemory<ulong>.Empty,new MeshJointAttachment[]{new(2,binding.Joint)}));
         animation=engine.Animation.CreateInstance(new(body,1));
         engine.Animation.SetPlayback(new(animation,AnimationPlaybackKind.Sample,"run",AnimationLoopMode.Repeat,1,1,true,0,false,.5f));
         string report=JsonSerializer.Serialize(new{joint=binding.Joint,target=binding.TargetId,child=binding.ChildId,position=new[]{binding.Transform.Translation.X,binding.Transform.Translation.Y,binding.Transform.Translation.Z},scale=new[]{binding.Transform.Scale.X,binding.Transform.Scale.Y,binding.Transform.Scale.Z},pose=.5});

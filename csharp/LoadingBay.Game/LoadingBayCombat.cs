@@ -256,7 +256,6 @@ internal sealed class LoadingBayCombat
                 candidate.MaterializeUnique(new Mechanics.ItemState(new EntityId(_entities.NextEntityValue), weapon.MechanicsDefinition), _player);
             }
             candidate.Grant(_player, starterAmmo.MechanicsDefinition, starterAmmo.StackId, pickup.StarterAmmunitionQuantity);
-            candidate.Validate();
             return true;
         }
         catch (Mechanics.MechanicsException) { return false; }

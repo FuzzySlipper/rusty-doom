@@ -266,7 +266,7 @@ internal sealed class LoadingBayPerceptionProjection
     {
         PerceptionObserver observer = player.CreatePerceptionObserver(playerEntity, _tuning);
         LoadingBayE1M1Landmark landmark = _tuning.ExitLandmark;
-        PerceptionReadoutLeaseReceipt receipt = _perception.QueryVisibility(new PerceptionQueryRequest(
+        PerceptionReadoutResult receipt = _perception.QueryVisibility(new PerceptionQueryRequest(
             player.Session,
             new[] { observer },
             new[] { new PerceptionTarget(landmark.EntityId, landmark.Position) },

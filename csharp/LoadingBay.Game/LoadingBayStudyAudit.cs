@@ -76,7 +76,7 @@ internal sealed class LoadingBayStudyAudit : IDisposable
             json.WriteNumber("X", point.X); json.WriteNumber("Y", point.Y); json.WriteNumber("Z", point.Z);
             json.WriteEndObject();
         }
-        void Report(string name, ImplicitAnalysisReportLeaseReceipt report)
+        void Report(string name, ImplicitAnalysisReportResult report)
         {
             json.WriteStartObject(name);
             json.WriteNumber("Complete", report.Complete); json.WriteNumber("Sampled", report.Sampled);
@@ -112,7 +112,7 @@ internal sealed class LoadingBayStudyAudit : IDisposable
             Report("Report", _service.ReadExpectedJoin(join.Request(_audit, Id, .4f, .05f, .025f, 20_000)));
             json.WriteEndObject();
         }
-        ImplicitAnalysisReportLeaseReceipt Enclosure(Vector3 min, Vector3 max, Vector3 seed,
+        ImplicitAnalysisReportResult Enclosure(Vector3 min, Vector3 max, Vector3 seed,
             ImplicitEnclosureOpening[] openings, uint budget)
             => _service.ReadEnclosure(new(_audit, LoadingBayStudyCoordinates.Minimum(min, max),
                 LoadingBayStudyCoordinates.Maximum(min, max), LoadingBayStudyCoordinates.World(seed),

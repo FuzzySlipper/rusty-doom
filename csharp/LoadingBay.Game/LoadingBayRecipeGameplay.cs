@@ -171,8 +171,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
                 {
                     _collected.Add(pickup.Id);
                     _overlapping.Remove(pickup.Id);
-                    var before = _engine.Spatial.ReadTrigger(new(_player.Session, pickup.Id));
-                    _engine.Spatial.SetTriggerActive(new(_player.Session, pickup.Id, before.Revision, false, tick));
+                    _engine.Spatial.SetTriggerActive(new(_player.Session, pickup.Id, false, tick));
                     GeometryDirty = true;
                 }
             if (_overlapping.Contains(32000) && _time >= _nextHazard)
@@ -215,8 +214,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
             enemy.Motion = default; enemy.Sequence = 0;
         }
         _triggerColliders[^1] = new(1, _player.Position - new Vector3(.3f, .9f, .3f), _player.Position + new Vector3(.3f, .9f, .3f), 1, uint.MaxValue, true, false, false);
-        var before = _engine.Spatial.ReadTrigger(new(_player.Session, Pickups[0].Id));
-        _engine.Spatial.RestoreTriggers(new(_player.Session, before.Revision,
+        _engine.Spatial.RestoreTriggers(new(_player.Session,
             Pickups.Select(p => p.Id).Append(32000UL).ToArray(), _triggerColliders));
         // Spawn is outside every trigger, so the restored overlap baseline is empty.
         GeometryDirty = true; _revision++;
@@ -350,7 +348,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
         for (int i = _fireballs.Count - 1; i >= 0; i--)
         {
             var p = _fireballs[i]; p.Impulse = Vector3.Zero;
-            DynamicsStepAndReadBody? state = null;
+            DynamicsBodyFact? state = null;
             foreach (var row in receipt.Bodies.Span) if (row.Body.Value == p.Body.Handle.Value) state = row;
             if (state is null) throw new InvalidOperationException("Engine omitted an active recipe projectile.");
             Vector3 next = state.Value.Readout.Transform.Translation;
