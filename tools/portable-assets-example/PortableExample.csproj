@@ -9,5 +9,5 @@
     <RustyEngineProductLifecycleMode>realtime</RustyEngineProductLifecycleMode>
     <RustyEngineProductFixedStepHz>60</RustyEngineProductFixedStepHz><RustyEngineProductFixedStepMaxCatchUpSteps>4</RustyEngineProductFixedStepMaxCatchUpSteps>
   </PropertyGroup>
-  <ItemGroup><PackageReference Include="Rusty.Engine" Version="0.1.0-dev.feec788503fe" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Rusty.Engine" Version="[$(RustyEnginePackageVersion)]" /></ItemGroup>
 </Project>

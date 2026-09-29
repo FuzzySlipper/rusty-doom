@@ -1,6 +1,6 @@
 # Engine bone attachment consumer
 
-Independent product using SDK/runtime `0.1.0-dev.feec788503fe` and ordinary
+Independent product using the repository's pinned Engine pair and ordinary
 Engine APIs. It loads the Workbench-exported descriptor and two GLBs, publishes
 `MeshJointAttachment` on `RightHand`, and samples the body's `run` clip at 50%.
 There is no Workbench dependency, descriptor parser or bone-follow loop.
@@ -9,7 +9,7 @@ From the repository root:
 
 ```sh
 workbench --workspace /home/agent/dev/asset-pipeline job fetch f5af8e42eb1e --to tools/attachment-example/content
-dotnet build tools/attachment-example/AttachmentExample.csproj -t:StageRustyEngineCoreClrProduct -p:RestoreAdditionalProjectSources=/home/agent/dev/asset-pipeline/.runtime/sdk-feed
+rusty build --project tools/attachment-example/AttachmentExample.csproj
 ```
 
 Run the staged product with the matching packaged Engine runtime. Set

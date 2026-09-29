@@ -6,7 +6,7 @@ Loading Bay is a complete-but-narrow ordinary C# consumer example. Copy its owne
 
 - Node and the pinned pnpm version for the Angular product UI.
 - A .NET SDK for the packaged CoreCLR product and the explicit `linux-x64` NativeAOT check.
-- One matched Rusty Engine SDK feed and runtime pack. The local development pair is provisioned under ignored `.runtime/`; select another complete pair explicitly through `RUSTY_RUNTIME_PACK` when needed.
+- The Engine `rusty` CLI (bootstrap: `curl -fsSL https://raw.githubusercontent.com/FuzzySlipper/rusty-engine/main/scripts/install-rusty.sh | bash`). The Engine SDK/runtime pair is pinned in `Directory.Build.props`; `rusty install` installs it and `rusty update` moves it.
 
 No WAD is required to build or run the committed demo. It is only an offline source for deliberate asset regeneration; preserve the provenance record when that happens.
 

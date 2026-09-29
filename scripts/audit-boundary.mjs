@@ -189,7 +189,7 @@ for (const section of ["dependencies", "devDependencies"]) {
 const gameProjectPath = resolve(repoRoot, "csharp/LoadingBay.Game/LoadingBay.Game.csproj");
 const gameProject = readFileSync(gameProjectPath, "utf8");
 for (const [label, marker] of [
-  ["packaged Rusty.Engine SDK", '<PackageReference Include="Rusty.Engine" Version="0.1.0-dev.playtest-20260928c"'],
+  ["packaged Rusty.Engine SDK", '<PackageReference Include="Rusty.Engine" Version="[$(RustyEnginePackageVersion)]"'],
   ["explicit product entry type", "<RustyEngineProductEntryType>LoadingBay.Game.LoadingBayProduct</RustyEngineProductEntryType>"],
   ["Angular staged UI root", "<RustyEngineProductUiRoot>$(MSBuildThisFileDirectory)../../dist/apps/loading-bay/browser</RustyEngineProductUiRoot>"],
   ["E1M1 content root", "<RustyEngineProductContentRoot>$(MSBuildThisFileDirectory)../../content</RustyEngineProductContentRoot>"],
@@ -212,7 +212,7 @@ for (const marker of ["cargo run", "RUSTY_ENGINE_ROOT", "LoadingBay.NativeProduc
     violations.push(`scripts/run-csharp-product.sh: obsolete host launch marker ${marker}`);
   }
 }
-for (const marker of ["rusty\" dev", "--project \"$game_project\"", "--runtime \"$runtime_pack\""]) {
+for (const marker of ["exec rusty dev", "--project \"$game_project\""]) {
   if (!productRunner.includes(marker)) {
     violations.push(`scripts/run-csharp-product.sh: missing packaged development marker ${marker}`);
   }

@@ -41,15 +41,10 @@ hitscan and enemy projectiles.
 
 ## Development artifacts
 
-The current working tree uses SDK `0.1.0-dev.playtest-20260928c` and a matching
-local development runtime under `.runtime/playtest-development-20260928k`.
-This is a local development pair rather than a published release. The SDK package
-is backed up in the companion Engine repository; the runtime pack is local. Both
-were built from that Engine checkout. `NuGet.Config`
-and `scripts/run-csharp-product.sh` use that local directory; environment overrides
-remain available. Build the UI normally and use `LOADING_BAY_LIVE_DEBUG=1` when
-running the product for these tools. Future clean release publication can replace
-both artifacts together.
+The Engine pair is pinned in `Directory.Build.props` and installed with the
+Engine `rusty` CLI (`rusty install`; `rusty status` shows the pin and paths).
+`scripts/run-csharp-product.sh` runs it with `rusty dev`. Build the UI normally
+and use `LOADING_BAY_LIVE_DEBUG=1` when running the product for these tools.
 
 A browser reconnect retains the shared native game. Restart this owned product
 host for a fresh world; do not infer a reset from a new playtest session. Other
