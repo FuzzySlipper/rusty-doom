@@ -1,0 +1,58 @@
+{
+  "wadPath": "/home/research/doom.ts/public/doom1.wad",
+  "wadSha256": "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771",
+  "wadByteLength": 4196020,
+  "format": "wav-pcm-u8-mono",
+  "entries": [
+    {
+      "name": "DSDORCLS",
+      "sourceLump": "DSDORCLS",
+      "sourceByteLength": 13890,
+      "sourceSha256": "ede0a1f6deebb85321fd5069f752c241ed1717c931882b01b144708b9ce0f0fb",
+      "sampleRate": 11025,
+      "sampleCount": 13850,
+      "wavSha256": "4d53526040fb2ddff09f23c894a64a13c9b825542014d9b19aade865a45a3847",
+      "wavByteLength": 13894
+    },
+    {
+      "name": "DSDOROPN",
+      "sourceLump": "DSDOROPN",
+      "sourceByteLength": 13824,
+      "sourceSha256": "6d257110631757dda8a6ecc344325d6e2e01826d817fb18c188473bbd7392d2c",
+      "sampleRate": 11025,
+      "sampleCount": 13784,
+      "wavSha256": "9aab33ed5d6efd25bb51659d4c48aff8acc81f35f08d9d0c65c5072eeb88be0a",
+      "wavByteLength": 13828
+    },
+    {
+      "name": "DSPISTOL",
+      "sourceLump": "DSPISTOL",
+      "sourceByteLength": 5669,
+      "sourceSha256": "b54942e3acacffd755494998e849a30f9020e067d1ce4bac972086fce2a2e69b",
+      "sampleRate": 11025,
+      "sampleCount": 5629,
+      "wavSha256": "dfbd4defc3d974874d47f063455b9ed95b09deb998a019160124c78a27012eca",
+      "wavByteLength": 5673
+    },
+    {
+      "name": "DSPUNCH",
+      "sourceLump": "DSPUNCH",
+      "sourceByteLength": 2504,
+      "sourceSha256": "72d9c179feeba5e103475acd8238c64e63adfcfc941c52fc688f5682bcabd7c7",
+      "sampleRate": 11025,
+      "sampleCount": 2464,
+      "wavSha256": "eb5f6f7e63aab60a2881e2f7bf78d667e5392f9391b5bcd51b82821913765305",
+      "wavByteLength": 2508
+    },
+    {
+      "name": "DSSHOTGN",
+      "sourceLump": "DSSHOTGN",
+      "sourceByteLength": 9453,
+      "sourceSha256": "91ac0f1eba355f186c9a591290004f0d355d5112e8efc8ed16729a81e18080e2",
+      "sampleRate": 11025,
+      "sampleCount": 9413,
+      "wavSha256": "f7b1501639c50ef442c005e51f45a48f95c6497a03facc28d46a4fcefb84770e",
+      "wavByteLength": 9457
+    }
+  ]
+}

@@ -18,6 +18,8 @@ internal sealed class LoadingBayStudyDoor
     internal void Reset() { Opening = false; Height = 0; }
     internal float Height { get; private set; }
     internal Transform Placement => new(new(0, Height, 0), Quaternion.Identity, Vector3.One);
+    /// <summary>World centre of the door leaf, where its sound comes from.</summary>
+    internal Vector3 Center => (Definition.Min + Definition.Max) / 2 + Placement.Translation;
     internal CharacterObstacle Obstacle => new(Definition.Entity, Placement, Definition.Min,
         Definition.Max, true, new(0, Opening && Height < Travel ? Speed : 0, 0), Vector3.Zero);
 

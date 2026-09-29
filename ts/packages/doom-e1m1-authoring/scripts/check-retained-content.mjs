@@ -37,6 +37,18 @@ if (sha256(skyBytes) !== textures.sky.pngSha256 || skyBytes.byteLength !== textu
   throw new Error(`${skyPath} no longer matches its E1M1 texture manifest`);
 }
 
+const sounds = readJson("content/doom-e1m1/sounds/manifest.json");
+if (sounds.wadSha256 !== textures.wadSha256) {
+  throw new Error("E1M1 sounds and textures must derive from the same WAD");
+}
+for (const entry of sounds.entries) {
+  const relativePath = `content/doom-e1m1/sounds/${entry.name}.wav`;
+  const bytes = readFileSync(resolve(repoRoot, relativePath));
+  if (sha256(bytes) !== entry.wavSha256 || bytes.byteLength !== entry.wavByteLength) {
+    throw new Error(`${relativePath} no longer matches its E1M1 sound manifest`);
+  }
+}
+
 const props = readJson("content/doom-e1m1/props/source-manifest.json");
 // The selected generated sky has separate provenance; retain the WAD sky above.
 const generatedSky = readJson("content/loading-bay/sky/manifest.json");
@@ -79,5 +91,5 @@ const intermediate = statSync(resolve(repoRoot, intermediatePath));
 if (intermediate.size === 0) throw new Error(`${intermediatePath} must not be empty`);
 
 console.log(
-  `retained E1M1 forge passed: ${textures.entries.length} textures, ${props.assets.length} props, admitted voxel, and source provenance`,
+  `retained E1M1 forge passed: ${textures.entries.length} textures, ${sounds.entries.length} sounds, ${props.assets.length} props, admitted voxel, and source provenance`,
 );

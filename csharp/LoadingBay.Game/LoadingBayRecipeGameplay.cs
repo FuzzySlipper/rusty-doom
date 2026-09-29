@@ -37,6 +37,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     internal const double DiagnosticsInterval = .25;
     private const double EnemyInterval = .05;
     private readonly IEngineContext _engine;
+    private readonly LoadingBayAudioPolicy _audio;
     private readonly DynamicsWorld _projectileWorld;
     private sealed class Fireball(ulong id, DynamicsBody body, Vector3 position, Vector3 impulse, double expires)
     {
@@ -122,9 +123,9 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
         new(31009,new(54,-.75f,39),false), new(31010,new(72,3.25f,-17),true),
         new(31011,new(26,-1.75f,11),false), new(31012,new(39,-1.75f,10),true)];
 
-    internal LoadingBayRecipeGameplay(IEngineContext engine, LoadingBayPlayerScene player, LoadingBayStudyDoor[] doors)
+    internal LoadingBayRecipeGameplay(IEngineContext engine, LoadingBayPlayerScene player, LoadingBayStudyDoor[] doors, LoadingBayAudioPolicy audio)
     {
-        _engine = engine; _player = player; _doors = doors;
+        _engine = engine; _player = player; _doors = doors; _audio = audio;
         _projectileWorld = engine.Dynamics.CreateWorld(new(Vector3.Zero));
         // Fireballs use explicit continuous Spatial sweeps below. Binding the full room
         // into Dynamics as well would duplicate collision work on every physics step.
@@ -255,6 +256,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
     {
         bool shotgun = weapon == RecipeWeapon.Shotgun, fist = weapon == RecipeWeapon.Fist;
         if (shotgun) Shells--; else if (!fist) Bullets--;
+        _audio.WeaponFired(weapon);
         _revision++;
         var colliders = CombatColliders();
         int pellets = shotgun ? 7 : 1;
@@ -271,6 +273,7 @@ internal sealed class LoadingBayRecipeGameplay : IDisposable
             enemy.Moving = false;
             if (enemy.Health == 0) { enemy.DeathStarted = _time; Say(enemy.Imp ? "Imp down." : "Trooper down."); }
             else { enemy.PainUntil = _time + (enemy.Imp ? 4 : 6) * LoadingBayRecipeAnimation.Tic; if (fist) Say("Punch hit!"); }
+            if (fist) _audio.PunchLanded();
             GeometryDirty = true;
         }
     }

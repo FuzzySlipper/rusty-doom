@@ -70,6 +70,7 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
     private readonly UiStream _hud = null!;
     private ulong _hudSequence;
     private readonly LoadingBayRecipeGameplay _gameplay = null!;
+    private readonly LoadingBayAudioPolicy _audio = null!;
     private readonly AimAssist _gamepadAim = new();
     private readonly WorldInteraction _worldInteraction = null!;
     private readonly InteractionDebugModule _interactionDebug = null!;
@@ -146,7 +147,8 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
             _navigationProjection = _player.ReplaceCollisionNavigation(NavigationWorldMinimum, NavigationWorldMaximum,
                 new CollisionNavigationConfig(NavigationGridId, NavigationCellSize, NavigationChunkSize, NavigationMaximumStepCells,
                     _tuning.CharacterRadius, _tuning.StandingCharacterHeight, NavigationMaximumSlopeDegrees, NavigationMaximumCells));
-            _gameplay = new(engine, _player, _doors);
+            _audio = new LoadingBayAudioPolicy(engine.Audio, _tuning);
+            _gameplay = new(engine, _player, _doors, _audio);
             _worldInteraction = new WorldInteraction(this);
             _interactionDebug = new InteractionDebugModule(_worldInteraction);
             _hud = engine.Ui.OpenStream(new UiStreamRequest("loading-bay.hud", "loading-bay.hud.snapshot.v1"));
@@ -325,7 +327,11 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
         if (door is not null)
         {
             bool opened = door.Use(_player.Position);
-            if (opened) _gameplay.Use();
+            if (opened)
+            {
+                _audio.DoorOpening(door.Center);
+                _gameplay.Use();
+            }
             return new(opened, opened ? "Door opening." : "Door is unavailable.");
         }
         if (target.Id != ExitInteractionEntity) return new(false, "Unknown interaction target.");
@@ -871,6 +877,7 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
         _studyAudit = null;
         Release(_hud);
         Release(_gameplay);
+        Release(_audio);
         Release(_player);
         foreach (Appearance appearance in _appearances) Release(appearance);
         foreach (MeshResource mesh in _meshes) Release(mesh);

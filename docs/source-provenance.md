@@ -1,6 +1,6 @@
 # E1M1 source provenance
 
-Loading Bay ships one authored content closure: `content/projects/doom-e1m1.project.json` and its direct `content/doom-e1m1/` inputs. The WAD is an offline authoring source only. No WAD bytes, Doom runtime code, sound, music, story text, or trade dress are read or shipped at runtime.
+Loading Bay ships one authored content closure: `content/projects/doom-e1m1.project.json` and its direct `content/doom-e1m1/` inputs. The WAD is an offline authoring source only. No WAD bytes, Doom runtime code, music, story text, or trade dress are read or shipped at runtime. Five sound effects are shipped as derived WAV files; see "Derived Doom sounds" below.
 
 ## Offline E1M1 source
 
@@ -14,7 +14,21 @@ The forge reads the id Software shareware IWAD at `/home/research/doom.ts/public
 - `content/doom-e1m1/doom-e1m1.asset-catalog.json` is the committed Engine asset-catalog closure for the voxel scene (SHA-256 `3a5e5347b12e522538950ca085e544f00be63b50bff424860cde01b088f25643`). `scripts/generate-e1m1-asset-catalog.mjs` derives its 49 used material/texture pairs offline from the canonical project, texture manifest, and voxel sparse runs; it normalizes stored catalog hashes and preserves exact source paths. Loading Bay admits and resolves this catalog through Engine `AuthoredContent`; it never parses the source-shaped project JSON at runtime.
 - `content/doom-e1m1/textures/manifest.json` closes the 54 derived wall/flat PNGs, their source WAD hash, palette hash `fd895921b5d0a394612bb29852ed003d44d69f76dec31c0dc6b5d5fc7d63f7bb`, and each output hash. `SKY1` is an authored equirectangular presentation asset; its source closure and output hashes are in that manifest.
 - `content/doom-e1m1/sprites/manifest.json` closes three generated atlases, 198 source lumps, frame identities, and the WAD/palette hashes. Sprite presentation is selected from authoritative product gameplay state; atlas frames do not own combat, collision, or timing authority.
+- `content/doom-e1m1/sounds/manifest.json` closes the five derived sound effects: the pistol (`DSPISTOL`), shotgun (`DSSHOTGN`) and fist (`DSPUNCH`) weapon sounds and the door sounds the canonical project names (`DSDOROPN`, `DSDORCLS`). See "Derived Doom sounds".
 - `content/projects/doom-e1m1.project.json` is the sole canonical project (current SHA-256 `08d069726cdeaf1fddf1181eb3e75d63bad11e5262a4a5b46b4cf9a3bf5ae31b`). `pnpm run check:content` verifies canonical admission and byte-stable regeneration.
+
+## Derived Doom sounds
+
+The owner decided on 2026-09-29 (Den rusty-engine #8814) to ship these WAD-derived sound effects, on the same footing as the derived textures and sprites above. This reverses the earlier rule that no WAD sound is shipped. The WAD's license/status is still not changed by this repository.
+
+`ts/packages/doom-e1m1-authoring/src/sound-cli.ts` (`pnpm --dir ts/packages/doom-e1m1-authoring run sounds:generate`, `sounds:check`) reads the same WAD offline. It decodes each DMX digital sound lump (format 3: 11,025 Hz unsigned 8-bit mono, 16 padding samples at each end) and writes it byte-for-byte deterministically as PCM WAV under `content/doom-e1m1/sounds/`. `manifest.json` records the WAD hash, each source lump's size and SHA-256, sample rate and count, and each WAV's SHA-256 and size. `check-retained-content.mjs` verifies the WAV bytes against the manifest and requires the same WAD hash as the textures.
+
+At runtime, `LoadingBayAudioPolicy` opens the clips through the Engine `Audio` service and emits them on the Sfx bus:
+- the room-study pistol and shotgun on each shot;
+- the fist only when a punch lands, as in Doom;
+- the door opening sound from the door's position when a study door starts to open.
+
+The study doors never close, so `DSDORCLS` is shipped for the project's door definitions but not played. The legacy voxel scene opens the clips but emits nothing yet.
 
 ## Semantic catalog provenance
 
@@ -38,7 +52,7 @@ The only non-Doom static-prop sources are colocated under `content/doom-e1m1/pro
 
 Three meshes derive from the retained Kenney Factory Kit 3.0 GLBs under `content/doom-e1m1/props/sources/kenney-factory-kit/`: `security-door`, `hazard-marker`, and `level-exit`. The copied Factory Kit CC0 notice is `content/doom-e1m1/props/KENNEY-FACTORY-KIT-LICENSE.txt` (SHA-256 `61e86565dd297e143ad631594980eda0a17fc81a4cd7c6d71acf2f5e0cad30b6`).
 
-`button-floor-square.glb` is retained from the same Kenney Factory Kit source pack under that license and contains the authored `toggle-on`, `toggle-off`, and `toggle` node clips. The GLB remains byte-for-byte unchanged at SHA-256 `f32def1dd9a57939b096d64361fc5058a8ba240a0394951e8681fb7326ebdeb6`. Its exact Factory Kit 3.0 external image dependency is retained at `content/doom-e1m1/props/sources/kenney-factory-kit/Textures/colormap.png` (512×512 RGBA PNG, SHA-256 `35d7bd6900dde0208429eeaec87fa17fbf024ed59f3f4eab54bc92802eba9dd7`) under the same copied CC0 notice; `source-manifest.json` checks both hashes. At Engine `913a9e665035e6bfdf6ac613cedb62396be4f31d`, landed #7589/#7591/#7595 support the GLB's texture transform, bounded external-image closure, and degenerate visual faces. Loading Bay therefore admits this source directly through `Animation.OpenAnimatedMesh`, retains the named E1M1 `doom-exit` appearance/instance, samples `toggle-off`, and plays `toggle-on` once on the authoritative completion transition. It does not use clip-pack association, a rig, or a local evaluator. The E1M1 closure currently contains no audio clip assets and its gameplay ledger excludes sound/music, so the product retains only a typed Engine SFX bus volume/mute policy and emits no synthetic audio.
+`button-floor-square.glb` is retained from the same Kenney Factory Kit source pack under that license and contains the authored `toggle-on`, `toggle-off`, and `toggle` node clips. The GLB remains byte-for-byte unchanged at SHA-256 `f32def1dd9a57939b096d64361fc5058a8ba240a0394951e8681fb7326ebdeb6`. Its exact Factory Kit 3.0 external image dependency is retained at `content/doom-e1m1/props/sources/kenney-factory-kit/Textures/colormap.png` (512×512 RGBA PNG, SHA-256 `35d7bd6900dde0208429eeaec87fa17fbf024ed59f3f4eab54bc92802eba9dd7`) under the same copied CC0 notice; `source-manifest.json` checks both hashes. At Engine `913a9e665035e6bfdf6ac613cedb62396be4f31d`, landed #7589/#7591/#7595 support the GLB's texture transform, bounded external-image closure, and degenerate visual faces. Loading Bay therefore admits this source directly through `Animation.OpenAnimatedMesh`, retains the named E1M1 `doom-exit` appearance/instance, samples `toggle-off`, and plays `toggle-on` once on the authoritative completion transition. It does not use clip-pack association, a rig, or a local evaluator.
 
 The five original low-poly meshes — `energy-cell`, `scatter-shells`, `med-patch`, `impact-vest`, and `breach-scattergun` — retain their own E1M1-local mesh JSON as canonical raw source. Their manifest records the retired historical generator identity only for traceability; no legacy prop kit or generator is required to reimport them.
 

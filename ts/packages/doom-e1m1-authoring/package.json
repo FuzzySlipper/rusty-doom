@@ -18,6 +18,8 @@
     "sprites:check": "tsc --build && node dist/sprite-cli.js --check",
     "sprites:generate": "tsc --build && node dist/sprite-cli.js --write",
     "test": "node scripts/check-retained-content.mjs",
-    "typecheck": "node scripts/check-retained-content.mjs"
+    "typecheck": "node scripts/check-retained-content.mjs",
+    "sounds:check": "tsc --build && node dist/sound-cli.js --check",
+    "sounds:generate": "tsc --build && node dist/sound-cli.js --write"
   }
 }
