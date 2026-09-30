@@ -54,7 +54,7 @@ using (var supportWorld = new EntityStore([EngineComponentTypes.Transform, Engin
     supportWorld.Set(movingLift, EngineComponentTypes.Kinematic, new Kinematic(new Vector3(10f, 2f, 6f), new Vector3(0f, -1f, 0f)));
     supportWorld.Set(movingLift, EngineComponentTypes.SpatialCollider, new SpatialCollider(new Vector3(-10f, -2f, -6f), new Vector3(10f, 2f, 6f), 2, uint.MaxValue, true, false, false));
     CharacterSupport continuation = LoadingBayWorldInteractionCoordinator.ResolvePlatformSupport(
-        true, 147, new HashSet<ulong> { 147 }, supportWorld, supportMap);
+        true, movingLift.Value, new HashSet<ulong> { 147 }, supportWorld, supportMap);
     CharacterObstacle obstacle = LoadingBayWorldInteractionCoordinator.ProjectPlatformObstacles(
         new HashSet<ulong> { 147 }, supportWorld, supportMap).Single();
     Require(continuation.Present && continuation.Lifecycle == CharacterSupportLifecycle.Active

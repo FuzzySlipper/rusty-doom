@@ -8,6 +8,6 @@
   "origin": "Built-in image generation, reference-guided reinterpretation followed by horizontal-wrap edit. Not an original Doom asset.",
   "reference": "doom-e1m1/textures/sky/SKY1.png",
   "referenceSha256": "2834a39fac8f538bbc340ab8a7d780251669f81d43ef1e94a0db551fe8c66429",
-  "generationRecord": "docs/experiments/sky-candidate/README.md",
+  "generationRecord": "[doc: rusty-doom/archive-8976-docs-experiments-sky-candidate-README-md]",
   "encoding": "8-bit RGBA PNG; RGB pixels identical to image-tool output, alpha=255"
 }

@@ -2,14 +2,12 @@
 
 Run `pnpm run scan:e1m1-recipes`. This offline authoring tool reads the existing intermediate export; it does not change or launch either playable scene. The source remains the retained E1M1 WAD export, not copied doom.ts implementation code.
 
-Default output: [spawn-area report](experiments/e1m1-spawn-scan/report.generated.md), [SVG plan](experiments/e1m1-spawn-scan/plan.generated.svg), and [editable draft](experiments/e1m1-spawn-scan/recipe.refined.json).
+Default output directory: `tmp/e1m1-spawn-scan`, or `tmp/e1m1-full-scan` with `--full`. Use `--out /absolute/path` to choose another directory. Outputs are local offline authoring aids and are not committed runtime dependencies.
 
 - `measurements.generated.json` preserves sectors, connected boundary loops, raw lines, sidedef textures/offsets, flags, heights, nearby things and adjacency. Adjacent sectors outside the selected region are marked `selected: false`.
 - `suggestions.generated.json` contains region, opening, height-transition and repeated-small-loop hypotheses with source IDs and explicit uncertainty.
 - `plan.generated.svg` and `report.generated.md` make the measurements inspectable. White lines are one-sided boundaries; amber lines are two-sided, not necessarily passable. Polygon holes use even-odd fill. Labels are placed inside recovered regions.
 - `recipe.refined.json` is seeded only if absent. Edit its decisions/features freely. Reruns overwrite the four generated files but never this draft. Compare new suggestions manually when the source changes; the recorded intermediate hash identifies the draft's original baseline.
-
-The checked draft includes a first manual grouping: chamber shell, lowered blue inset/transition, paired narrow opening candidates, and side alcove connection. These are editable construction notes, not an executable recipe format or automatic mesh reconstruction.
 
 ## Scope and coordinates
 
@@ -22,23 +20,18 @@ pnpm run scan:e1m1-recipes --input /absolute/path/e1m1.intermediate.json --scale
 
 All measurements and draft coordinates remain in Doom units. Conversion is explicitly recorded: X = map x / scale, Z = -map y / scale, Y = height / scale, without origin shifting. Changing scale records the desired interpretation; it does not silently rescale the source coordinates. The existing authoring convention is 16 map units per Engine unit; calibrate player/architecture proportions when constructing the refined room.
 
-## Current limits and evidence
+## Current limits
 
-Sector 37 originally exposed a touching-boundary limitation. The scanner now orients edges using front/back sidedefs and follows the owning face at touching vertices. It recovers three separate strips without joining their interiors. Open, inconsistent, coincident-ray or degenerate boundaries still produce warnings instead of guessed polygons. The original manually edited spawn draft is preserved and may still contain its older unresolved note; compare it with the refreshed generated suggestions. Small-loop repetition detection is deliberately conservative and produces no support hypothesis for this particular scan; the visible square boundaries need manual interpretation. Per-line height changes are candidate steps or ledges, not automatically a staircase. Two-sided geometry, line specials and clearance are evidence, not full dynamic-door or traversal semantics.
+The scanner orients edges using front/back sidedefs and follows the owning face at touching vertices. Sector 37 provides a touching-boundary case with three separate strips whose interiors must not be joined. Open, inconsistent, coincident-ray or degenerate boundaries still produce warnings instead of guessed polygons. Small-loop repetition detection is deliberately conservative; repeated square boundaries still need manual interpretation. Per-line height changes are candidate steps or ledges, not automatically a staircase. Two-sided geometry, line specials and clearance are evidence, not full dynamic-door or traversal semantics.
 
 The scanner does not fit arbitrary regions into boxes, repair arbitrary invalid or intersecting contours, infer a complete constructive solid tree, emit C# or generate runtime meshes. Keep irregular contours and source IDs until deciding how to simplify them. Sector bounds must not be treated as solid boxes.
 
-Validation: `pnpm run test:e1m1-recipes` checks disconnected loops/holes, ambiguous topology, real export selection and texture retention, bad references/scale, and manual-file preservation across repeat runs. The boundary and existing provenance checks also pass. The SVG was rasterized with `rsvg-convert` and inspected directly for labels, holes, bounds and spawn location. No game playtest is applicable to this offline-only change.
+Validation: `pnpm run test:e1m1-recipes` checks disconnected loops/holes, ambiguous topology, real export selection and texture retention, bad references/scale, and manual-file preservation across repeat runs. No game playtest is applicable to this offline-only tool.
 
-## Full-map assessment
+## Full-map scan
 
-Run `pnpm run scan:e1m1-recipes --full`. Bounds come from the input vertices; `--full` and `--bounds` are mutually exclusive. The separate [full-map report](experiments/e1m1-full-scan/report.generated.md) and [editable draft](experiments/e1m1-full-scan/recipe.refined.json) retain all 85 sectors and 475 linedefs. There are 232 suggestions and no unresolved boundary warnings. The overview uses compact labels and leader lines where labels would overlap.
+Run `pnpm run scan:e1m1-recipes --full`. Bounds come from the input vertices; `--full` and `--bounds` are mutually exclusive. The output uses the same generated files and editable-draft preservation rules as a bounded scan. `pnpm run test:e1m1-recipes` checks full-map boundary coverage with source endpoints and no invented bridging edges.
 
-The full draft contains seven provisional manual spatial groups covering every sector exactly once. These organize review and construction; they are not inferred gameplay rooms. Four sectors (4, 68, 76, 81) start with zero clearance and need line-special/moving-sector interpretation before a playable reconstruction. The tool neither opens those sectors nor converts them into permanent static walls automatically.
+Manual spatial grouping and construction decisions belong in the operator's draft. Initially closed sectors still need line-special/moving-sector interpretation before a playable reconstruction; the tool neither opens those sectors nor converts them into permanent static walls automatically. Complete contours support measurement, but a reusable recipe still needs decisions about wall runs, holes, shared boundaries, materials and moving openings.
 
-Decision for this pass: defer the full playable reconstruction, while completing full-map measurement and a first grouped authoring draft. Complete contours are sufficient for measurement, but a useful reusable recipe still needs decisions about wall runs, holes, shared boundaries, material treatment and moving openings. The next construction exercise should cover the spawn-to-north corridor connection and its initially closed sector before expanding all groups. This is a product authoring step, not a request for a generic automatic mesh-to-CSG converter.
-
-Six focused tests now include touching lobes, rejection of unbalanced directed edges, and full-map coverage: every measured sector boundary is represented exactly once with source endpoints, and no invented bridging edge. The full SVG was rendered and inspected; the boundary/provenance checks passed. Existing playable scenes remain unchanged.
-
-
-Historical scan outputs and construction observations are preserved in Den `[doc: rusty-doom/campaign-8976-evidence-archive]`. Generate new outputs to an explicit operator-selected directory; they are offline authoring aids rather than runtime dependencies. The optional study recipes live under `csharp/LoadingBay.RoomStudy`.
+Historical scan outputs, manually grouped drafts, visual checks and construction observations are preserved in Den `[doc: rusty-doom/campaign-8976-evidence-archive]`. The optional study recipes live under `csharp/LoadingBay.RoomStudy`.

@@ -1065,7 +1065,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         ArgumentNullException.ThrowIfNull(entityMap);
         if (!supportPresent) return default;
         if (!platforms.Contains(entityMap.Authored(supportEntity))
-            || !entities.TryGet(entityMap.Runtime(supportEntity), EngineComponentTypes.Transform, out Transform transform))
+            || !entities.TryGet(new EntityId(supportEntity), EngineComponentTypes.Transform, out Transform transform))
         {
             throw new InvalidOperationException($"E1M1 character continuation referenced unknown platform {supportEntity}.");
         }

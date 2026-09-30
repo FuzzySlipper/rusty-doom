@@ -7,6 +7,34 @@ using Xunit;
 public sealed class WorldRegressionTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlatformContinuationUsesTheProjectedRuntimeIdentity(bool reverseAllocation)
+    {
+        using var entities = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]);
+        var order = Enumerable.Range(1, (int)LoadingBayE1M1SemanticCatalog.CanonicalEntityCount).Select(id => (ulong)id).ToArray();
+        if (reverseAllocation) Array.Reverse(order);
+        var map = LoadingBayEntityMap.Bootstrap(entities, order);
+        var definition = LoadingBayE1M1SemanticCatalog.Lifts.First();
+        var lift = map.Runtime(definition.PlatformEntityId);
+        var advanced = new Transform(new Vector3(112, 6, 76), Quaternion.Identity, Vector3.One);
+        entities.Set(lift, EngineComponentTypes.Transform, advanced);
+        entities.Set(lift, EngineComponentTypes.Kinematic, new Kinematic(Vector3.One, -Vector3.UnitY));
+        entities.Set(lift, EngineComponentTypes.SpatialCollider, new SpatialCollider(-Vector3.One, Vector3.One, 2, uint.MaxValue, true, false, false));
+        HashSet<ulong> platforms = [definition.PlatformEntityId];
+        var obstacle = Assert.Single(LoadingBayWorldInteractionCoordinator.ProjectPlatformObstacles(platforms, entities, map));
+        Assert.Equal(lift.Value, obstacle.Entity);
+        if (reverseAllocation) Assert.NotEqual(definition.PlatformEntityId, obstacle.Entity);
+
+        // CharacterStep carries this projected runtime identity into the next support query.
+        var support = LoadingBayWorldInteractionCoordinator.ResolvePlatformSupport(true, obstacle.Entity, platforms, entities, map);
+        Assert.True(support.Present);
+        Assert.Equal(CharacterSupportLifecycle.Active, support.Lifecycle);
+        Assert.Equal(obstacle.Entity, support.Entity);
+        Assert.Equal(advanced, support.Transform);
+    }
+
+    [Theory]
     [InlineData(1, false)]
     [InlineData(4, false)]
     [InlineData(4, true)]

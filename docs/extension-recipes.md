@@ -24,4 +24,4 @@ Keep Angular limited to its exported `mountProductUi` module and copied HUD proj
 
 ## Proof
 
-Run `./scripts/verify-csharp-spine.sh` for product changes. Add focused browser evidence for a browser-facing change and focused deterministic/provenance evidence for content work. Record an unfinished visible behavior in the project's known-limitations record; do not claim complete E1M1 traversal from a build, HTTP response, or the currently stalled manual certifier.
+Run `./scripts/verify-csharp-spine.sh` for product changes. Add focused browser evidence for a browser-facing change and focused deterministic/provenance evidence for content work. Record an unfinished visible behavior in the project's known-limitations record; do not claim complete E1M1 traversal from a build or HTTP response. The manual E1M1 certifier is retired and unavailable.
