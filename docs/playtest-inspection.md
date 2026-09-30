@@ -30,7 +30,7 @@ so agents can inspect it while simulation is held.
 `assist probe` adds ankle/step/head/floor rays and the latest character-controller
 receipt: grounded state, blocked axes, contact normal/source and step attempt.
 `assist interaction` supplies each door's signed yaw/pitch adjustment and current
-refusal. Door focus points now clamp the eye position to the door surface.
+refusal. Door focus points clamp the eye position to the door surface.
 
 `assist jump-plan` takes world XYZ **feet** coordinates and estimates a bounded
 jump from live tuning. `assist jump` executes ordinary jump and forward controls,
@@ -48,8 +48,9 @@ and use `LOADING_BAY_LIVE_DEBUG=1` when running the product for these tools.
 
 A browser reconnect retains the shared native game. Restart this owned product
 host for a fresh world; do not infer a reset from a new playtest session. Other
-sessions on the same host share mode, game state and player controls. Inspector
-camera overrides and drawing mode belong to each browser renderer.
+sessions on the same host share mode, game state and player controls. The
+runtime renders the world, so its observer camera, drawing mode and held time
+are runtime state too: every page attached to the host sees them.
 
 `assist clearance` takes a nearby world XYZ target feet position. It inspects the
 actual standing capsule against retained level geometry and current doors,
