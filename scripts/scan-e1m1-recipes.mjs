@@ -605,8 +605,8 @@ async function main() {
       resolve(
         root,
         options.full
-          ? "docs/experiments/e1m1-full-scan"
-          : "docs/experiments/e1m1-spawn-scan",
+          ? "tmp/e1m1-full-scan"
+          : "tmp/e1m1-spawn-scan",
       ),
   );
   const status = await writeScan(out, result);

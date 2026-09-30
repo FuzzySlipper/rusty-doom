@@ -84,7 +84,7 @@ internal sealed record LoadingBayWeaponImpact(ulong EnemyEntityId, int Damage, i
 /// <summary>One product-authorized enemy action; Engine performs the visibility, casts, and body simulation.</summary>
 internal sealed record LoadingBayEnemyAttackPlan(ulong EnemyEntityId, LoadingBayE1M1EnemyAttackKind Kind, Vector3 Origin, int Damage, double Range, int CooldownTicks, float ProjectileMass, float ProjectileRadius, float ProjectileImpulse, float ProjectileGravityScale, int ProjectileLifetimeTicks, float ProjectileRestitution, ulong Tick);
 /// <summary>Product-owned copy of the public Engine continuation checkpoint; it contains values, never leases or handles.</summary>
-internal sealed record LoadingBayCharacterContinuationSnapshot(ulong SourceSessionIdentity, ulong SourceGeneration, ulong SpatialSessionFingerprint, ulong ContentAuthorityHash, ulong ConfigFingerprint, CharacterControllerConfig Config, CharacterMotion Motion);
+internal sealed record LoadingBayCharacterContinuationSnapshot(ulong SourceGeneration, CharacterMotion Motion);
 /// <summary>Canonical pose and look plus an optional post-step continuation. Null means the snapshot predates the first admitted character step.</summary>
 internal sealed record LoadingBayPlayerSnapshot(Vector3 Position, LookState Look, LoadingBayCharacterContinuationSnapshot? Continuation);
 /// <summary>Canonical pose and look for save payloads. Live Engine motion and continuation stay out of saves.</summary>

@@ -13,7 +13,7 @@ import {
   findE1M1Label,
 } from "./wad-decode.js";
 
-const WAD_PATH = "/home/research/doom.ts/public/doom1.wad";
+import { WAD_PATH, wadTest } from "./test-wad.js";
 const EXPECTED_SHA = "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771";
 const EXPECTED_WALL_TEXTURES = [
   "BIGDOOR2",
@@ -79,7 +79,7 @@ function loadWadBuffer(): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-test("WAD header decodes as IWAD 1264 lumps and expected SHA", () => {
+wadTest("WAD header decodes as IWAD 1264 lumps and expected SHA", () => {
   const buf = loadWadBuffer();
   const wad = decodeWad(buf, { computeSha256: true });
   assert.equal(wad.identification, "IWAD");
@@ -88,7 +88,7 @@ test("WAD header decodes as IWAD 1264 lumps and expected SHA", () => {
   assert.equal(wad.byteLength, 4196020);
 });
 
-test("E1M1 payload counts match plan §3 invariants", () => {
+wadTest("E1M1 payload counts match plan §3 invariants", () => {
   const buf = loadWadBuffer();
   const inter = buildE1M1Intermediate(buf, WAD_PATH);
   assert.equal(inter.source.wadSha256, EXPECTED_SHA);
@@ -102,17 +102,17 @@ test("E1M1 payload counts match plan §3 invariants", () => {
   assert.equal(inter.source.e1m1LumpIndex, 6);
 });
 
-test("vertex bounds match decoded doom1.wad (-768..3808 / -4864..-2048)", () => {
+wadTest("vertex bounds match decoded doom1.wad (-768..3808 / -4864..-2048)", () => {
   const inter = buildE1M1Intermediate(loadWadBuffer(), WAD_PATH);
   assert.deepEqual(inter.diagnostics.vertexBounds, { minX: -768, maxX: 3808, minY: -4864, maxY: -2048 });
 });
 
-test("sector height range matches WAD (-136..264)", () => {
+wadTest("sector height range matches WAD (-136..264)", () => {
   const inter = buildE1M1Intermediate(loadWadBuffer(), WAD_PATH);
   assert.deepEqual(inter.diagnostics.sectorFloorCeilingRange, { minFloor: -136, maxCeiling: 264 });
 });
 
-test("texture incidence matches extracted sets (32 walls, 22 flats)", () => {
+wadTest("texture incidence matches extracted sets (32 walls, 22 flats)", () => {
   const inter = buildE1M1Intermediate(loadWadBuffer(), WAD_PATH);
   assert.equal(inter.diagnostics.textureIncidence.wallTextureNames.length, 32);
   assert.equal(inter.diagnostics.textureIncidence.flatTextureNames.length, 22);
@@ -120,7 +120,7 @@ test("texture incidence matches extracted sets (32 walls, 22 flats)", () => {
   assert.deepEqual(inter.diagnostics.textureIncidence.flatTextureNames, [...EXPECTED_FLATS]);
 });
 
-test("sidedef sentinel and sector light invariants", () => {
+wadTest("sidedef sentinel and sector light invariants", () => {
   const inter = buildE1M1Intermediate(loadWadBuffer(), WAD_PATH);
   // At least one linedef should be single-sided (backSidedef === -1)
   assert.ok(inter.level.linedefs.some((ld) => ld.backSidedef === -1));
@@ -149,14 +149,14 @@ test("decode helpers reject misaligned buffers", () => {
   assert.throws(() => decodeSectors(new ArrayBuffer(25)), /multiple of 26/);
 });
 
-test("findE1M1Label requires exact payload order", () => {
+wadTest("findE1M1Label requires exact payload order", () => {
   const wad = decodeWad(loadWadBuffer());
   assert.equal(findE1M1Label(wad.entries), 6);
   // truncated order — still an E1M1 label but missing payload lumps → payload mismatch
   assert.throws(() => findE1M1Label(wad.entries.slice(0, 10) as never), /payload mismatch/);
 });
 
-test("deterministic serialize produces stable JSON", async () => {
+wadTest("deterministic serialize produces stable JSON", async () => {
   const { serializeIntermediate } = await import("./wad-decode.js");
   const inter = buildE1M1Intermediate(loadWadBuffer(), WAD_PATH);
   const a = serializeIntermediate(inter);

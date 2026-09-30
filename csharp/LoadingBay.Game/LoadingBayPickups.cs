@@ -86,7 +86,7 @@ internal sealed class LoadingBayPickups
         catch (Mechanics.MechanicsException) { _manualPickupKeys.Remove(pickup); return Reject("pickup.inventory-rejected"); }
     }
 
-    internal LoadingBayReceipt CollectCanonicalPickup(ulong entityId)
+    internal LoadingBayReceipt CollectCanonicalPickup(ulong entityId, ulong? tick = null)
     {
         LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(entityId);
         if (PickupState(entityId).Lifecycle == LoadingBayPickupLifecycle.Collected) return Reject("pickup.already-collected");
@@ -95,7 +95,7 @@ internal sealed class LoadingBayPickups
             ? _combat.CollectWeaponStarter(pickup)
             : CollectPickup(CanonicalPickupKey(entityId), LoadingBayDefinitions.Item(pickup.ItemId), pickup.Quantity);
         _manualPickupKeys.Remove(CanonicalPickupKey(entityId));
-        UpdatePickupState(pickup, outcome.Accepted ? LoadingBayPickupLifecycle.Collected : PickupState(entityId).Lifecycle, outcome.Code, _currentTick());
+        UpdatePickupState(pickup, outcome.Accepted ? LoadingBayPickupLifecycle.Collected : PickupState(entityId).Lifecycle, outcome.Code, tick ?? _currentTick());
         return outcome;
     }
 
@@ -106,14 +106,6 @@ internal sealed class LoadingBayPickups
         return pickup.ProgramId == "pickup/weapon-starter"
             ? _combat.CanApplyWeaponStarter(pickup)
             : CanApplyPickup(LoadingBayDefinitions.Item(pickup.ItemId));
-    }
-
-    internal void ApplyLifecycleFact(PickupLifecycleFact lifecycle)
-    {
-        LoadingBayPickupStateComponent state = PickupState(lifecycle.PickupEntityId);
-        state.Lifecycle = lifecycle.Lifecycle;
-        state.Cause = lifecycle.Cause;
-        state.Tick = lifecycle.Tick;
     }
 
     internal void RestorePickups(LoadingBayPickupSnapshot[] pickups)

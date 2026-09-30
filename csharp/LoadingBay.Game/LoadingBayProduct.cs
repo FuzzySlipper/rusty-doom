@@ -8,7 +8,8 @@ namespace LoadingBay.Game;
 
 /// <summary>
 /// Loading Bay's thin product lifecycle owner. The session owns E1M1 gameplay,
-/// content admission, generated Engine service use, and UI projection.
+/// content admission and generated Engine service use; the product retains
+/// shared presentation resources across gameplay resets.
 /// </summary>
 public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSource
 {
@@ -23,6 +24,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     private readonly LoadingBayExitButtonAnimation? _exitButtonAnimation;
     private readonly LoadingBayExitPresentation? _exitPresentation;
     private readonly LoadingBaySkyBackground? _skyBackground;
+    // An inline gameplay reset keeps the Engine runtime epoch, so the HUD stream
+    // and its monotonic publication sequence belong to this product lifetime.
+    private readonly LoadingBayHudProjection? _hudProjection;
     private readonly Queue<Exception> _retirementFailures = new();
     private ulong _droppedRetirementFailures;
     private bool _started;
@@ -32,20 +36,22 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     private readonly EntityStoreDebugModule _entityWorldDebug;
     private bool _debugWorldRegistered;
 
-    public LoadingBayProduct(ProductCreateContext context)
+    public LoadingBayProduct(ProductCreateContext context) : this(context, null) { }
+
+    internal LoadingBayProduct(ProductCreateContext context,
+        Func<IEngineContext, LoadingBaySkyReadout, ILoadingBaySession>? experimentFactory)
     {
         ArgumentNullException.ThrowIfNull(context);
         _entityWorldDebug = CreateEntityStoreDebugModule();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation, DebugNavigationTargets, DebugNavigationRoute,
-            () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, enabled => RequireSession().Diagnostics(enabled));
 
-        if (Environment.GetEnvironmentVariable("LOADING_BAY_SCENE") != "legacy-voxel")
+        if (experimentFactory is not null)
         {
             _skyBackground = new LoadingBaySkyBackground(context.Engine.Content,
                 context.Engine.Graphics, context.Engine.CameraView);
             try
             {
-                _sessionFactory = () => new LoadingBayRoomStudy(context.Engine, _skyBackground.Readout);
+                _sessionFactory = () => experimentFactory(context.Engine, _skyBackground.Readout);
                 _session = _sessionFactory();
                 _session.ActivateSharedRealizations();
                 _session.Publish();
@@ -63,6 +69,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         LoadingBayExitPresentation? presentation = null;
         LoadingBaySkyBackground? skyBackground = null;
         ILoadingBaySession? session = null;
+        LoadingBayHudProjection? hud = null;
         try
         {
             skyBackground = new LoadingBaySkyBackground(
@@ -77,7 +84,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             _exitButtonAnimation = animation;
             presentation = new LoadingBayExitPresentation(context.Engine.Presentation, LoadingBayTuning.E1M1);
             _exitPresentation = presentation;
-            _sessionFactory = () => CreateSession(context, presentation, animation, skyBackground);
+            hud = new LoadingBayHudProjection(context.Engine.Ui);
+            _hudProjection = hud;
+            _sessionFactory = () => CreateSession(context, presentation, animation, skyBackground, hud);
             session = _sessionFactory();
             session.ActivateSharedRealizations();
             session.Publish();
@@ -88,11 +97,11 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         {
             Console.Error.WriteLine($"Loading Bay product construction failed: {constructionFailure}");
             List<Exception>? failures = null;
-            try { DetachDebugWorld(session); }
-            catch (Exception cleanupFailure) { (failures ??= []).Add(cleanupFailure); }
             try { UnregisterDebugWorld(); }
             catch (Exception cleanupFailure) { (failures ??= []).Add(cleanupFailure); }
             try { session?.Dispose(); }
+            catch (Exception cleanupFailure) { (failures ??= []).Add(cleanupFailure); }
+            try { hud?.Dispose(); }
             catch (Exception cleanupFailure) { (failures ??= []).Add(cleanupFailure); }
             try { presentation?.Dispose(); }
             catch (Exception cleanupFailure) { (failures ??= []).Add(cleanupFailure); }
@@ -114,8 +123,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
         _entityWorldDebug = CreateEntityStoreDebugModule();
         _session = _sessionFactory();
-        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, DebugSpatialMap, DebugSpatialMapAt, DebugCombatObservation, DebugNavigationTargets, DebugNavigationRoute,
-            () => (_session as LoadingBayRoomStudy)?.GeometryAudit ?? "No construction-study audit in this session.", enabled => RequireSession().Diagnostics(enabled));
+        _liveDebug = new LoadingBayLiveDebugModule(DebugReadout, DebugSetTrack, enabled => RequireSession().Diagnostics(enabled));
         AdoptDebugWorld(_session);
     }
 
@@ -179,7 +187,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         }
 
         // Static DC extraction is startup work, never realtime input work.
-        if (_session is LoadingBayRoomStudy recipe)
+        if (_session is ILoadingBayExperimentSession recipe)
         {
             recipe.Restart();
             _started = true;
@@ -190,27 +198,10 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         // Replacement construction is preflight-only. It must not emit a fresh HUD
         // using the prior generation's shared presentation readout.
         ILoadingBaySession replacement = _sessionFactory();
-        try
-        {
-            // The shared exit-button cue starts the new generation from its authored
-            // off sample. A failed replacement publication propagates to the host's
-            // terminal incarnation failure; there is no same-instance retry, so the
-            // prior generation's cue is not restored.
-            _exitButtonAnimation?.ResetForGeneration();
-            replacement.ActivateSharedRealizations();
-            // This is the one replacement publication that may touch shared
-            // Engine realizations. It therefore carries only fresh state.
-            replacement.Publish();
-        }
-        catch
-        {
-            replacement.Dispose();
-            throw;
-        }
-
         ILoadingBaySession previous = RequireSession();
         try
         {
+            // Adopt managed ownership before activating the replacement's camera or HUD.
             AdoptDebugWorld(replacement);
         }
         catch
@@ -218,10 +209,9 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             replacement.Dispose();
             throw;
         }
-        DetachDebugWorld(previous);
         previous.DeactivateSharedRealizations();
         _session = replacement;
-        // Once the published replacement becomes current, it is the authoritative
+        // Once the replacement becomes current, it is the authoritative
         // continuation. A late old-session teardown failure cannot safely roll it
         // back, so lifecycle state commits before best-effort old-resource cleanup.
         _started = true;
@@ -236,6 +226,12 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             // does not attempt a rollback against already-replaced Engine state.
             RetainRetirementFailure(retirementFailure);
         }
+        // Shared Engine resources activate only after managed ownership commits.
+        // Activation failure faults this incarnation; it cannot leave a disposed
+        // candidate behind the previous live session's debug store.
+        _exitButtonAnimation?.ResetForGeneration();
+        replacement.ActivateSharedRealizations();
+        replacement.Publish();
     }
 
     public void Shutdown()
@@ -255,8 +251,6 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             (failures ??= []).Add(retirementFailure);
         if (_droppedRetirementFailures != 0)
             (failures ??= []).Add(new InvalidOperationException($"Loading Bay retired {_droppedRetirementFailures} additional prior-session cleanup failures."));
-        try { DetachDebugWorld(session); }
-        catch (Exception debugDetachFailure) { (failures ??= []).Add(debugDetachFailure); }
         try { UnregisterDebugWorld(); }
         catch (Exception debugUnregisterFailure) { (failures ??= []).Add(debugUnregisterFailure); }
         try
@@ -267,6 +261,8 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         {
             (failures ??= []).Add(activeCleanupFailure);
         }
+        try { _hudProjection?.Dispose(); }
+        catch (Exception hudCleanupFailure) { (failures ??= []).Add(hudCleanupFailure); }
         try
         {
             _exitPresentation?.Dispose();
@@ -300,13 +296,8 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
     {
         ArgumentNullException.ThrowIfNull(registrar);
         registrar.Register(_liveDebug);
-        if (_session is LoadingBayRoomStudy study)
-        {
-            registrar.Register(new PlaytestDebugModule(study.ReadPlaytestObservation, study.InspectAction,
-                new[] { "forward", "back", "left", "right", "use", "attack", "fist", "pistol", "shotgun", "jump" }, study.InspectLook));
-            registrar.Register(new SpatialInspectionDebugModule(study.InspectGrid, study.InspectProbe, study.InspectJump));
-            registrar.Register(new SpatialClearanceDebugModule(study.InspectClearance));
-        }
+        if (_session is ILoadingBayExperimentSession experiment)
+            experiment.RegisterDebugCommands(registrar);
         registrar.Register(_entityWorldDebug);
         if (_session is ILoadingBayInteractionDebugSession interaction)
             registrar.Register(interaction.InteractionDebugModule);
@@ -316,13 +307,14 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         ProductCreateContext context,
         LoadingBayExitPresentation presentation,
         LoadingBayExitButtonAnimation animation,
-        LoadingBaySkyBackground skyBackground)
+        LoadingBaySkyBackground skyBackground,
+        LoadingBayHudProjection hud)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(presentation);
         ArgumentNullException.ThrowIfNull(animation);
         ArgumentNullException.ThrowIfNull(skyBackground);
-        return new LoadingBaySession(context.Engine, presentation, animation, skyBackground.Readout);
+        return new LoadingBaySession(context.Engine, presentation, animation, skyBackground.Readout, hud);
     }
 
     private static EntityStoreDebugModule CreateEntityStoreDebugModule()
@@ -342,7 +334,6 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         ArgumentNullException.ThrowIfNull(session);
         if (session is ILoadingBayDebugSession debugSession)
         {
-            debugSession.SetDebugEntityWorldChanged(ReplaceDebugWorld);
             if (_debugWorldRegistered)
             {
                 _entityWorldDebug.ReplaceStore(DebugWorldName, debugSession.DebugEntityWorld);
@@ -362,25 +353,12 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         }
     }
 
-    private void DetachDebugWorld(ILoadingBaySession? session)
-    {
-        if (session is ILoadingBayDebugSession debugSession)
-            debugSession.SetDebugEntityWorldChanged(null);
-    }
-
     private void UnregisterDebugWorld()
     {
         if (!_debugWorldRegistered)
             return;
         _entityWorldDebug.UnregisterStore(DebugWorldName);
         _debugWorldRegistered = false;
-    }
-
-    private void ReplaceDebugWorld(EntityStore world)
-    {
-        ArgumentNullException.ThrowIfNull(world);
-        if (_debugWorldRegistered)
-            _entityWorldDebug.ReplaceStore(DebugWorldName, world);
     }
 
     private ILoadingBaySession RequireSession() => _session
@@ -393,7 +371,7 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
         LoadingBayEngineServiceReadout services = session.EngineReadout();
         LoadingBayPlayerSnapshot player = readout.PlayerState;
         return string.Join(';',
-            $"recipe={(session as LoadingBayRoomStudy)?.DiagnosticReadout}",
+            $"recipe={(session as ILoadingBayExperimentSession)?.DiagnosticReadout}",
             $"lifecycle={(_shutdown ? "shutdown" : !_started ? "created" : _paused ? "paused" : "running")}",
             $"generation={readout.Generation}",
             $"step={readout.Step}",
@@ -441,31 +419,6 @@ public sealed class LoadingBayProduct : IEngineProduct, IDebugCommandModuleSourc
             return DebugCommandResult.Failure(DebugCommandStatus.Failed, receipt.Code);
         return DebugCommandResult.Success($"{track}={value};code={receipt.Code}");
     }
-
-    private DebugCommandResult DebugSpatialMap(string format, int radius, double cellSize)
-        => _session is ILoadingBaySpatialObservationSession observation
-            ? observation.ReadSpatialMap(format, radius, cellSize)
-            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Spatial map is unavailable for this Loading Bay session.");
-
-    private DebugCommandResult DebugSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize)
-        => _session is ILoadingBaySpatialObservationSession observation
-            ? observation.ReadSpatialMapAt(format, centerX, centerZ, supportY, radius, cellSize)
-            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Spatial map is unavailable for this Loading Bay session.");
-
-    private DebugCommandResult DebugCombatObservation()
-        => _session is ILoadingBaySpatialObservationSession observation
-            ? observation.ReadCombatObservation()
-            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Combat observation is unavailable for this Loading Bay session.");
-
-    private DebugCommandResult DebugNavigationTargets()
-        => _session is ILoadingBaySpatialObservationSession observation
-            ? observation.ReadNavigationTargets()
-            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Navigation targets are unavailable for this Loading Bay session.");
-
-    private DebugCommandResult DebugNavigationRoute(string targetId)
-        => _session is ILoadingBaySpatialObservationSession observation
-            ? observation.ReadNavigationRoute(targetId)
-            : DebugCommandResult.Failure(DebugCommandStatus.ModuleUnavailable, "Navigation routes are unavailable for this Loading Bay session.");
 
     private void RetainRetirementFailure(Exception failure)
     {

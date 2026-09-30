@@ -3,8 +3,13 @@ using LoadingBay.Game;
 
 internal static class NavigationGuidanceExercise
 {
-    internal static void Run()
+    internal static void Run(Action<bool, string>? assertion = null)
     {
+        void Require(bool condition, string message)
+        {
+            if (assertion is not null) assertion(condition, message);
+            else if (!condition) throw new InvalidOperationException(message);
+        }
         LoadingBayNavigationTarget[] targets =
         [
             new("pickup-shotgun-west", "western shotgun", "pickup", new(-27f, -.25f, -9f), true, "available", false, null),
@@ -41,8 +46,4 @@ internal static class NavigationGuidanceExercise
         Require(!visits.Contains(shotgun.Id), "navigation visits survived the ordinary run reset");
     }
 
-    private static void Require(bool condition, string message)
-    {
-        if (!condition) throw new InvalidOperationException(message);
-    }
 }

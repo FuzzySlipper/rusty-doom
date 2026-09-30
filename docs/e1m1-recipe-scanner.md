@@ -41,17 +41,4 @@ Decision for this pass: defer the full playable reconstruction, while completing
 Six focused tests now include touching lobes, rejection of unbalanced directed edges, and full-map coverage: every measured sector boundary is represented exactly once with source endpoints, and no invented bridging edge. The full SVG was rendered and inspected; the boundary/provenance checks passed. Existing playable scenes remain unchanged.
 
 
-The proposed next construction exercise has now been implemented and traversed: the existing study includes the dogleg corridor, initially closed usable door and north room. See [room-study evidence](room-study.md#connected-north-wing-construction-pass). This is a manually refined subset; the remaining full-map groups are still authoring references.
-
-
-The next connected subset now also includes the eastern descending connector, zigzag basin/walkway and southern door/room. See [eastern construction evidence](room-study.md#eastern-zigzag-and-southern-room). Diagonal floor joins were manually refined into a unioned surface with short slopes after native traversal exposed an uphill snag. This is an example of the measured draft supporting construction decisions rather than prescribing exact geometry.
-
-The next manual construction pass uses sectors 78–84 for the terminal approach, a third independent study door and terminal chamber (`LoadingBayTerminalRecipe.cs`). It preserves the scanner's narrowing and floor/ceiling proportions while connecting to the already simplified southern room. Source geometry remains authoring evidence only; the runtime does not parse this draft. Exposed-surface overlap diagnostics are tracked upstream in Engine task #8255.
-
-The western group now has a connected manual interpretation in `LoadingBayWestWingRecipe.cs`: angled chamber, paired blocks, split stair rises, upper gallery and outer hall. The spawn-side dogleg and lower-hall return stair are deliberate author refinements rather than source topology. This is another example of measured scanner suggestions becoming editable construction vocabulary; the full-map draft itself is not consumed at runtime.
-
-The central court now has a manual sector-5/13 interpretation in `LoadingBayCourtyardRecipe.cs`, with a north-hall stair connection and recoverable recessed pool. The west edge and connector accommodate the study's stylized spawn room. Engine task #8255's published audit is now consumed while composing named recipe pieces, with analysis explicitly requested after startup; the scanner remains source-analysis tooling and does not implement geometry auditing.
-
-The southern connecting group now has a manual interpretation in `LoadingBaySouthPassageRecipe.cs`: courtyard descent, bent low passage, eastern ascent and fourth usable door. The old eastern basin and wall are cut to admit the connection, and the landing is unioned into the existing walkway. This is a connected authoring refinement, not automatic scanner output or secret-discovery gameplay.
-
-The first full-map grouping now has a manually authored measured-footprint starting room in `LoadingBayRoomRecipe`; see [spawn refinement](experiments/spawn-layout/README.md). Source dimensions guide practical recipes. Other provisional groups are not thereby certified source-exact. The scanner remains an offline authoring aid.
+Historical scan outputs and construction observations are preserved in Den `[doc: rusty-doom/campaign-8976-evidence-archive]`. Generate new outputs to an explicit operator-selected directory; they are offline authoring aids rather than runtime dependencies. The optional study recipes live under `csharp/LoadingBay.RoomStudy`.

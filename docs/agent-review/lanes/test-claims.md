@@ -37,8 +37,8 @@ implementation that the suite would not notice.
 - Absent broad integration, browser, AOT, performance, or full-certification
   suites. Focused semantic tests, build, and CoreCLR staging appropriate to the
   change are the standard here; browser evidence answers only a changed
-  interaction, AOT answers only a real fidelity question, and `certify:e1m1`
-  remains release/manual with its known stall at waypoint `[127,121]`.
+  interaction, AOT answers only a real fidelity question, and the retired E1M1 certifier
+  has historical stalled evidence at `[127,121]`.
 - A demand for new tests that pin validation ceremony nobody wants — hash
   checks on admitted content, proposal/acceptance audit trails, revision
   guards, rollback around ordinary gameplay, or traversal replay. That is a

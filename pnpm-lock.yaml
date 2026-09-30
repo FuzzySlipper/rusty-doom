@@ -84,8 +84,6 @@ importers:
 
   ts/packages/doom-e1m1-authoring: {}
 
-  ts/packages/project-content: {}
-
 packages:
 
   '@algolia/abtesting@1.14.1':

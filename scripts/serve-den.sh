@@ -33,7 +33,4 @@ if [[ ! "$DEMO_BIND_PORT" =~ ^[0-9]+$ ]] || (( DEMO_BIND_PORT < 1 || DEMO_BIND_P
   exit 2
 fi
 cd "$DEMO_ROOT"
-LOADING_BAY_PORT="$DEMO_BIND_PORT" \
-  LOADING_BAY_BIND_HOST="$DEMO_BIND_HOST" \
-  LOADING_BAY_LIVE_DEBUG=1 \
-  exec "$DEMO_ROOT/scripts/run-csharp-product.sh"
+exec "$DEMO_ROOT/scripts/run-csharp-product.sh" --port "$DEMO_BIND_PORT" --bind-host "$DEMO_BIND_HOST" --live-debug

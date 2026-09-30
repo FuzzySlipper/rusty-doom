@@ -1,0 +1,207 @@
+using Xunit;
+
+public sealed class SemanticScenarioTests
+{
+    public static TheoryData<string, string> Cases => new()
+    {
+        { "lifecycle", "batched admitted movement did not reconcile every host-admitted simulation tick" },
+        { "lifecycle", "first catch-up batch did not preserve Engine-admitted tick identities" },
+        { "lifecycle", "admitted movement tick overflow was not rejected" },
+        { "lifecycle", "admission trust did not reject an empty Engine content readout" },
+        { "lifecycle", "admission trust did not reject a zero-length Engine content entry" },
+        { "lifecycle", "admission trust did not reject a wrong-path Engine content entry" },
+        { "lifecycle", "admission trust did not reject a multi-entry Engine content readout" },
+        { "lifecycle", "admission trust did not accept a path-matched Engine content entry regardless of hash" },
+        { "lifecycle", "E1M1 platform carry did not supply the post-motion Engine support continuation" },
+        { "lifecycle", "reordered entity bootstrap did not actually differ in runtime allocation" },
+        { "lifecycle", "authored E1M1 identity did not resolve its runtime entity and kind after reordered allocation" },
+        { "lifecycle", "authored E1M1 mapping did not stay bijective over the canonical identities" },
+        { "lifecycle", "updates before Start must be ignored" },
+        { "lifecycle", "running update was not delegated" },
+        { "lifecycle", "restart did not replace after fresh publication" },
+        { "lifecycle", "failed replacement did not retain the current session" },
+        { "lifecycle", "current session was lost after failed replacement" },
+        { "lifecycle", "shutdown did not dispose active replacement" },
+        { "lifecycle", "restart did not attempt old-session disposal" },
+        { "lifecycle", "replacement was not authoritative after old-session disposal failed" },
+        { "lifecycle", "shutdown did not report old retirement failure after disposing the active replacement" },
+        { "lifecycle", "restart retained stale gameplay state, facts, or generation" },
+        { "lifecycle", "E1M1 authored-base to Engine-center spawn conversion drifted" },
+        { "lifecycle", "pre-first-step snapshot did not retain its spawn pose through restore" },
+        { "lifecycle", "E1M1 did not retain canonical player identity 1 after entity bootstrap" },
+        { "lifecycle", "generated world target platform bounds drifted" },
+        { "lifecycle", "canonical nukage did not retain its inclusive cooldown boundary" },
+        { "lifecycle", "canonical door did not enter opening state" },
+        { "lifecycle", "canonical floor or lift did not begin lowering" },
+        { "lifecycle", "world snapshot did not retain typed in-flight transitions" },
+        { "lifecycle", "canonical due steps did not settle the door/floor/lift boundaries" },
+        { "lifecycle", "world snapshot restore did not rebuild semantic in-flight state" },
+        { "lifecycle", "restored in-flight transitions did not settle on the resumed timeline" },
+        { "lifecycle", "world snapshot accepted an impossible settled floor due step" },
+        { "lifecycle", "canonical barrel did not settle through the typed explosive state" },
+        { "lifecycle", "canonical secret was not one-shot" },
+        { "lifecycle", "canonical exit was incorrectly encounter-gated" },
+        { "lifecycle", "E1M1 did not own fist and pistol" },
+        { "lifecycle", "E1M1 equipment or bullets drifted" },
+        { "lifecycle", "headless weapon fire did not prepare the equipped pistol plan" },
+        { "lifecycle", "headless weapon settlement did not consume ammunition, record fire/miss facts, or set cooldown" },
+        { "lifecycle", "headless weapon settlement ignored its cooldown gate" },
+        { "lifecycle", "headless projectile damage did not apply typed canonical damage" },
+        { "lifecycle", "headless projectile outcome was not recorded" },
+        { "lifecycle", "headless barrel damage did not commit scaled health without exploding" },
+        { "lifecycle", "headless barrel explosion did not record exactly one unchained explosion fact" },
+        { "lifecycle", "headless barrel damage exploded the same barrel twice" },
+        { "lifecycle", "headless barrel damage accepted an unknown barrel" },
+        { "lifecycle", "hostile vitals maximum was accepted or mutated state" },
+        { "lifecycle", "weapon cooldown did not survive restore onto the resumed timeline" },
+        { "lifecycle", "exercise could not establish a health-bonus delta" },
+        { "lifecycle", "canonical health pickup did not use generated E1M1 semantics" },
+        { "lifecycle", "canonical health pickup collected more than once" },
+        { "lifecycle", "canonical pickup snapshot did not restore its health result" },
+        { "lifecycle", "health bonus was not consumed without lowering health at its authored cap" },
+        { "lifecycle", "health pickup above its local cap was consumed or lowered health" },
+        { "lifecycle", "armor pickup above its local cap was consumed or lowered armor" },
+        { "lifecycle", "full-health medikit was consumed" },
+        { "lifecycle", "damage was rejected" },
+        { "lifecycle", "rejected medikit was incorrectly retired" },
+        { "lifecycle", "exercise could not establish partial green armor" },
+        { "lifecycle", "green armor did not set 90 armor to its minimum" },
+        { "lifecycle", "unneeded green armor was consumed" },
+        { "lifecycle", "green armor did not retain its typed divisor" },
+        { "lifecycle", "armor bonus did not select its typed protection mode" },
+        { "lifecycle", "exercise could not establish bonus armor protection" },
+        { "lifecycle", "armor bonus did not use divisor three" },
+        { "lifecycle", "blue armor did not select its typed protection mode" },
+        { "lifecycle", "armor bonus replaced blue armor protection instead of preserving it" },
+        { "lifecycle", "blue armor did not use divisor two" },
+        { "lifecycle", "snapshot restore did not preserve typed armor protection" },
+        { "lifecycle", "authored shotgun pickup did not atomically grant equipment and starter shells" },
+        { "lifecycle", "dormant enemy shotgun drop was collectable before its owner materialized it" },
+        { "lifecycle", "snapshot restore did not remove later-acquired Engine equipment and shells" },
+        { "lifecycle", "starter-ammo overflow staged a weapon or retired its pickup" },
+        { "lifecycle", "semantic snapshot omitted canonical player pose/look or typed pickup state" },
+        { "lifecycle", "snapshot accepted a cooldown for an unowned weapon" },
+        { "lifecycle", "invalid equipped weapon was accepted" },
+        { "lifecycle", "impossible encounter activation state was accepted or mutated gameplay" },
+        { "lifecycle", "restore did not swap the actual Engine equipment slot" },
+        { "lifecycle", "valid snapshot did not restore atomically" },
+        { "lifecycle", "snapshot accepted a noncanonical pickup alias" },
+        { "lifecycle", "snapshot with an unknown pickup id threw or was accepted" },
+        { "lifecycle", "canonical hitscan encounter did not activate" },
+        { "lifecycle", "distance-rejected enemy without a Perception pair was treated as visible" },
+        { "lifecycle", "Engine-backed enemy attack settlement did not apply typed canonical damage" },
+        { "lifecycle", "enemy cooldown admitted a repeated attack early" },
+        { "lifecycle", "canonical encounter did not activate its members" },
+        { "lifecycle", "canonical enemy did not accept an admitted lethal hit" },
+        { "lifecycle", "same-tick enemy defeat did not materialize its dormant drop state and clear the encounter" },
+        { "lifecycle", "canonical actor/encounter snapshot did not capture activation and defeat state" },
+        { "lifecycle", "canonical actor snapshot did not restore defeated actor state" },
+        { "lifecycle", "defeated enemy's activated dormant drop was not collectible through the canonical pickup policy" },
+        { "lifecycle", "snapshot restore did not retain an active canonical enemy drop lifecycle" },
+        { "lifecycle", "bounded pickup fact journal lost its repeated-collection observability" },
+        { "lifecycle", "Engine ProductStateStore did not save" },
+        { "lifecycle", "Engine ProductStateStore did not restore" },
+        { "lifecycle", "corrupt persistence mutated state" },
+        { "lifecycle", "shapeless JSON was accepted" },
+        { "lifecycle", "shapeless JSON mutated state" },
+        { "PlayerInput", "W did not start movement" },
+        { "PlayerInput", "held movement was lost between input batches" },
+        { "PlayerInput", "physical W release left mapped movement latched" },
+        { "PlayerInput", "W could not restart after release" },
+        { "PlayerInput", "opposing keys did not cancel" },
+        { "PlayerInput", "releasing one opposing key lost the other direction" },
+        { "PlayerInput", "focus clear retained movement or pending look" },
+        { "PlayerInput", "movement could not resume after focus clear" },
+        { "PlayerInput", "restore clear retained physical controls" },
+        { "PlayerInput", "mouse right/down did not turn right/look down" },
+        { "PlayerInput", "mouse left/up did not turn left/look up" },
+        { "PlayerInput", "large pointer input did not clamp to valid look state" },
+        { "PlayerInput", "idle stick drift moved the player" },
+        { "PlayerInput", "partial forward stick lost proportional movement" },
+        { "PlayerInput", "neutral stick retained movement" },
+        { "PlayerInput", "stick look did not scale with admitted simulation time" },
+        { "PlayerInput", "focus clear retained stick look" },
+        { "PlayerInput", "controller A did not request jump" },
+        { "PlayerInput", "jump press repeated without another edge" },
+        { "PlayerInput", "controller A release retained jump" },
+        { "PlayerInput", "controller X did not request use" },
+        { "PlayerInput", "controller fire was lost or repeated without an edge" },
+        { "PlayerInput", "controller fire did not rearm after release" },
+        { "PlayerInput", "focus clear retained pending fire" },
+        { "PlayerInput", "gamepad aim seam did not receive the shaped controller delta before look integration" },
+        { "PlayerInput", "neutral gamepad look unexpectedly cleared the selected gamepad aim mode" },
+        { "PlayerInput", "keyboard look did not clear the selected gamepad aim mode" },
+        { "StudyDoor", "Remote use opened the study door" },
+        { "StudyDoor", "Door must initially block traversal" },
+        { "StudyDoor", "Close use did not initiate opening" },
+        { "StudyDoor", "Repeated use restarted opening" },
+        { "StudyDoor", "Invalid timing moved the door" },
+        { "StudyDoor", "Door did not advance on admitted time" },
+        { "StudyDoor", "Moving collision and presentation disagree" },
+        { "StudyDoor", "Door did not clamp at full travel" },
+        { "StudyDoor", "Fully open door continued moving" },
+        { "StudyDoor", "Open door does not clear a standing player" },
+        { "StudyDoor", "Return use unexpectedly closed the route" },
+        { "StudyDoor", "Independent study doors shared state or collision identity" },
+        { "StudyDoor", "North-door use opened the southern door" },
+        { "StudyDoor", "Southern-door bounds did not admit local use" },
+        { "StudyDoor", "Independent door motion did not retain the first opening" },
+        { "NavigationGuidance", "navigation targets did not retain case-insensitive stable identity" },
+        { "NavigationGuidance", "navigation accepted an unknown target" },
+        { "NavigationGuidance", "navigation changed the canonical gameplay-world pickup coordinate" },
+        { "NavigationGuidance", "navigation arrival policy did not remain separate from an Engine route result" },
+        { "NavigationGuidance", "navigation progress did not retain the authored transcript regions" },
+        { "NavigationGuidance", "navigation feet conversion drifted from the player-body convention" },
+        { "NavigationGuidance", "navigation bearing no longer reports positive right" },
+        { "NavigationGuidance", "navigation visits did not record only product arrival facts" },
+        { "NavigationGuidance", "navigation visits survived the ordinary run reset" },
+        { "RecipeAnimation", "Fist ready pose missing" },
+        { "RecipeAnimation", "Punch must reach all forward poses" },
+        { "RecipeAnimation", "Punch must recover to ready" },
+        { "RecipeAnimation", "Pistol initial windup missing" },
+        { "RecipeAnimation", "Pistol discharge boundary differs from source timing" },
+        { "RecipeAnimation", "Pistol recoil frame missing" },
+        { "RecipeAnimation", "Pistol did not settle after recovery" },
+        { "RecipeAnimation", "Shotgun pump apex missing" },
+        { "RecipeAnimation", "Shotgun reverse pump missing" },
+        { "RecipeAnimation", "Shotgun did not finish its complete cycle" },
+        { "RecipeAnimation", "Flash appeared before discharge" },
+        { "RecipeAnimation", "Second muzzle flash frame missing" },
+        { "RecipeAnimation", "Muzzle flash failed to expire" },
+        { "RecipeAnimation", "Imp death must animate before retaining the corpse" },
+        { "RecipeAnimation", "Trooper death must animate before retaining the corpse" },
+        { "RecipeAnimation", "Weapon frames must share one canvas and pixel aspect" },
+    };
+
+    // Each runner case starts with a fresh scenario and executes its arrange prefix.
+    // Previous checks evaluate their setup operations; only this case's outcome is asserted.
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void SemanticOutcome(string scenario, string outcome)
+    {
+        bool reached = false;
+        void Check(bool condition, string message)
+        {
+            if (message != outcome) return;
+            reached = true;
+            Assert.True(condition, message);
+            throw new OutcomeReached();
+        }
+        try
+        {
+            switch (scenario)
+            {
+                case "lifecycle": LifecycleScenario.Run(Check); break;
+                case "PlayerInput": PlayerInputExercise.Run(Check); break;
+                case "StudyDoor": StudyDoorExercise.Run(Check); break;
+                case "NavigationGuidance": NavigationGuidanceExercise.Run(Check); break;
+                case "RecipeAnimation": RecipeAnimationExercise.Run(Check); break;
+                default: throw new ArgumentException(scenario);
+            }
+        }
+        catch (OutcomeReached) { }
+        Assert.True(reached, $"Scenario did not reach {outcome}");
+    }
+
+    private sealed class OutcomeReached : Exception;
+}

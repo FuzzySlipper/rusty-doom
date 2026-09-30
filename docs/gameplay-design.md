@@ -20,7 +20,7 @@ is the admitted-step product root. It owns:
 
 - the `EntityStore` (`_entities`), the authored-to-runtime map
   (`LoadingBayEntityMap`), the `InventoryStore` (`_inventory`), the
-  `SimulationScheduler` (`_scheduler`), and `LoadingBayWorldState` (`_world`);
+  `LoadingBayWorldState` (`_world`);
 - live player vitality as an attached Engine `StatsComponent`
   (`LoadingBayStats.ForPlayer`) plus `LoadingBayArmorProtection`
   (`_armorProtection`); enemy vitality/posture in attached per-enemy
@@ -52,9 +52,7 @@ entity per canonical authored identity with creation-time kind metadata
 (`EntityTypeId`: player, enemy, pickup, encounter, barrel, hazard, door,
 floor, lift, secret, exit, world-object) and records the mapping; no code
 asserts `EntityId.Value` equals the authored number. The lifecycle exercise
-proves resolution under reversed allocation order. Engine spatial,
-perception, and trigger facts keep using authored identities by Engine
-authority and are never translated by the map. No generic ECS framework.
+proves resolution under reversed allocation order. Engine spatial and trigger entities use runtime identity. The boundary maps trigger facts back to authored identity before game policy reads them; product/save facts retain authored identities. No generic ECS framework.
 
 ## Game-domain owners
 
@@ -127,6 +125,11 @@ perception, voxel realization, presentation/animation, UI streams, persistence
 primitives, renderer/canvas, and the browser shell. The immutable SDK exposes
 the supported C# services and generates product binding below `obj`.
 
+The product retains the HUD stream and its publication sequence across E1M1
+gameplay resets. A replacement session publishes only after ownership commits;
+retiring the previous session does not close the shared stream. Product shutdown
+retires the stream after the final session.
+
 Adopted for this campaign (pinned pair verified in #8377; see below):
 `EntityStore`/`Actor`/`EntityTypeId`/class components,
 `StatsComponent`/`Track` (double-backed `Stat` with integer/float accessors,
@@ -153,9 +156,7 @@ is owned by generators: update `scripts/generate-e1m1-semantic-catalog.mjs`
 
 Focused semantic tests, build, and CoreCLR staging appropriate to the change
 are the standard. Browser evidence answers only a changed interaction; AOT
-answers only a real fidelity question. `pnpm run certify:e1m1` remains
-release/manual with its known stall at waypoint `[127,121]`; source checks are
-not proof of complete traversal. Do not silently weaken
+answers only a real fidelity question. The retired E1M1 certifier stopped at `[127,121]`; there is no current certification command. Source checks are not proof of complete traversal. Do not silently weaken
 correctness/provenance checks or imply unsupported traversal succeeded.
 
 ## Campaign map

@@ -250,10 +250,6 @@ internal sealed class LoadingBayCombat
         try
         {
             Mechanics.InventoryEdit candidate = _inventory.Prepare();
-            if (!OwnedWeaponIds().Contains(weapon.Id, StringComparer.Ordinal))
-            {
-                candidate.MaterializeUnique(new Mechanics.ItemState(new EntityId(_entities.NextEntityValue), weapon.MechanicsDefinition), _player);
-            }
             candidate.Grant(_player, starterAmmo.MechanicsDefinition, starterAmmo.StackId, pickup.StarterAmmunitionQuantity);
             return true;
         }

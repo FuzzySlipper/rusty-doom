@@ -1,6 +1,6 @@
-# Spatial inspection
+# Optional study spatial inspection
 
-Run the product with live debug enabled, then invoke one of these commands through
+Run the optional room-study product with `./scripts/run-room-study.sh`, then invoke these commands through
 `rusty-live-debug`:
 
 ```text

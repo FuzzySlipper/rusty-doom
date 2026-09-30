@@ -23,9 +23,8 @@ internal static class LoadingBayEntityKinds
 /// Explicit authored-E1M1-identity to runtime-entity mapping over one
 /// <see cref="EntityStore"/>. The store allocates runtime <see cref="EntityId"/>
 /// values in whatever order construction requests; this map is the only path
-/// from an authored catalog identity to the live runtime entity. Engine
-/// spatial, perception, and trigger facts keep using authored identities by
-/// Engine authority and are never translated here.
+/// from an authored catalog identity to the live runtime entity. Engine component projections use runtime identities; coordinators translate
+/// their facts back through this map at the product-domain boundary.
 /// </summary>
 internal sealed class LoadingBayEntityMap
 {
@@ -43,6 +42,7 @@ internal sealed class LoadingBayEntityMap
     private static readonly HashSet<ulong> Exits = LoadingBayE1M1SemanticCatalog.Exits.Select(exit => exit.EntityId).ToHashSet();
 
     private readonly Dictionary<ulong, EntityId> _runtime = new();
+    private readonly Dictionary<ulong, ulong> _authored = new();
 
     private LoadingBayEntityMap()
     {
@@ -74,6 +74,7 @@ internal sealed class LoadingBayEntityMap
         foreach (ulong authored in order)
         {
             EntityId entity = store.Create(new EntityTypeId(KindFor(authored)));
+            map._authored.Add(entity.Value, authored);
             if (!map._runtime.TryAdd(authored, entity))
                 throw new InvalidOperationException($"Duplicate authored E1M1 identity {authored}.");
         }
@@ -95,6 +96,8 @@ internal sealed class LoadingBayEntityMap
         if (Exits.Contains(authored)) return LoadingBayEntityKinds.Exit;
         return LoadingBayEntityKinds.WorldObject;
     }
+
+    internal ulong Authored(ulong runtime) => _authored.TryGetValue(runtime, out ulong authored) ? authored : 0;
 
     internal EntityId Runtime(ulong authored) =>
         _runtime.TryGetValue(authored, out EntityId entity)

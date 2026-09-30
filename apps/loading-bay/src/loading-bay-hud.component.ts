@@ -1,5 +1,4 @@
 import {
-  type AfterViewInit,
   type ElementRef,
   ViewChild,
   ChangeDetectionStrategy,
@@ -433,7 +432,7 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
         data-rusty-ui-interactive
         (toggle)="toggleDebug($event)"
       >
-        <summary>Debug · F3</summary>
+        <summary>Debug</summary>
         <div class="identity">
           <span>{{
             snapshot().content === "doom-room-study"
@@ -489,7 +488,7 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
       </details>
 
       <div class="controls-hint">
-        WASD MOVE · MOUSE LOOK · J/L TURN · I/K PITCH · SHIFT PRECISION · CLICK/CTRL FIRE · E USE · R RESTART · 1 FIST · 2 PISTOL · 3 SHOTGUN
+        WASD MOVE · MOUSE LOOK · J/L TURN · I/K PITCH · SHIFT PRECISION · CLICK/CTRL FIRE · E USE · R RESTART
       </div>
       @if (statusText(); as text) {
         <div class="status-message" [class.dead]="snapshot().dead">
@@ -543,39 +542,12 @@ const EMPTY_READOUT: LoadingBayHudSnapshot = {
     </section>
   `,
 })
-export class LoadingBayHudComponent implements AfterViewInit, OnDestroy {
+export class LoadingBayHudComponent implements OnDestroy {
   @ViewChild("debugBlock", { static: true })
   private debugBlock!: ElementRef<HTMLDetailsElement>;
   @ViewChild("debugWidgets", { static: true })
   private debugWidgets!: ElementRef<HTMLElement>;
   private debugMount: ReturnType<typeof mountLoadingBayDebug> | null = null;
-  private readonly debugEvents = new AbortController();
-
-  ngAfterViewInit(): void {
-    const stop = (event: Event): void => event.stopPropagation();
-    for (const type of [
-      "pointerdown",
-      "pointermove",
-      "pointerup",
-      "pointercancel",
-      "mousedown",
-      "mousemove",
-      "mouseup",
-      "wheel",
-      "keydown",
-      "keyup",
-      "click",
-    ]) {
-      this.debugBlock.nativeElement.addEventListener(type, stop, {
-        signal: this.debugEvents.signal,
-      });
-    }
-    document.addEventListener("keydown", this.toggleDebugShortcut, {
-      capture: true,
-      signal: this.debugEvents.signal,
-    });
-  }
-
   protected toggleDebug(event: Event): void {
     this.setDebugOpen((event.target as HTMLDetailsElement).open);
   }
@@ -600,21 +572,6 @@ export class LoadingBayHudComponent implements AfterViewInit, OnDestroy {
 
   private readonly usesShells = (): boolean =>
     this.snapshot().weapon.trim().toLocaleLowerCase() === "shotgun";
-
-  private readonly toggleDebugShortcut = (event: KeyboardEvent): void => {
-    if (
-      event.repeat ||
-      (event.code !== "F3" && event.code !== "Backquote") ||
-      (event.code === "Backquote" && isEditable(event.target))
-    ) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    const nextOpen = !this.debugBlock.nativeElement.open;
-    this.debugBlock.nativeElement.open = nextOpen;
-    this.setDebugOpen(nextOpen);
-  };
 
   private setDebugOpen(open: boolean): void {
     this.application.ui?.setInteractionMode(open ? "interface" : "gameplay");
@@ -646,7 +603,6 @@ export class LoadingBayHudComponent implements AfterViewInit, OnDestroy {
   );
 
   ngOnDestroy(): void {
-    this.debugEvents.abort();
     this.debugMount?.dispose();
     this.unsubscribe?.();
   }
@@ -661,148 +617,7 @@ function readHudSnapshot(
   ) {
     return null;
   }
-  const value = envelope.value;
-  if (!isRecord(value)) return null;
-  const health = finite(value.health);
-  const armor = finite(value.armor);
-  const bullets = finite(value.bullets);
-  const shells = finite(value.shells);
-  const kills = optionalFinite(value.kills, 0);
-  const totalEnemies = optionalFinite(value.totalEnemies, 0);
-  const collected = optionalFinite(value.collected, 0);
-  const totalPickups = optionalFinite(value.totalPickups, 0);
-  const weapon = optionalString(value.weapon, "");
-  const dead = optionalBoolean(value.dead, false);
-  const message = optionalString(value.message, "");
-  const weaponFlash = optionalBoolean(value.weaponFlash, false);
-  const damageFlash = optionalBoolean(value.damageFlash, false);
-  const generation = finite(value.generation);
-  const step = finite(value.step);
-  const droppedFacts = finite(value.droppedFacts);
-  const pendingSchedules = finite(value.pendingSchedules);
-  const exitVisibilityRevision = finite(value.exitVisibilityRevision);
-  const presentationBillboards = finite(value.presentationBillboards);
-  const effectsVolume = finite(value.effectsVolume);
-  const admittedSteps = finite(value.admittedSteps);
-  const droppedSteps = finite(value.droppedSteps);
-  const materialCount = finite(value.materialCount);
-  const materialMappingCount = finite(value.materialMappingCount);
-  if (
-    health === null ||
-    armor === null ||
-    bullets === null ||
-    shells === null ||
-    kills === null ||
-    totalEnemies === null ||
-    collected === null ||
-    totalPickups === null ||
-    weapon === null ||
-    dead === null ||
-    message === null ||
-    weaponFlash === null ||
-    damageFlash === null ||
-    generation === null ||
-    step === null ||
-    droppedFacts === null ||
-    pendingSchedules === null ||
-    exitVisibilityRevision === null ||
-    presentationBillboards === null ||
-    effectsVolume === null ||
-    admittedSteps === null ||
-    droppedSteps === null ||
-    materialCount === null ||
-    materialMappingCount === null ||
-    typeof value.complete !== "boolean" ||
-    typeof value.exitVisibility !== "boolean" ||
-    typeof value.animationCue !== "string" ||
-    typeof value.updateMode !== "string" ||
-    typeof value.lifecycle !== "string" ||
-    typeof value.effectsMuted !== "boolean" ||
-    typeof value.catalogHash !== "string" ||
-    typeof value.voxelPresentationRealized !== "boolean" ||
-    typeof value.skyPath !== "string" ||
-    typeof value.skyHash !== "string" ||
-    typeof value.skyResourceRealized !== "boolean" ||
-    typeof value.skyBackgroundSelected !== "boolean" ||
-    !Array.isArray(value.facts) ||
-    !value.facts.every(isHudFact)
-  ) {
-    return null;
-  }
-  return {
-    content: typeof value.content === "string" ? value.content : "doom-e1m1",
-    health,
-    armor,
-    bullets,
-    shells,
-    weapon,
-    kills,
-    totalEnemies,
-    collected,
-    totalPickups,
-    dead,
-    message,
-    weaponFlash,
-    damageFlash,
-    generation,
-    step,
-    complete: value.complete,
-    facts: value.facts,
-    droppedFacts,
-    pendingSchedules,
-    exitVisibility: value.exitVisibility,
-    exitVisibilityRevision,
-    presentationBillboards,
-    animationCue: value.animationCue,
-    effectsMuted: value.effectsMuted,
-    effectsVolume,
-    updateMode: value.updateMode,
-    lifecycle: value.lifecycle,
-    admittedSteps,
-    droppedSteps,
-    catalogHash: value.catalogHash,
-    materialCount,
-    materialMappingCount,
-    voxelPresentationRealized: value.voxelPresentationRealized,
-    skyPath: value.skyPath,
-    skyHash: value.skyHash,
-    skyResourceRealized: value.skyResourceRealized,
-    skyBackgroundSelected: value.skyBackgroundSelected,
-  };
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function finite(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function optionalFinite(value: unknown, fallback: number): number | null {
-  return value === undefined ? fallback : finite(value);
-}
-
-function optionalString(value: unknown, fallback: string): string | null {
-  if (value === undefined) return fallback;
-  return typeof value === "string" ? value : null;
-}
-
-function optionalBoolean(value: unknown, fallback: boolean): boolean | null {
-  if (value === undefined) return fallback;
-  return typeof value === "boolean" ? value : null;
-}
-
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement)
-  );
-}
-
-function isHudFact(value: unknown): value is LoadingBayHudFact {
-  return isRecord(value) && typeof value.kind === "string";
+  // The C# product owns this first-party contract. Optional experimental fields
+  // use the same projection defaults; the UI does not validate gameplay state.
+  return { ...EMPTY_READOUT, ...(envelope.value as unknown as LoadingBayHudSnapshot) };
 }

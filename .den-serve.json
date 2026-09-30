@@ -1,8 +1,8 @@
 {
-  "project": "rusty-engine-demo",
+  "project": "rusty-doom",
   "serve": {
     "command": "bash scripts/serve-den.sh --host {host} --port {port}",
-    "preferredPort": 37300,
+    "preferredPort": 0,
     "healthUrl": "/",
     "readyText": "Rusty Product Host",
     "reusePolicy": "broker_owned",
@@ -11,8 +11,8 @@
   "playtest": {
     "startPath": "/",
     "viewport": {
-      "width": 1600,
-      "height": 900
+      "width": 1280,
+      "height": 720
     },
     "headed": false,
     "recordVideo": false

@@ -1,69 +1,64 @@
 # Loading Bay
 
-Loading Bay is an ordinary C# Rusty Engine product for the committed Doom E1M1 Hangar closure. Its normal development lane is the packaged `Rusty.Engine` SDK and the matching `rusty dev` CoreCLR runtime pack. NativeAOT is a separate fidelity/release check, not the edit-run loop.
+Loading Bay is a free experimental Rusty Engine test repository. The supported product is the Doom E1M1 voxel port, implemented in C# with the packaged Engine SDK. CoreCLR through `rusty dev` is the normal development lane; NativeAOT is an optional fidelity/release check.
 
-## Demo
-
-![Room Study scene running in a browser: metal walls and ceiling beams over a recessed blue floor, two supports, a distant hostile, the marine pistol viewmodel, and the player HUD](docs/images/loading-bay-room-study.png)
-
-Played and captured on the browser playtest lane: `bash scripts/run-room-study.sh` serves this scene on port 4395 and the playtest controller drives ordinary keyboard input in the remote browser, then captures a 1280x720 frame. The capture transport is a video stream of the browser window, so the image is not correlated to a specific Engine render submission. See [the room study](docs/room-study.md) and [spatial and combat inspection](docs/spatial-inspection.md).
-
-## Run the product
-
-The ignored `.runtime/` directory receives the matched SDK feed and runtime pack for the selected development release. It contains Engine artifacts only; the repository does not carry an Engine host, browser shell, generated binding, or source checkout.
+## Run
 
 ```bash
+rusty install
 pnpm install --frozen-lockfile
-pnpm run build:shell
-./scripts/run-csharp-product.sh
+./scripts/run-csharp-product.sh --live-debug
 ```
 
-The launcher stages `LoadingBay.Game` through the SDK and starts its CoreCLR bundle with `rusty dev`. It prints the local URL (normally `http://127.0.0.1:4394`). The runtime pack owns its browser shell, renderer preload, canvas, input, and lifecycle; Angular supplies the disposable DOM HUD module.
+`rusty install` installs the Engine pair pinned in `Directory.Build.props` into the shared cache. Only `rusty update` changes that pin. The SDK builds the Angular HUD from source, stages the product and starts the matching runtime. The default URL is `http://127.0.0.1:4394`. `.runtime/` contains development persistence, not the Engine installation.
 
-Engine contributors may explicitly select a source override with `./scripts/run-csharp-product.sh --engine-source /absolute/rusty-engine`. Ordinary product work must use the package and matching runtime pack instead.
+Pass Engine CLI options directly:
+
+```bash
+./scripts/run-csharp-product.sh --port 4397 --bind-host 127.0.0.1 --live-debug
+./scripts/run-csharp-product.sh --output window --live-debug
+```
+
+Engine contributors can explicitly pass `--engine-source /absolute/rusty-engine`. Normal product work uses the installed package pair.
 
 ## Controls
 
-Click the canvas to capture the mouse; Escape releases it. WASD moves, mouse movement looks, Space jumps, E uses, and a primary click fires. Browser automation can use J/L to turn and I/K to pitch at 120 degrees per second; hold left Shift for precision look at 24 degrees per second. Left Control fires.
+Click the canvas to capture the mouse; Escape releases it. WASD moves, mouse movement looks, Space jumps, E uses, primary click or left Control fires, and R restarts. J/L turn and I/K pitch at 120 degrees per second; hold left Shift for precision look at 24 degrees per second. Standard gamepads use left stick movement, right stick look, A jump, X use and right-trigger fire.
 
-Standard gamepads (including the Wolf tester) use the left stick to move, right stick to look, A to jump, X to use, and a right-trigger press to fire. Sticks have a 15% radial dead zone and proportional movement; right-stick look reaches 108 degrees per second. Gamepad aim assistance selects fresh visible hostile facts, slows and boundedly tracks a right-stick turn, then may make a constrained fresh shot-direction correction before the ordinary collision ray. Right-stick, RT, or X selects gamepad aim mode; neutral stick retains target focus without moving the camera, while keyboard or pointer input clears that mode. E/X uses the same focused door or exit action as `interaction.use`; it does not move the player or bypass reach, visibility, or product availability. Gameplay input state clears on focus loss and restore.
+The optional room study also supports 1/2/3 for fist, pistol and shotgun selection. Its gamepad aim assistance and interaction inspection are experimental features, separate from supported E1M1 policy.
 
-## Debugging
+## Architecture and checks
 
-Press Escape to release the mouse, then expand **Debug** in the upper-left corner. It contains the runtime and content readouts, **Show metrics** for Engine renderer/performance diagnostics, and **Open live debug** for the Engine command console. Collapsing the block disposes its diagnostic widgets and stops their polling. Player vitals remain visible.
-
-The Den launcher enables live debug. For a direct local launch, use `LOADING_BAY_LIVE_DEBUG=1 ./scripts/run-csharp-product.sh` to enable the command console and renderer metrics.
-
-## Architecture
-
-- `csharp/LoadingBay.Game` owns typed E1M1 policy, product state, validation, facts, snapshots, saves, and the `loading-bay.hud.snapshot.v1` projection.
-- The packaged SDK generates CoreCLR staging and NativeAOT composition below `obj`; Loading Bay has no checked composition project or native exports.
-- Rusty Engine owns the host, update cadence, renderer/canvas, spatial and voxel mechanisms, content admission, persistence primitives, and browser runtime shell.
-- `apps/loading-bay` exports `mountProductUi` for that shell and renders copied HUD data only. It does not run gameplay, create a renderer, or own a loop.
-- E1M1 source artifacts and provenance remain under `content/doom-e1m1/`, `content/projects/`, and [docs/source-provenance.md](docs/source-provenance.md). The runtime admits the committed closure through Engine content services rather than parsing authoring source in C#.
-
-## Focused proof
+`csharp/LoadingBay.Game` owns E1M1 state, combat, pickups, world progression, saves and the read-only HUD projection. Engine owns the host, rendering, input, lifecycle, spatial queries and persistence primitives. `apps/loading-bay` exports `mountProductUi` and renders the Angular HUD. The SDK compiles it when declared source inputs change.
 
 ```bash
-./scripts/verify-csharp-spine.sh  # catalog, staged CoreCLR build, lifecycle exercise, NativeAOT fidelity check
-pnpm run audit:boundary           # packaged SDK/runtime ownership and retired-lane checks
+./scripts/verify-csharp-spine.sh  # catalogs, focused tests, managed build, CoreCLR stage and lifecycle exercise
+./scripts/verify-csharp-spine.sh --aot  # explicit NativeAOT fidelity check
+pnpm run verify
 ```
 
-Browser-facing work still needs focused visible evidence of the affected canvas/HUD/input path. Build or HTTP success alone is not browser acceptance. `pnpm run certify:e1m1` is release/manual only and currently stalls at waypoint `[127,121]`; do not treat it as a passing complete traversal.
+The historical manual traversal stalled at waypoint `[127,121]`; its retired `certify:e1m1` command is unavailable. Focused tests and smoke evidence do not establish complete E1M1 traversal.
+
+## Optional room-study experiment
+
+```bash
+./scripts/run-room-study.sh
+```
+
+This selects the separate ordinary SDK product `csharp/LoadingBay.RoomStudy/LoadingBay.RoomStudy.csproj` on port 4395, with live debug enabled. Its construction recipes, alternate gameplay and authoring audits are excluded from the default E1M1 assembly. Set `auditGeometry` in `content/loading-bay/room-study.settings.json` to enable construction captures. No environment variable selects the scene or host behaviour.
+
+## Licence and asset notice
+
+Repository-authored code and documentation are [MIT licensed](LICENSE). Doom level data, textures, sprites and sounds were derived from the original Doom shareware WAD. That original work remains owned by id Software and/or its respective rights holders; those assets are outside the MIT licence. Other third-party assets retain their own notices, including Kenney CC0 material.
+
+This is an unofficial, free test repository, unaffiliated with or endorsed by the original rights holders. Providing it free does not change third-party ownership or grant additional rights to their assets. [Source provenance](docs/source-provenance.md) records the source identities and derived files.
 
 ## Documentation
 
-- [Design and authority](docs/design.md)
+- [Gameplay ownership](docs/gameplay-design.md)
+- [Design](docs/design.md)
 - [Onboarding](docs/downstream-onboarding.md)
-- [Extension recipes](docs/extension-recipes.md)
-- [C# migration map](docs/code-migration-map.md)
-- [E1M1 gameplay ledger](docs/doom-e1m1-gameplay-ledger.md)
-- [Presentation frame](docs/presentation-frame.md)
-- [Spatial and combat inspection](docs/spatial-inspection.md)
-- [Source provenance](docs/source-provenance.md)
-
-## Optional spawn-room construction study
-
-`bash scripts/run-room-study.sh` launches a Doom-inspired implicit/DC room on port 4395 using the existing FPS controls and textured mesh collision. It is separate from the normal E1M1 port. See [the room study](docs/room-study.md) for the recipe, controls, and initial evidence.
-
-For offline geometry-assisted authoring, run `pnpm run scan:e1m1-recipes`. The [recipe-scanner guide](docs/e1m1-recipe-scanner.md) explains the measured SVG plan, candidate features and protected editable draft.
+- [Game session protocol](docs/game-session-protocol.md)
+- [Optional room study](docs/room-study.md)
+- [Spatial inspection](docs/spatial-inspection.md)
+- [Offline recipe scanner](docs/e1m1-recipe-scanner.md)

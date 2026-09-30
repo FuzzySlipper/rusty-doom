@@ -46,7 +46,7 @@ function run(): void {
   try {
     actual = readFileSync(outPath, "utf8");
   } catch {
-    throw new Error(`${outPath} missing; run \`pnpm --filter @rusty-engine-demo/doom-e1m1-authoring generate\` to create it`);
+    throw new Error(`${outPath} missing; run \`pnpm --filter @loading-bay/e1m1-authoring generate\` to create it`);
   }
   if (actual !== expected) {
     const msg = `${outPath} is stale (bytes actual=${actual.length} expected=${expected.length}). Run generate --write.`;

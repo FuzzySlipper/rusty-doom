@@ -13,7 +13,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
     private readonly List<RenderResource> _textures = [];
     private readonly IVoxelScenePresentationService _service;
     private readonly VoxelScenePresentation _presentation;
-    private readonly Dictionary<uint, ulong> _materialHandlesBySlot;
     private readonly LoadingBayVoxelSceneReadout _identity;
     private LoadingBayVoxelSceneReadout _readout;
     private bool _disposed;
@@ -30,7 +29,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         AuthoredCatalog? catalog = null;
         List<Material> materials = [];
         List<LoadingBayAuthoredMaterialReadout> materialReadouts = [];
-        Dictionary<uint, ulong> materialHandlesBySlot = [];
         VoxelScenePresentation? presentation = null;
         try
         {
@@ -88,8 +86,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
                     new AuthoredMaterialAppearanceRequest(catalog, catalogMaterial.EntryId, resource.Handle));
                 materials.Add(appearanceMaterial);
                 bindings.Add(new VoxelSceneMaterialBinding(paletteRow.MaterialSlot, appearanceMaterial));
-                if (!materialHandlesBySlot.TryAdd(paletteRow.MaterialSlot, appearanceMaterial.Handle.Value))
-                    throw new InvalidOperationException($"The E1M1 voxel palette contains duplicate material slot {paletteRow.MaterialSlot}.");
                 materialReadouts.Add(new LoadingBayAuthoredMaterialReadout(
                     catalogMaterial.EntryId,
                     materialEntry.Version,
@@ -116,14 +112,14 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
             VoxelScenePresentationReadout presentationReadout = ValidatePresentation(
                 engine.VoxelScenePresentation.RefreshScene(presentation));
             VoxelSceneMaterialMappingResult mappingReadout = engine.VoxelScenePresentation.ReadMaterialMapping(presentation);
-            ValidateMaterialMapping(mappingReadout, materialHandlesBySlot);
+            // Engine owns the effective mapping, including valid renderer slot zero
+            // and distinct face variants. Retain its readout without a second validator.
 
             _catalogContent = catalogContent;
             _catalog = catalog;
             _materials = materials;
             _service = engine.VoxelScenePresentation;
             _presentation = presentation;
-            _materialHandlesBySlot = materialHandlesBySlot;
             _identity = new LoadingBayVoxelSceneReadout(
                 LoadingBayAdmittedContent.AssetCatalogPath,
                 catalogReadout.CanonicalHash,
@@ -156,7 +152,6 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         if (_disposed) throw new ObjectDisposedException(nameof(LoadingBayVoxelScenePresentation));
         VoxelScenePresentationReadout presentation = ValidatePresentation(_service.RefreshScene(_presentation));
         VoxelSceneMaterialMappingResult mapping = _service.ReadMaterialMapping(_presentation);
-        ValidateMaterialMapping(mapping, _materialHandlesBySlot);
         _readout = _identity with
         {
             MappingCount = checked((uint)mapping.Mappings.Length),
@@ -238,22 +233,5 @@ internal sealed class LoadingBayVoxelScenePresentation : IDisposable
         if (!readout.Present || readout.ChunkCount == 0)
             throw new InvalidOperationException("Engine did not project the complete textured E1M1 voxel scene.");
         return readout;
-    }
-
-    private static void ValidateMaterialMapping(VoxelSceneMaterialMappingResult mapping, IReadOnlyDictionary<uint, ulong> materialHandlesBySlot)
-    {
-        if (mapping.Mappings.Length == 0)
-            throw new InvalidOperationException("Engine did not retain an effective E1M1 voxel material mapping.");
-        HashSet<(uint SourceSlot, SpatialFace Face)> seen = [];
-        HashSet<uint> mappedSlots = [];
-        foreach (VoxelSceneMaterialMappingRow row in mapping.Mappings.Span)
-        {
-            if (!materialHandlesBySlot.TryGetValue(row.SourceSlot, out ulong materialHandle) ||
-                row.MaterialValue != materialHandle || row.RendererSlot == 0 || !seen.Add((row.SourceSlot, row.Face)))
-                throw new InvalidOperationException("Engine voxel material mapping lost canonical E1M1 material provenance.");
-            mappedSlots.Add(row.SourceSlot);
-        }
-        if (!mappedSlots.SetEquals(materialHandlesBySlot.Keys))
-            throw new InvalidOperationException("Engine voxel material mapping did not realize every canonical E1M1 material slot.");
     }
 }

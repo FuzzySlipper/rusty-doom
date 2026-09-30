@@ -4,8 +4,13 @@ using Rusty.Engine;
 
 internal static class PlayerInputExercise
 {
-    internal static void Run()
+    internal static void Run(Action<bool, string>? assertion = null)
     {
+        void Require(bool condition, string message)
+        {
+            if (assertion is not null) assertion(condition, message);
+            else if (!condition) throw new InvalidOperationException(message);
+        }
         var input = new LoadingBayPlayerInput(LoadingBayTuning.E1M1);
         LoadingBayPlayerInputFrame Read(params ProductInputEvent[] events) => input.Consume(events, 1f / 60f, default);
 
@@ -93,8 +98,4 @@ internal static class PlayerInputExercise
         Kind = kind, Edge = edge, Keyboard = key, ControllerButton = button, ControllerAxis = axis, X = x, Y = y,
     };
 
-    private static void Require(bool condition, string message)
-    {
-        if (!condition) throw new InvalidOperationException(message);
-    }
 }

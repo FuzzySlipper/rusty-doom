@@ -28,4 +28,4 @@ Loading Bay is an ordinary C# product using the packaged Rusty Engine SDK. Doom 
 - C# refactors: focused semantic tests, `dotnet build`, and CoreCLR staging via `./scripts/verify-csharp-spine.sh` (semantic catalog, staged CoreCLR product, lifecycle exercise). NativeAOT (`VerifyRustyEngineAot`) is an explicit fidelity check only for a real fidelity question.
 - Browser-facing changes: build the Angular shell, run `./scripts/run-csharp-product.sh`, and obtain focused evidence of the affected Engine canvas/HUD/input continuation — only when it answers the changed interaction.
 - Content/provenance changes: run the relevant deterministic content/provenance check; do not make the C# runtime parse source-shaped authoring data.
-- `pnpm run certify:e1m1` is release/manual only and currently stalls at waypoint `[127,121]`. It is not passing certification or proof of complete E1M1 traversal.
+- The retired E1M1 certifier stopped at waypoint `[127,121]`; its evidence is historical, and no complete E1M1 traversal certification is claimed. There is no current `certify:e1m1` command.

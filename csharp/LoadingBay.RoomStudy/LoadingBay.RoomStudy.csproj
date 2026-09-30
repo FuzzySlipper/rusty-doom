@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../LoadingBay.Game/LoadingBay.Product.props" />
+  <PropertyGroup>
+    <RustyEngineWatchPaths>$(MSBuildProjectDirectory);$(MSBuildProjectDirectory)/../LoadingBay.Game;$(RustyEngineProductUiSourceRoot);$(RustyEngineProductContentRoot)</RustyEngineWatchPaths>
+    <RustyEngineProductEntryType>LoadingBay.Game.LoadingBayRoomStudyProduct</RustyEngineProductEntryType>
+    <RustyEngineProductId>loading-bay.room-study</RustyEngineProductId>
+    <RustyEngineProductTitle>Loading Bay — Room Study Experiment</RustyEngineProductTitle>
+  </PropertyGroup>
+  <ItemGroup>
+    <RustyEngineProductInputIntent Include="player.weapon.fist" Value="digital" />
+    <RustyEngineProductInputMapping Include="player.weapon.fist" Intent="player.weapon.fist" Trigger="key:digit-1:pressed" />
+    <RustyEngineProductInputIntent Include="player.weapon.pistol" Value="digital" />
+    <RustyEngineProductInputMapping Include="player.weapon.pistol" Intent="player.weapon.pistol" Trigger="key:digit-2:pressed" />
+    <RustyEngineProductInputIntent Include="player.weapon.shotgun" Value="digital" />
+    <RustyEngineProductInputMapping Include="player.weapon.shotgun" Intent="player.weapon.shotgun" Trigger="key:digit-3:pressed" />
+    <!-- Shared product policy/lifecycle sources; this graph has one SDK entry. -->
+    <Compile Include="../LoadingBay.Game/*.cs" Exclude="../LoadingBay.Game/AssemblyInfo.cs" LinkBase="E1M1" />
+  </ItemGroup>
+</Project>

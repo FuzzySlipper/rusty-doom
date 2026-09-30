@@ -240,7 +240,7 @@ export function buildE1M1Intermediate(
 }
 
 export function serializeIntermediate(intermediate: E1M1Intermediate): string {
-  // Deterministic emit: sort keys already stable; use 2-space indent + trailing newline (like project-content).
+  // Deterministic emit: sort keys already stable; use 2-space indent + trailing newline.
   const json: E1M1Json = intermediate;
   return `${JSON.stringify(json, null, 2)}\n`;
 }

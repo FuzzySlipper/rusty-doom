@@ -92,5 +92,11 @@ for (const textureId of [...textureIds].sort()) {
   });
 }
 
-await writeFile(outputPath, `${JSON.stringify({ entries }, null, 2)}\n`);
-console.log(`wrote ${outputPath}: ${materialIds.length} used material entries, ${textureIds.size} texture entries`);
+const generated = `${JSON.stringify({ entries }, null, 2)}\n`;
+if (process.argv.includes("--check")) {
+  if (await readFile(outputPath, "utf8") !== generated) throw new Error("E1M1 asset catalog is stale; regenerate it.");
+  console.log("E1M1 asset catalog matches retained content.");
+} else {
+  await writeFile(outputPath, generated);
+  console.log(`wrote ${outputPath}: ${materialIds.length} used material entries, ${textureIds.size} texture entries`);
+}

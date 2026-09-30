@@ -56,7 +56,7 @@ if '--check' in sys.argv:
 else:
     asset.write_bytes(png)
 lines += ['        _ => throw new System.ArgumentException("Unknown retained Doom sprite", nameof(name)),', '    };', '}']
-target = root / 'csharp/LoadingBay.Game/LoadingBayRecipeSprites.g.cs'
+target = root / 'csharp/LoadingBay.RoomStudy/LoadingBayRecipeSprites.g.cs'
 content = '\n'.join(lines)+'\n'
 if '--check' in sys.argv:
     if target.read_text() != content: raise SystemExit('Recipe sprite catalog is stale; regenerate it.')

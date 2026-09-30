@@ -8,6 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../LoadingBay.Game/LoadingBay.Game.csproj" />
+    <ProjectReference Include="../LoadingBay.RoomStudy/LoadingBay.RoomStudy.csproj" />
   </ItemGroup>
 </Project>

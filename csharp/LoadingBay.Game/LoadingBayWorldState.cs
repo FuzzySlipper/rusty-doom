@@ -46,6 +46,8 @@ internal sealed class LoadingBayWorldState
     private LoadingBayFloorStateComponent Floor(ulong entityId) => _entities.Get<LoadingBayFloorStateComponent>(_entityMap.Runtime(entityId));
     private LoadingBayLiftStateComponent Lift(ulong entityId) => _entities.Get<LoadingBayLiftStateComponent>(_entityMap.Runtime(entityId));
     private LoadingBayBarrelStateComponent Barrel(ulong entityId) => _entities.Get<LoadingBayBarrelStateComponent>(_entityMap.Runtime(entityId));
+    internal bool BarrelBlocksShots(ulong entityId) => !Barrel(entityId).Exploded;
+
     private LoadingBayHazardStateComponent Hazard(ulong entityId) => _entities.Get<LoadingBayHazardStateComponent>(_entityMap.Runtime(entityId));
 
     /// <summary>Live single-entity reads for ordinary gameplay; Capture stays at save/diagnostic boundaries.</summary>
@@ -245,7 +247,7 @@ internal sealed class LoadingBayWorldState
         return exploded.Select(value => value.Barrel).ToArray();
     }
 
-    /// <summary>Semantic continuations only; Engine scheduler handles are deliberately not part of product persistence.</summary>
+    /// <summary>Semantic due-step continuations; the live world components own their timing.</summary>
     internal IEnumerable<ulong> DueSteps() => LoadingBayE1M1SemanticCatalog.Doors
         .Select(value => Door(value.EntityId).DueStep)
         .Concat(LoadingBayE1M1SemanticCatalog.Floors.Select(value => Floor(value.EntityId).DueStep))

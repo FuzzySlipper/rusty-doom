@@ -14,3 +14,7 @@
 .runtime/
 csharp/**/bin/
 csharp/**/obj/
+
+/apps/loading-bay/src/rusty-engine-product-ui.generated.d.ts
+
+/tmp/

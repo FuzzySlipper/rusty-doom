@@ -18,7 +18,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     ]);
     private readonly LoadingBayEntityMap _entityMap;
     private readonly Mechanics.InventoryStore _inventory = new();
-    private SimulationScheduler _scheduler = new();
     private readonly LoadingBayWorldState _world;
     private ProductStateStore<LoadingBaySnapshot>? _store;
     private LoadingBayEngineServices? _engineServices;
@@ -43,7 +42,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     private double _hudDiagnosticElapsed;
     private bool _disposed;
     private ulong _dropped;
-    private Action<EntityStore>? _debugEntityWorldChanged;
 
     public LoadingBaySession(LoadingBayTuning? tuning = null)
     {
@@ -57,7 +55,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         _inventory.RegisterEquipment(new Mechanics.EquipmentState(_player));
         _combat = new LoadingBayCombat(_inventory, _player, _playerStats, _tuning, _entities, _entityMap, Record, () => _hasFacts ? _facts.SimulationStep : 0);
         _pickups = new LoadingBayPickups(_inventory, _player, _playerStats, _tuning, _entities, _entityMap, _combat, Record, () => _hasFacts ? _facts.SimulationStep : 0);
-        _worldPolicy = new LoadingBayWorld(_world, _combat, _playerStats, Record, ScheduleWorldContinuation);
+        _worldPolicy = new LoadingBayWorld(_world, _combat, _playerStats, Record);
         _playerSnapshot = InitialPlayerSnapshot(_tuning);
         foreach (LoadingBayE1M1PickupPlacement pickup in LoadingBayE1M1SemanticCatalog.Pickups)
         {
@@ -79,7 +77,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         IEngineContext engine,
         LoadingBayExitPresentation exitPresentation,
         LoadingBayExitButtonAnimation exitButtonAnimation,
-        LoadingBaySkyReadout skyReadout)
+        LoadingBaySkyReadout skyReadout,
+        LoadingBayHudProjection hud)
         : this()
     {
         ProductStateStore<LoadingBaySnapshot>? store = null;
@@ -87,7 +86,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         {
             store = new ProductStateStore<LoadingBaySnapshot>(engine, "loading-bay", LoadingBaySnapshotCodec.Create());
             _engineContext = engine; _exitPresentation = exitPresentation; _exitButtonAnimation = exitButtonAnimation; _skyReadout = skyReadout;
-            _engineServices = new LoadingBayEngineServices(engine, _tuning, _entities, _entityMap, _player, exitPresentation, exitButtonAnimation, skyReadout);
+            _engineServices = new LoadingBayEngineServices(engine, _tuning, _entities, _entityMap, _player, exitPresentation, exitButtonAnimation, skyReadout, hud);
             _combat.MaterializeDrop = _engineServices.MaterializeEnemyDrop;
             _playerSnapshot = _engineServices.CapturePlayer();
             _store = store;
@@ -112,9 +111,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         ThrowIfDisposed();
         _facts = update.Facts;
         _hasFacts = true;
-        _scheduler.Advance(update);
-        for (uint offset = 0; offset < update.Facts.AdmittedStepCount; offset++)
-            _world.Advance(LoadingBayAdmittedStepTicks.At(update.Facts, offset), Record);
+        if (_engineServices is null)
+            for (uint offset = 0; offset < update.Facts.AdmittedStepCount; offset++)
+                _world.Advance(LoadingBayAdmittedStepTicks.At(update.Facts, offset), Record);
         _engineServices?.Update(update, _tuning, Record, _pickups, _worldPolicy, _world, _combat, DamageCanonicalBarrel);
         if (_engineServices is not null) _playerSnapshot = _engineServices.CapturePlayer();
         PublishFromUpdate(update.Facts);
@@ -287,7 +286,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
     {
         if (_disposed) return;
         _disposed = true;
-        _debugEntityWorldChanged = null;
         _journal.Clear();
         List<Exception>? failures = null;
         try { _engineServices?.Dispose(); }
@@ -299,7 +297,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         if (failures is { Count: > 0 }) throw new AggregateException(failures);
     }
 
-    internal LoadingBayReadout Readout() => new(_player, _hasFacts ? _facts : default, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _combat.ArmorProtection, _combat.BulletQuantity(), _combat.ShellQuantity(), _combat.OwnedWeaponIds(), _combat.EquippedWeaponId(), _combat.WeaponCooldowns(), _playerSnapshot, _pickups.PickupSnapshots(), _combat.ActorReadouts(), _worldPolicy.Complete, _scheduler.Readout.Pending, _tuning, _journal.ToArray(), _dropped);
+    internal LoadingBayReadout Readout() => new(_player, _hasFacts ? _facts : default, HealthTrack.ValueInt64, ArmorTrack.ValueInt64, _combat.ArmorProtection, _combat.BulletQuantity(), _combat.ShellQuantity(), _combat.OwnedWeaponIds(), _combat.EquippedWeaponId(), _combat.WeaponCooldowns(), _playerSnapshot, _pickups.PickupSnapshots(), _combat.ActorReadouts(), _worldPolicy.Complete, checked((uint)_world.DueSteps().Count()), _tuning, _journal.ToArray(), _dropped);
 
     LoadingBayReadout ILoadingBaySession.Readout() => Readout();
 
@@ -307,36 +305,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         => _engineServices?.Readout ?? LoadingBayEngineServiceReadout.Empty;
 
     EntityStore ILoadingBayDebugSession.DebugEntityWorld => _engineServices?.EntityStore ?? _entities;
-
-    void ILoadingBayDebugSession.SetDebugEntityWorldChanged(Action<EntityStore>? callback)
-        => _debugEntityWorldChanged = callback;
-
-
-
-
-
-
-
-
-
-    /// <summary>Product policy consumes Engine visibility evidence and admits only active, ready actors.</summary>
-
-    /// <summary>Only a completed Engine combat execution advances the corresponding actor's readiness.</summary>
-
-
-
-
-
-    /// <summary>Called only after Engine's overlap coordinator has established a canonical hazard enter/stay fact.</summary>
-
-
-
-
-
-
-
-    /// <summary>Consumes already-resolved world facts; it deliberately performs no spatial query or presentation work.</summary>
-
 
     internal LoadingBayReceipt DeveloperSetTrack(ulong generation, string track, int value, string correlation)
     {
@@ -401,9 +369,8 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
                 // already applied, and per-step motion re-derives from it, so a failed Engine
                 // restore rejects without rollback and heals on the next admitted update.
                 _engineServices.RestorePlayer(snapshot.Player);
-                IReadOnlyList<CanonicalPickupTriggerStateFact> triggerFacts = _engineServices.RestoreSemanticPickups(snapshot.Pickups);
-                _engineServices.RestoreEncounterActivations(_combat.ActivatedEncounters);
                 _engineServices.RestoreWorldMotion(snapshot.World, _hasFacts ? _facts.SimulationStep : 0);
+                IReadOnlyList<CanonicalPickupTriggerStateFact> triggerFacts = _engineServices.RestoreSemanticPickups(snapshot.Pickups);
                 if (_sharedRealizationsActive) _engineServices.ActivateSharedRealizations();
                 foreach (CanonicalPickupTriggerStateFact triggerFact in triggerFacts) Record(triggerFact);
             }
@@ -435,7 +402,6 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
 
     private void Record(LoadingBayFact fact)
     {
-        if (fact is PickupLifecycleFact lifecycle) _pickups.ApplyLifecycleFact(lifecycle);
         if (_journal.Count == _tuning.FactJournalCapacity)
         {
             LoadingBayFact evicted = _journal.Dequeue();
@@ -503,10 +469,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         _combat.RestoreEncounters(snapshot.Encounters);
         _worldPolicy.RestoreCompletion(snapshot.Complete);
         _world.Apply(snapshot.World);
-        _scheduler = new SimulationScheduler();
-        foreach (ulong dueStep in _world.DueSteps()) ScheduleWorldContinuation(dueStep);
     }
-    private void ScheduleWorldContinuation(ulong dueStep) => _scheduler.ScheduleAt(dueStep, context => _world.Advance(context.SimulationStep, Record));
     private LoadingBayReceipt Accept(string code, string? correlation = null) => new(true, code, correlation);
     private LoadingBayReceipt Reject(string code, string? correlation = null) { Record(new RejectedFact(code, correlation)); return new(false, code, correlation); }
     /// <summary>
@@ -528,7 +491,7 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         {
             LoadingBayE1M1PickupPlacement placement;
             try { placement = LoadingBayE1M1SemanticCatalog.Pickup(state.EntityId); }
-            catch (ArgumentOutOfRangeException) { return false; }
+            catch (InvalidOperationException) { return false; }
             if (state.ItemId != placement.ItemId || state.ProgramId != placement.ProgramId || string.IsNullOrWhiteSpace(state.Cause)) return false;
             if (placement.StartsDormant
                 ? state.Lifecycle is not (LoadingBayPickupLifecycle.Dormant or LoadingBayPickupLifecycle.Active or LoadingBayPickupLifecycle.Collected)
@@ -542,8 +505,9 @@ internal sealed class LoadingBaySession : ILoadingBaySession, ILoadingBayDebugSe
         cooldowns.Length <= LoadingBayDefinitions.Weapons.Count
         && cooldowns.All(cooldown => !string.IsNullOrWhiteSpace(cooldown.WeaponId) && weapons.Contains(cooldown.WeaponId, StringComparer.Ordinal))
         && cooldowns.Select(cooldown => cooldown.WeaponId).Distinct(StringComparer.Ordinal).Count() == cooldowns.Length;
-    private static bool ValidPlayer(LoadingBayPlayerPose player) =>
-        Finite(player.Position) && float.IsFinite(player.Look.YawRadians) && float.IsFinite(player.Look.PitchRadians);
+    private bool ValidPlayer(LoadingBayPlayerPose player) =>
+        Finite(player.Position) && float.IsFinite(player.Look.YawRadians) && float.IsFinite(player.Look.PitchRadians)
+        && Look.Integrate(new LookRequest(player.Look, System.Numerics.Vector2.Zero, _tuning.PointerLook)).After == player.Look;
     private static bool Finite(System.Numerics.Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
     private static bool ValidWeapons(string[] weapons, string? equipped) =>
         ValidDistinct(weapons)

@@ -7,7 +7,7 @@ import { decodePnames, decodeTexture1, decodePatch, flatToPng, textureToPngBytes
 import { decodePalette } from "./textures.js";
 import { decodeWad, buildE1M1Intermediate } from "./wad-decode.js";
 
-const WAD_PATH = "/home/research/doom.ts/public/doom1.wad";
+import { WAD_PATH, wadTest } from "./test-wad.js";
 const MANIFEST_PATH = fileURLToPath(new URL("../../../../content/doom-e1m1/textures/manifest.json", import.meta.url));
 
 function wadBytes(): Uint8Array {
@@ -21,7 +21,7 @@ function wadEntries() {
   return decodeWad(ab).entries;
 }
 
-test("PLAYPAL palette is 256 colors and PNAMES 350", () => {
+wadTest("PLAYPAL palette is 256 colors and PNAMES 350", () => {
   const bytes = wadBytes();
   const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const wad = decodeWad(ab);
@@ -42,7 +42,7 @@ test("PLAYPAL palette is 256 colors and PNAMES 350", () => {
   assert.ok(pnames.includes("W94_1") || pnames.includes("w94_1"));
 });
 
-test("TEXTURE1 decodes 125 textures including BIGDOOR2", () => {
+wadTest("TEXTURE1 decodes 125 textures including BIGDOOR2", () => {
   const raw = readFileSync(WAD_PATH);
   const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   const wad = decodeWad(ab);
@@ -56,7 +56,7 @@ test("TEXTURE1 decodes 125 textures including BIGDOOR2", () => {
   assert.ok(bigdoor.patches.length > 0);
 });
 
-test("patch decode handles W94_1 case-insensitive", () => {
+wadTest("patch decode handles W94_1 case-insensitive", () => {
   const raw = readFileSync(WAD_PATH);
   const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   const wad = decodeWad(ab);
@@ -99,7 +99,7 @@ test("texture repeat scale is expressed in voxel cells, not reciprocal pixels", 
   }
 });
 
-test("wall provenance covers TEXTURE1 entry plus patch bytes (R6676-1 regression)", async () => {
+wadTest("wall provenance covers TEXTURE1 entry plus patch bytes (R6676-1 regression)", async () => {
   if (!existsSync(MANIFEST_PATH)) {
     test.skip("manifest missing");
     return;
@@ -151,7 +151,7 @@ test("wall provenance covers TEXTURE1 entry plus patch bytes (R6676-1 regression
   assert.equal(wall.sourceByteLength, expectedLen);
 });
 
-test("texture manifest VTX budgets within limits", () => {
+wadTest("texture manifest VTX budgets within limits", () => {
   if (!existsSync(MANIFEST_PATH)) {
     test.skip("manifest missing");
     return;

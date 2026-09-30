@@ -6,7 +6,7 @@ import { directoryByName, wadLumpBytes } from "./textures.js";
 import { decodeDmxSound, pcm8MonoToWav } from "./sounds.js";
 import { decodeWad } from "./wad-decode.js";
 
-const WAD_PATH = "/home/research/doom.ts/public/doom1.wad";
+import { WAD_PATH, wadTest } from "./test-wad.js";
 
 test("DMX sounds drop 16 padding samples at each end", () => {
   const lump = new Uint8Array(8 + 40);
@@ -24,7 +24,7 @@ test("DMX sounds drop 16 padding samples at each end", () => {
   assert.deepEqual([...wav.slice(44)], [...sound.samples]);
 });
 
-test("DSPISTOL decodes to half a second at 11025 Hz", () => {
+wadTest("DSPISTOL decodes to half a second at 11025 Hz", () => {
   const raw = readFileSync(WAD_PATH);
   const buffer = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   const entry = directoryByName(decodeWad(buffer).entries).get("DSPISTOL")!;

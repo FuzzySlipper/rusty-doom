@@ -1,6 +1,6 @@
-# Adaptive Doom playtesting
+# Optional study playtesting
 
-Doom consumes Engine time/drawing/observer controls and publishes product facts
+The optional `LoadingBay.RoomStudy` product consumes Engine time/drawing/observer controls and publishes product facts
 through `PlaytestDebugModule`. Use crew-services `playtest assist SESSION` to
 discover actions and telemetry; no Jev configuration or gameplay script is needed.
 
@@ -43,8 +43,7 @@ hitscan and enemy projectiles.
 
 The Engine pair is pinned in `Directory.Build.props` and installed with the
 Engine `rusty` CLI (`rusty install`; `rusty status` shows the pin and paths).
-`scripts/run-csharp-product.sh` runs it with `rusty dev`. Build the UI normally
-and use `LOADING_BAY_LIVE_DEBUG=1` when running the product for these tools.
+`scripts/run-room-study.sh` runs it through `rusty dev` with live debug and SDK-owned UI compilation. The supported E1M1 voxel product does not register these experimental assist modules; use ordinary controls for it.
 
 A browser reconnect retains the shared native game. Restart this owned product
 host for a fresh world; do not infer a reset from a new playtest session. Other

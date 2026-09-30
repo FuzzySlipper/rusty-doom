@@ -1,5 +1,5 @@
 {
-  "name": "@rusty-engine-demo/doom-e1m1-authoring",
+  "name": "@loading-bay/e1m1-authoring",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,8 +17,8 @@
     "generate": "node scripts/check-retained-content.mjs",
     "sprites:check": "tsc --build && node dist/sprite-cli.js --check",
     "sprites:generate": "tsc --build && node dist/sprite-cli.js --write",
-    "test": "node scripts/check-retained-content.mjs",
-    "typecheck": "node scripts/check-retained-content.mjs",
+    "test": "tsc --build && node --test dist/*.test.js",
+    "typecheck": "tsc --build",
     "sounds:check": "tsc --build && node dist/sound-cli.js --check",
     "sounds:generate": "tsc --build && node dist/sound-cli.js --write"
   }

@@ -16,6 +16,8 @@ internal sealed class LoadingBayEngineServices : IDisposable
     private readonly LoadingBayPlayerScene _player;
     private readonly LoadingBaySemanticPickupCoordinator _semanticPickups;
     private readonly LoadingBayWorldInteractionCoordinator _worldInteractions;
+    private readonly EntityTriggerProjection _triggers;
+    private readonly EntityId _playerEntity;
     private readonly LoadingBayEncounterCoordinator _encounters;
     private readonly LoadingBayCombatCoordinator _combat;
     private readonly LoadingBayVoxelScenePresentation _voxelPresentation;
@@ -35,10 +37,12 @@ internal sealed class LoadingBayEngineServices : IDisposable
         EntityId playerEntity,
         LoadingBayExitPresentation exitPresentation,
         LoadingBayExitButtonAnimation exitButtonAnimation,
-        LoadingBaySkyReadout skyReadout)
+        LoadingBaySkyReadout skyReadout,
+        LoadingBayHudProjection hud)
     {
         _entities = entities ?? throw new ArgumentNullException(nameof(entities));
         _entityMap = entityMap ?? throw new ArgumentNullException(nameof(entityMap));
+        _playerEntity = playerEntity;
         List<IDisposable> constructed = [];
         try
         {
@@ -54,14 +58,16 @@ internal sealed class LoadingBayEngineServices : IDisposable
             constructed.Add(_semanticPickups);
             _worldInteractions = new LoadingBayWorldInteractionCoordinator(engine, _player, entities, _entityMap, playerEntity, tuning);
             constructed.Add(_worldInteractions);
+            _entities.Set(playerEntity, EngineComponentTypes.Transform, new Transform(_player.Position, Quaternion.Identity, Vector3.One));
+            _entities.Set(playerEntity, EngineComponentTypes.SpatialCollider,
+                new SpatialCollider(-tuning.PlayerPickupHalfExtents, tuning.PlayerPickupHalfExtents, 1, uint.MaxValue, true, false, false));
+            _triggers = new EntityTriggerProjection(_entities, engine.Spatial, _player.Session, EngineComponentTypes.SpatialCollider);
             _encounters = new LoadingBayEncounterCoordinator(engine.Perception, _player, playerEntity);
             _combat = new LoadingBayCombatCoordinator(engine, _player, playerEntity, tuning);
             constructed.Add(_combat);
             _worldServices = new LoadingBayWorldServices(engine, tuning, exitPresentation, exitButtonAnimation);
             constructed.Add(_worldServices);
-            _player.ActivateCamera();
-            _hud = new LoadingBayHudProjection(engine.Ui);
-            constructed.Add(_hud);
+            _hud = hud ?? throw new ArgumentNullException(nameof(hud));
             _readout = LoadingBayEngineServiceReadout.Empty with { Sky = _skyReadout, VoxelScene = _voxelPresentation.Readout };
         }
         catch (Exception constructionFailure)
@@ -98,12 +104,19 @@ internal sealed class LoadingBayEngineServices : IDisposable
         ArgumentNullException.ThrowIfNull(combat);
         float fixedDeltaSeconds = (float)update.Facts.FixedDeltaSeconds;
         LoadingBaySemanticInput input = _player.Update(update, tuning,
-            (tick, supportPresent, supportEntity) => _worldInteractions.PrepareCharacterStep(
-                tick, fixedDeltaSeconds, world, supportPresent, supportEntity),
+            (tick, supportPresent, supportEntity) =>
+            {
+                LoadingBayCharacterStepEnvironment environment = _worldInteractions.PrepareCharacterStep(
+                    tick, fixedDeltaSeconds, world, supportPresent, supportEntity);
+                world.Advance(tick, record);
+                return environment;
+            },
             tick =>
             {
-                _semanticPickups.ReconcileMovementStep(tick, _player, pickups, record);
-                _worldInteractions.ReconcileMovementStep(tick, _player, worldPolicy, record);
+                _entities.Set(_playerEntity, EngineComponentTypes.Transform, new Transform(_player.Position, Quaternion.Identity, Vector3.One));
+                EntityTriggerProjectionReconcileReceipt triggers = _triggers.ReconcileTriggers(tick, SpatialTriggerCause.Movement);
+                _semanticPickups.ReconcileMovementStep(triggers.Facts.Span, pickups, record);
+                _worldInteractions.ReconcileMovementStep(tick, triggers.Facts.Span, worldPolicy, record);
                 _encounters.ReconcileMovementStep(tick, combat);
                 _combat.Advance(tick, fixedDeltaSeconds, combat);
             });
@@ -111,24 +124,28 @@ internal sealed class LoadingBayEngineServices : IDisposable
         if (input.UseRequested)
         {
             record(new SemanticInputFact("player.use"));
-            _worldInteractions.Use(update.Facts.SimulationStep, _player, worldPolicy, record);
+            _worldInteractions.Use(update.Facts.SimulationStep, _player, worldPolicy, tuning, record);
         }
         if (input.FireRequested)
         {
             record(new SemanticInputFact("player.fire"));
-            _combat.Fire(update.Facts.SimulationStep, combat, damageCanonicalBarrel);
+            _combat.Fire(update.Facts.SimulationStep, combat, world, damageCanonicalBarrel);
         }
     }
 
     internal IReadOnlyList<CanonicalPickupTriggerStateFact> RestoreSemanticPickups(LoadingBayPickupSnapshot[] pickupStates)
     {
         ThrowIfDisposed();
-        return _semanticPickups.Restore(pickupStates, _player);
+        return _semanticPickups.Restore(pickupStates, _triggers);
     }
 
     internal LoadingBayPlayerSnapshot CapturePlayer() => _player.Capture();
 
-    internal void RestorePlayer(LoadingBayPlayerPose player) => _player.Restore(player.Position, player.Look, _player.Tuning);
+    internal void RestorePlayer(LoadingBayPlayerPose player)
+    {
+        _player.Restore(player.Position, player.Look, _player.Tuning);
+        _entities.Set(_playerEntity, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
+    }
 
     internal CanonicalPickupTriggerStateFact MaterializeEnemyDrop(ulong pickupEntityId, Vector3 translation, ulong tick)
     {
@@ -159,13 +176,8 @@ internal sealed class LoadingBayEngineServices : IDisposable
     internal void ActivateSharedRealizations()
     {
         ThrowIfDisposed();
+        _player.ActivateCamera();
         _worldServices.ActivateSharedRealizations();
-    }
-
-    internal void RestoreEncounterActivations(IReadOnlySet<ulong> activeEncounterIds)
-    {
-        ThrowIfDisposed();
-        _encounters.Restore(activeEncounterIds);
     }
 
     internal void RestoreWorldMotion(LoadingBayWorldSnapshot world, ulong simulationStep)
@@ -185,7 +197,7 @@ internal sealed class LoadingBayEngineServices : IDisposable
         if (_disposed) return;
         _disposed = true;
         List<Exception>? failures = null;
-        foreach (IDisposable value in new IDisposable[] { _hud, _worldServices, _combat, _worldInteractions, _semanticPickups, _voxelPresentation, _player, _content })
+        foreach (IDisposable value in new IDisposable[] { _worldServices, _combat, _worldInteractions, _semanticPickups, _voxelPresentation, _player, _content })
         {
             try { value.Dispose(); }
             catch (Exception exception) { (failures ??= []).Add(exception); }
@@ -337,7 +349,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     {
         ThrowIfDisposed();
         if (!_voxelPublished) throw new InvalidOperationException("E1M1 voxels must be staged before camera activation.");
-        if (_camera is not null) throw new InvalidOperationException("Loading Bay's E1M1 camera is already active.");
+        if (_camera is not null) { _cameraView.SetActiveCamera(_camera); return; }
         Camera? camera = null;
         try
         {
@@ -490,7 +502,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
                 _lastCharacterStep = receipt;
                 _position = receipt.Transform.Translation;
                 _motion = receipt.Motion;
-                _continuation = Copy(_spatial.CaptureCharacterContinuation(new CharacterContinuationCaptureRequest(_session, receipt.Generation)));
+                _continuation = new(receipt.Generation, receipt.Motion);
                 _jumpPressed = false;
                 reconcileAdmittedMovementStep(tick);
             }
@@ -554,7 +566,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
 
     private static float DegreesToRadians(float degrees) => degrees * (MathF.PI / 180f);
     private static bool Finite(Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
-    private static LoadingBayCharacterContinuationSnapshot Copy(CharacterContinuationCheckpoint checkpoint) => new(checkpoint.SourceSessionIdentity, checkpoint.SourceGeneration, checkpoint.SpatialSessionFingerprint, checkpoint.ContentAuthorityHash, checkpoint.ConfigFingerprint, checkpoint.Config, checkpoint.Motion);
+
 
     private static void ValidatePublishedVoxelScene(VoxelAssetSpatialPublishResult receipt)
     {
@@ -591,7 +603,6 @@ internal sealed class LoadingBayEncounterCoordinator
     private readonly IPerceptionService _perception;
     private readonly LoadingBayPlayerScene _player;
     private readonly EntityId _playerEntity;
-    private readonly HashSet<ulong> _active = [];
 
     internal LoadingBayEncounterCoordinator(IPerceptionService perception, LoadingBayPlayerScene player, EntityId playerEntity)
     {
@@ -607,7 +618,7 @@ internal sealed class LoadingBayEncounterCoordinator
         ArgumentNullException.ThrowIfNull(combat);
         foreach (LoadingBayE1M1EncounterDefinition encounter in LoadingBayE1M1SemanticCatalog.Encounters)
         {
-            if (_active.Contains(encounter.EntityId)) continue;
+            if (combat.ActivatedEncounters.Contains(encounter.EntityId)) continue;
             PerceptionReadoutResult readout = _perception.QueryVisibility(new PerceptionQueryRequest(
                 _player.Session,
                 new[] { new PerceptionObserver(encounter.EntityId, encounter.Translation, Vector3.UnitZ, encounter.ActivationRadius, -1d, 1d) },
@@ -622,17 +633,10 @@ internal sealed class LoadingBayEncounterCoordinator
             if (!inRange) continue;
             LoadingBayReceipt outcome = combat.ActivateEncounter(encounter.EntityId, tick);
             if (!outcome.Accepted) throw new InvalidOperationException($"Canonical encounter {encounter.EntityId} overlap could not settle: {outcome.Code}.");
-            _active.Add(encounter.EntityId);
         }
     }
 
-    internal void Restore(IReadOnlySet<ulong> activeEncounterIds)
-    {
-        if (activeEncounterIds.Any(id => !LoadingBayE1M1SemanticCatalog.Encounters.Any(encounter => encounter.EntityId == id)))
-            throw new InvalidOperationException("Snapshot supplied an unknown E1M1 encounter activation.");
-        _active.Clear();
-        _active.UnionWith(activeEncounterIds);
-    }
+
 }
 
 /// <summary>Uses public Engine keyed RNG and raycasts; it retains no combat state or geometry authority.</summary>
@@ -670,19 +674,19 @@ internal sealed class LoadingBayCombatCoordinator : IDisposable
         catch { _projectileWorld.Dispose(); throw; }
     }
 
-    internal void Fire(ulong tick, LoadingBayCombat combat, Func<ulong, int, ulong, LoadingBayReceipt> damageBarrel)
+    internal void Fire(ulong tick, LoadingBayCombat combat, LoadingBayWorldState world, Func<ulong, int, ulong, LoadingBayReceipt> damageBarrel)
     {
         ArgumentNullException.ThrowIfNull(combat);
         LoadingBayWeaponFirePlan? plan = combat.PrepareWeaponFire(tick);
         if (plan is null) return;
         List<LoadingBayWeaponImpact> impacts = [];
         IReadOnlySet<ulong> eligibleEnemies = combat.EligibleEnemyEntities();
-        SpatialEntityCollider[] eligibleHitboxes = _enemyHitboxes.Where(hitbox => eligibleEnemies.Contains(hitbox.Entity)).Concat(_barrelHitboxes).ToArray();
         for (int pellet = 0; pellet < plan.PelletCount; pellet++)
         {
             int damage = 0;
             for (int roll = 0; roll < plan.DamageRolls; roll++) damage += checked((int)_random.DrawKeyed(new KeyedRngRequest(tick, RandomScope, $"{plan.WeaponId}.pellet.{pellet}.roll.{roll}", 1, plan.Damage)).Value);
             Vector3 direction = SpreadDirection(plan, pellet, tick);
+            SpatialEntityCollider[] eligibleHitboxes = ShotHitboxes(_enemyHitboxes, _barrelHitboxes, eligibleEnemies, world);
             SpatialHit hit = _spatial.CastRay(new SpatialRaycastRequest(_player.Session, _player.Position, direction, plan.MaximumDistance, new SpatialQueryFilter(1, uint.MaxValue), eligibleHitboxes, new ulong[] { _playerEntity.Value }, eligibleHitboxes));
             bool barrel = hit.Present && hit.Kind == SpatialHitKind.Entity && _barrelHitboxes.Any(hitbox => hitbox.Entity == hit.Entity);
             if (barrel)
@@ -695,6 +699,11 @@ internal sealed class LoadingBayCombatCoordinator : IDisposable
         }
         _ = combat.SettleWeaponFire(plan, impacts);
     }
+
+    internal static SpatialEntityCollider[] ShotHitboxes(IEnumerable<SpatialEntityCollider> enemies,
+        IEnumerable<SpatialEntityCollider> barrels, IReadOnlySet<ulong> eligibleEnemies, LoadingBayWorldState world)
+        => enemies.Where(hitbox => eligibleEnemies.Contains(hitbox.Entity))
+            .Concat(barrels.Where(hitbox => world.BarrelBlocksShots(hitbox.Entity))).ToArray();
 
     /// <summary>Runs once per host-admitted movement step: Engine visibility first, then product readiness, then Engine attack realization.</summary>
     internal void Advance(
@@ -866,12 +875,10 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
     private const string TriggerTag = "pickup";
     private readonly EntityStore _entities;
     private readonly LoadingBayEntityMap _entityMap;
-    private readonly EntityTriggerProjection _spatialEntities;
     private readonly ISpatialService _spatial;
     private readonly SpatialSession _session;
     private readonly EntityId _player;
     private readonly LoadingBayE1M1PickupPlacement[] _pickups;
-    private readonly Dictionary<ulong, Vector3> _pickupTranslations = [];
     private readonly Vector3 _playerHalfExtents;
     private bool _disposed;
 
@@ -886,46 +893,37 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         _pickups = LoadingBayE1M1SemanticCatalog.Pickups;
         _playerHalfExtents = tuning.PlayerPickupHalfExtents;
         _player = playerEntity;
-        if (_player.Value != 1 || !_entities.IsAlive(_player) || _entities.NextEntityValue <= LoadingBayE1M1SemanticCatalog.CanonicalEntityCount)
-            throw new InvalidOperationException("The E1M1 canonical world was not bootstrapped before ephemeral entities were allocated.");
 
         foreach (LoadingBayE1M1PickupPlacement pickup in _pickups)
         {
-            _pickupTranslations.Add(pickup.EntityId, pickup.Translation);
             _entities.Set(_entityMap.Runtime(pickup.EntityId), EngineComponentTypes.Transform,
                 new Transform(pickup.Translation, Quaternion.Identity, Vector3.One));
             _entities.Set(_entityMap.Runtime(pickup.EntityId), EngineComponentTypes.SpatialCollider,
                 new SpatialCollider(pickup.BoundsMin, pickup.BoundsMax, 0, 0, false, true, true));
         }
-        _entities.Set(_player, EngineComponentTypes.Transform,
-            new Transform(player.Position, Quaternion.Identity, Vector3.One));
-        _entities.Set(_player, EngineComponentTypes.SpatialCollider,
-            new SpatialCollider(-tuning.PlayerPickupHalfExtents, tuning.PlayerPickupHalfExtents, 1, uint.MaxValue, true, false, false));
-        _spatialEntities = new EntityTriggerProjection(_entities, _spatial, _session, EngineComponentTypes.SpatialCollider);
         foreach (LoadingBayE1M1PickupPlacement pickup in _pickups)
         {
-            _spatial.RegisterTrigger(new SpatialTriggerRegisterRequest(_session, pickup.EntityId, TriggerScope, TriggerTag, SpatialTriggerGeometry.EntityBounds));
+            _spatial.RegisterTrigger(new SpatialTriggerRegisterRequest(_session, _entityMap.Runtime(pickup.EntityId).Value, TriggerScope, TriggerTag, SpatialTriggerGeometry.EntityBounds));
             if (pickup.StartsDormant)
-                _spatial.SetTriggerActive(new SpatialTriggerSetActiveRequest(_session, pickup.EntityId, false, 0));
+                _spatial.SetTriggerActive(new SpatialTriggerSetActiveRequest(_session, _entityMap.Runtime(pickup.EntityId).Value, false, 0));
         }
     }
 
     internal void ReconcileMovementStep(
-        ulong tick,
-        LoadingBayPlayerScene player,
+        ReadOnlySpan<SpatialTriggerFact> facts,
         LoadingBayPickups pickups,
         Action<LoadingBayFact> record)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(pickups);
-        _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
-        EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement);
-        foreach (SpatialTriggerFact fact in receipt.Facts.Span)
+        foreach (SpatialTriggerFact runtimeFact in facts)
         {
+            SpatialTriggerFact fact = runtimeFact with { Trigger = _entityMap.Authored(runtimeFact.Trigger) };
+
             if (!fact.Enter || fact.Subject != _player.Value || !_pickups.Any(pickup => pickup.EntityId == fact.Trigger)) continue;
             // Collect first and retire the trigger only on success: retiring a registered
             // trigger cannot fail, so there is nothing to undo when collection is refused.
-            LoadingBayReceipt outcome = pickups.CollectCanonicalPickup(fact.Trigger);
+            LoadingBayReceipt outcome = pickups.CollectCanonicalPickup(fact.Trigger, fact.Tick);
             record(new CanonicalPickupOverlapFact(fact.Trigger, fact.Subject, fact.Tick, outcome.Accepted, outcome.Code));
             LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(fact.Trigger);
             if (!outcome.Accepted)
@@ -934,29 +932,30 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
                 continue;
             }
             SpatialTriggerLifecycleResult retired = _spatial.SetTriggerActive(
-                new SpatialTriggerSetActiveRequest(_session, fact.Trigger, false, fact.Tick));
+                new SpatialTriggerSetActiveRequest(_session, _entityMap.Runtime(fact.Trigger).Value, false, fact.Tick));
             record(new CanonicalPickupTriggerStateFact(
                 fact.Trigger, retired.Active, retired.RemovedOverlapCount, "pickup.collected"));
             record(new PickupLifecycleFact(fact.Trigger, pickup.ItemId, pickup.ProgramId, LoadingBayPickupLifecycle.Collected, outcome.Code, fact.Tick));
         }
     }
 
-    internal IReadOnlyList<CanonicalPickupTriggerStateFact> Restore(LoadingBayPickupSnapshot[] pickupStates, LoadingBayPlayerScene player)
+    internal IReadOnlyList<CanonicalPickupTriggerStateFact> Restore(LoadingBayPickupSnapshot[] pickupStates, EntityTriggerProjection triggers)
     {
         ThrowIfDisposed();
-        _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
         HashSet<ulong> collected = pickupStates.Where(state => state.Lifecycle == LoadingBayPickupLifecycle.Collected).Select(state => state.EntityId).ToHashSet();
         HashSet<ulong> materializedDrops = pickupStates.Where(state => state.Lifecycle == LoadingBayPickupLifecycle.Active && LoadingBayE1M1SemanticCatalog.Pickup(state.EntityId).StartsDormant).Select(state => state.EntityId).ToHashSet();
         foreach (ulong pickupEntityId in materializedDrops)
         {
             LoadingBayE1M1EnemyDefinition owner = LoadingBayE1M1SemanticCatalog.Enemies.Single(enemy => enemy.DropPickupEntityId == pickupEntityId);
-            _pickupTranslations[pickupEntityId] = owner.Translation;
             _entities.Set(_entityMap.Runtime(pickupEntityId), EngineComponentTypes.Transform, new Transform(owner.Translation, Quaternion.Identity, Vector3.One));
         }
         ulong[] active = _pickups.Where(pickup => (!pickup.StartsDormant || materializedDrops.Contains(pickup.EntityId)) && !collected.Contains(pickup.EntityId))
             .Select(pickup => pickup.EntityId).ToArray();
         SpatialTriggerRestoreReceipt restored = _spatial.RestoreTriggers(new SpatialTriggerRestoreRequest(
-            _session, active, ProjectCurrentColliders(player.Position)));
+            _session, active.Select(id => _entityMap.Runtime(id).Value).Concat(LoadingBayE1M1SemanticCatalog.Hazards.Select(x => _entityMap.Runtime(x.EntityId).Value))
+                .Concat(LoadingBayE1M1SemanticCatalog.Floors.Select(x => _entityMap.Runtime(x.EntityId).Value))
+                .Concat(LoadingBayE1M1SemanticCatalog.Lifts.Select(x => _entityMap.Runtime(x.EntityId).Value))
+                .Concat(LoadingBayE1M1SemanticCatalog.Secrets.Select(x => _entityMap.Runtime(x.EntityId).Value)).ToArray(), triggers.ReconcileTriggers(0, SpatialTriggerCause.Restore).Entities));
         return _pickups.Select(pickup => new CanonicalPickupTriggerStateFact(
             pickup.EntityId, active.Contains(pickup.EntityId), restored.ActiveOverlapCount, "snapshot.restored")).ToArray();
     }
@@ -967,15 +966,9 @@ internal sealed class LoadingBaySemanticPickupCoordinator : IDisposable
         LoadingBayE1M1PickupPlacement pickup = LoadingBayE1M1SemanticCatalog.Pickup(pickupEntityId);
         if (!pickup.StartsDormant) throw new InvalidOperationException("Only canonical enemy drops may be materialized by enemy defeat.");
         _entities.Set(_entityMap.Runtime(pickupEntityId), EngineComponentTypes.Transform, new Transform(translation, Quaternion.Identity, Vector3.One));
-        _pickupTranslations[pickupEntityId] = translation;
-        SpatialTriggerLifecycleResult activated = _spatial.SetTriggerActive(new SpatialTriggerSetActiveRequest(_session, pickupEntityId, true, tick));
+        SpatialTriggerLifecycleResult activated = _spatial.SetTriggerActive(new SpatialTriggerSetActiveRequest(_session, _entityMap.Runtime(pickupEntityId).Value, true, tick));
         return new CanonicalPickupTriggerStateFact(pickupEntityId, activated.Active, activated.RemovedOverlapCount, "enemy.drop-materialized");
     }
-
-    private ReadOnlyMemory<SpatialEntityCollider> ProjectCurrentColliders(Vector3 playerPosition) => _pickups
-        .Select(pickup => new SpatialEntityCollider(pickup.EntityId, _pickupTranslations[pickup.EntityId] + pickup.BoundsMin, _pickupTranslations[pickup.EntityId] + pickup.BoundsMax, 0, 0, false, true, true))
-        .Append(new SpatialEntityCollider(_player.Value, playerPosition - _playerHalfExtents, playerPosition + _playerHalfExtents, 1, uint.MaxValue, true, false, false))
-        .ToArray();
 
     public void Dispose()
     {
@@ -998,7 +991,6 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     private const string TriggerScope = "loading-bay.e1m1.world";
     private readonly EntityStore _entities;
     private readonly LoadingBayEntityMap _entityMap;
-    private readonly EntityTriggerProjection _spatialEntities;
     private readonly ISpatialService _spatial;
     private readonly IPerceptionService _perception;
     private readonly EntityKinematicMotion _kinematics;
@@ -1038,9 +1030,6 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         foreach (LoadingBayE1M1DoorDefinition value in LoadingBayE1M1SemanticCatalog.Doors) BindPlatform(value.EntityId, value.ClosedTranslation, value.BoundsMin, value.BoundsMax);
         foreach (LoadingBayE1M1FloorDefinition value in LoadingBayE1M1SemanticCatalog.Floors) BindPlatform(value.PlatformEntityId, value.UpperTranslation, value.PlatformBoundsMin, value.PlatformBoundsMax);
         foreach (LoadingBayE1M1LiftDefinition value in LoadingBayE1M1SemanticCatalog.Lifts) BindPlatform(value.PlatformEntityId, value.RaisedTranslation, value.PlatformBoundsMin, value.PlatformBoundsMax);
-        _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
-        _entities.Set(_player, EngineComponentTypes.SpatialCollider, new SpatialCollider(-_playerHalfExtents, _playerHalfExtents, 1, uint.MaxValue, true, false, false));
-        _spatialEntities = new EntityTriggerProjection(_entities, _spatial, _session, EngineComponentTypes.SpatialCollider);
     }
 
     /// <summary>
@@ -1075,7 +1064,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         ArgumentNullException.ThrowIfNull(entities);
         ArgumentNullException.ThrowIfNull(entityMap);
         if (!supportPresent) return default;
-        if (!platforms.Contains(supportEntity)
+        if (!platforms.Contains(entityMap.Authored(supportEntity))
             || !entities.TryGet(entityMap.Runtime(supportEntity), EngineComponentTypes.Transform, out Transform transform))
         {
             throw new InvalidOperationException($"E1M1 character continuation referenced unknown platform {supportEntity}.");
@@ -1099,19 +1088,18 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
             Transform transform = entities.Get(id, EngineComponentTypes.Transform);
             Kinematic kinematic = entities.Get(id, EngineComponentTypes.Kinematic);
             SpatialCollider collider = entities.Get(id, EngineComponentTypes.SpatialCollider);
-            return new CharacterObstacle(entity, transform, collider.Min, collider.Max, collider.Enabled, kinematic.Velocity, Vector3.Zero);
+            return new CharacterObstacle(id.Value, transform, collider.Min, collider.Max, collider.Enabled, kinematic.Velocity, Vector3.Zero);
         }).ToArray();
     }
 
-    internal void ReconcileMovementStep(ulong tick, LoadingBayPlayerScene player,
+    internal void ReconcileMovementStep(ulong tick, ReadOnlySpan<SpatialTriggerFact> facts,
         LoadingBayWorld worldPolicy, Action<LoadingBayFact> record)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(worldPolicy);
-        _entities.Set(_player, EngineComponentTypes.Transform, new Transform(player.Position, Quaternion.Identity, Vector3.One));
-        EntityTriggerProjectionReconcileReceipt receipt = _spatialEntities.ReconcileTriggers(tick, SpatialTriggerCause.Movement);
-        foreach (SpatialTriggerFact fact in receipt.Facts.Span)
+        foreach (SpatialTriggerFact runtimeFact in facts)
         {
+            SpatialTriggerFact fact = runtimeFact with { Trigger = _entityMap.Authored(runtimeFact.Trigger) };
             if (fact.Subject != _player.Value) continue;
             LoadingBayReceipt result;
             // Facts encode edges only. Continued hazard truth is read below from the active Engine overlap set.
@@ -1130,7 +1118,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     {
         foreach (ulong trigger in _hazards.OrderBy(value => value))
         {
-            SpatialTriggerReadResult state = _spatial.ReadTrigger(new SpatialTriggerReadRequest(_session, trigger));
+            SpatialTriggerReadResult state = _spatial.ReadTrigger(new SpatialTriggerReadRequest(_session, _entityMap.Runtime(trigger).Value));
             if (!state.Active) throw new InvalidOperationException($"Canonical E1M1 hazard trigger {trigger} was unexpectedly inactive.");
             if (!PlayerOverlaps(state.Subjects.Span)) continue;
             LoadingBayReceipt outcome = worldPolicy.ApplyHazard(trigger, tick);
@@ -1146,7 +1134,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     }
 
     /// <summary>One bounded Engine perception query chooses the authored use target; product policy decides only what that target means.</summary>
-    internal void Use(ulong tick, LoadingBayPlayerScene player, LoadingBayWorld worldPolicy, Action<LoadingBayFact> record)
+    internal void Use(ulong tick, LoadingBayPlayerScene player, LoadingBayWorld worldPolicy, LoadingBayTuning tuning, Action<LoadingBayFact> record)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(worldPolicy);
@@ -1156,7 +1144,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
             .Concat(exits.Select(value => new PerceptionTarget(value.EntityId, value.Translation))).ToArray();
         PerceptionReadoutResult receipt = _perception.QueryVisibility(new PerceptionQueryRequest(
             _session,
-            new[] { player.CreatePerceptionObserver(_player.Value, LoadingBayTuning.E1M1) },
+            new[] { player.CreatePerceptionObserver(_player.Value, tuning) },
             targets,
             ReadOnlyMemory<SpatialEntityCollider>.Empty,
             0,
@@ -1188,6 +1176,10 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     }
 
     private void RealizeMotion(ulong tick, float deltaSeconds, LoadingBayWorldState world)
+        => RealizeMotion(tick, deltaSeconds, world, _entities, _entityMap, _kinematics, _session);
+
+    internal static void RealizeMotion(ulong tick, float deltaSeconds, LoadingBayWorldState world,
+        EntityStore entities, LoadingBayEntityMap entityMap, EntityKinematicMotion kinematics, SpatialSession session)
     {
         if (!float.IsFinite(deltaSeconds) || deltaSeconds <= 0f) return;
         List<EntityId> active = [];
@@ -1195,21 +1187,21 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         {
             LoadingBayDoorSnapshot state = world.DoorState(definition.EntityId);
             if (state.State is not (LoadingBayDoorState.Opening or LoadingBayDoorState.Closing)) continue;
-            SetVelocity(_entityMap.Runtime(state.EntityId), state.State == LoadingBayDoorState.Opening ? definition.OpenTranslation : definition.ClosedTranslation, state.DueStep, tick, deltaSeconds, active);
+            SetVelocity(entities, entityMap.Runtime(state.EntityId), state.State == LoadingBayDoorState.Opening ? definition.OpenTranslation : definition.ClosedTranslation, state.DueStep, tick, deltaSeconds, active);
         }
         foreach (LoadingBayE1M1FloorDefinition definition in LoadingBayE1M1SemanticCatalog.Floors.OrderBy(value => value.EntityId))
         {
             LoadingBayFloorSnapshot state = world.FloorState(definition.EntityId);
             if (state.State != LoadingBayFloorState.Lowering) continue;
-            SetVelocity(_entityMap.Runtime(definition.PlatformEntityId), definition.LoweredTranslation, state.DueStep, tick, deltaSeconds, active);
+            SetVelocity(entities, entityMap.Runtime(definition.PlatformEntityId), definition.LoweredTranslation, state.DueStep, tick, deltaSeconds, active);
         }
         foreach (LoadingBayE1M1LiftDefinition definition in LoadingBayE1M1SemanticCatalog.Lifts.OrderBy(value => value.EntityId))
         {
             LoadingBayLiftSnapshot state = world.LiftState(definition.EntityId);
             if (state.State is not (LoadingBayLiftState.Lowering or LoadingBayLiftState.Raising)) continue;
-            SetVelocity(_entityMap.Runtime(definition.PlatformEntityId), state.State == LoadingBayLiftState.Lowering ? definition.LoweredTranslation : definition.RaisedTranslation, state.DueStep, tick, deltaSeconds, active);
+            SetVelocity(entities, entityMap.Runtime(definition.PlatformEntityId), state.State == LoadingBayLiftState.Lowering ? definition.LoweredTranslation : definition.RaisedTranslation, state.DueStep, tick, deltaSeconds, active);
         }
-        if (active.Count != 0) _kinematics.Step(_session, deltaSeconds, active.ToArray());
+        if (active.Count != 0) kinematics.Step(session, deltaSeconds, active.ToArray());
     }
 
     internal void RestoreMotion(LoadingBayWorldSnapshot world, ulong tick)
@@ -1258,14 +1250,13 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
         _entities.Set(entity, EngineComponentTypes.Kinematic, new Kinematic(kinematic.HalfExtents, Vector3.Zero));
     }
 
-    private void SetVelocity(EntityId entity, Vector3 destination, ulong dueStep, ulong tick, float deltaSeconds, List<EntityId> active)
+    private static void SetVelocity(EntityStore entities, EntityId entity, Vector3 destination, ulong dueStep, ulong tick, float deltaSeconds, List<EntityId> active)
     {
-        if (dueStep <= tick) return;
-        Transform current = _entities.Get(entity, EngineComponentTypes.Transform);
-        ulong remainingSteps = dueStep - tick + 1;
+        Transform current = entities.Get(entity, EngineComponentTypes.Transform);
+        ulong remainingSteps = dueStep > tick ? dueStep - tick + 1 : 1;
         Vector3 velocity = (destination - current.Translation) / (remainingSteps * deltaSeconds);
-        Kinematic currentKinematic = _entities.Get(entity, EngineComponentTypes.Kinematic);
-        _entities.Set(entity, EngineComponentTypes.Kinematic, new Kinematic(currentKinematic.HalfExtents, velocity));
+        Kinematic currentKinematic = entities.Get(entity, EngineComponentTypes.Kinematic);
+        entities.Set(entity, EngineComponentTypes.Kinematic, new Kinematic(currentKinematic.HalfExtents, velocity));
         active.Add(entity);
     }
 
@@ -1273,7 +1264,7 @@ internal sealed class LoadingBayWorldInteractionCoordinator : IDisposable
     {
         _entities.Set(_entityMap.Runtime(entityId), EngineComponentTypes.Transform, new Transform(translation, Quaternion.Identity, Vector3.One));
         _entities.Set(_entityMap.Runtime(entityId), EngineComponentTypes.SpatialCollider, new SpatialCollider(min, max, 0, 0, false, true, true));
-        _spatial.RegisterTrigger(new SpatialTriggerRegisterRequest(_session, entityId, TriggerScope, tag, SpatialTriggerGeometry.EntityBounds));
+        _spatial.RegisterTrigger(new SpatialTriggerRegisterRequest(_session, _entityMap.Runtime(entityId).Value, TriggerScope, tag, SpatialTriggerGeometry.EntityBounds));
     }
 
     private void BindPlatform(ulong entityId, Vector3 translation, Vector3 boundsMin, Vector3 boundsMax)

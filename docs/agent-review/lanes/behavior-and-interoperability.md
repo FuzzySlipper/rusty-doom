@@ -36,7 +36,7 @@ that proves it matters.
   be a stub, a hardcoded example, or a partial adapter.
 - Broader interactive or browser evaluation as a completion requirement. Focused
   Engine canvas/HUD/input continuation answers a changed interaction; full
-  `certify:e1m1` traversal does not establish this lane.
+  historical traversal does not establish this lane.
 - A demand for defensive validation, verification, or audit machinery as the
   meaning of "complete". Completeness here means the specified behavior through
   the required shared operations — direct mutation through the owning service

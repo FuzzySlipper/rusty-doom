@@ -18,7 +18,7 @@ import {
 } from "./sprite-extract.js";
 import { parseSpriteLumpAssignments } from "./sprite-contract.js";
 
-const WAD_PATH = "/home/research/doom.ts/public/doom1.wad";
+import { WAD_PATH, wadTest } from "./test-wad.js";
 const WAD_SHA256 =
   "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771";
 const WAD_BYTE_LENGTH = 4196020;
@@ -74,7 +74,7 @@ function decodeGeneratedPngRgba(bytes: Uint8Array): {
   return { width, height, rgba };
 }
 
-test("canonical sprite selection is bounded to the requested world, player-weapon, and E1M1 pickup families", () => {
+wadTest("canonical sprite selection is bounded to the requested world, player-weapon, and E1M1 pickup families", () => {
   const wad = decodeWad(loadWad(), { computeSha256: true });
   assert.equal(wad.sha256, WAD_SHA256);
   assert.equal(wad.byteLength, WAD_BYTE_LENGTH);
@@ -109,7 +109,7 @@ test("canonical sprite selection is bounded to the requested world, player-weapo
   assert.equal(selected.lumps[0]?.entry.name, "POSSA1");
   assert.equal(selected.lumps.at(-1)?.entry.name, "ARM2B0");
 });
-test("known canonical lumps retain exact source bytes and patch dimensions", () => {
+wadTest("known canonical lumps retain exact source bytes and patch dimensions", () => {
   const buffer = loadWad();
   const wad = decodeWad(buffer);
   const selected = selectCanonicalSpriteLumps(wad.entries).lumps;
@@ -199,7 +199,7 @@ test("Doom lump suffixes preserve directional coverage and mirror flags", () => 
   ]);
 });
 
-test("generated sprite contract keeps clips, timing, directions, dimensions, and pivots exact", () => {
+wadTest("generated sprite contract keeps clips, timing, directions, dimensions, and pivots exact", () => {
   const manifest = renderSpriteArtifacts(WAD_PATH).manifest;
   assert.equal(manifest.schemaVersion, 2);
   assert.equal(manifest.contract.tickRateHz, 35);
@@ -262,7 +262,7 @@ test("generated sprite contract keeps clips, timing, directions, dimensions, and
   assert.equal(clip("POSS", "idle").steps[0]!.state, "S_POSS_STND");
 });
 
-test("sprite posts decode as transparent RGBA without treating palette index 255 as transparent", () => {
+wadTest("sprite posts decode as transparent RGBA without treating palette index 255 as transparent", () => {
   const buffer = loadWad();
   const wad = decodeWad(buffer);
   const directory = directoryByName(wad.entries);
@@ -285,7 +285,7 @@ test("sprite posts decode as transparent RGBA without treating palette index 255
   );
 });
 
-test("atlas manifest has exact source/output provenance and normalized frame UVs", () => {
+wadTest("atlas manifest has exact source/output provenance and normalized frame UVs", () => {
   const rendered = renderSpriteArtifacts(WAD_PATH);
   assert.equal(rendered.manifest.wadSha256, WAD_SHA256);
   assert.equal(rendered.manifest.wadByteLength, WAD_BYTE_LENGTH);

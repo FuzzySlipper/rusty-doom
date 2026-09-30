@@ -1,0 +1,379 @@
+using System.Numerics;
+using LoadingBay.Game;
+using Rusty.Engine;
+using Rusty.Engine.Entities;
+using Rusty.Engine.Persistence;
+using Mechanics = Rusty.Engine.Mechanics;
+
+internal static class LifecycleScenario
+{
+    internal static void Run(Action<bool, string> Require)
+    {
+var created = new List<RecordingSession>(); int attempts = 0;
+Require(new[]
+    {
+        LoadingBayAdmittedStepTicks.At(Update(step: 12, admittedSteps: 3).Facts, 0),
+        LoadingBayAdmittedStepTicks.At(Update(step: 12, admittedSteps: 3).Facts, 1),
+        LoadingBayAdmittedStepTicks.At(Update(step: 12, admittedSteps: 3).Facts, 2),
+    }.SequenceEqual([12UL, 13UL, 14UL]), "batched admitted movement did not reconcile every host-admitted simulation tick");
+Require(new[]
+    {
+        LoadingBayAdmittedStepTicks.At(Update(step: 0, admittedSteps: 4).Facts, 0),
+        LoadingBayAdmittedStepTicks.At(Update(step: 0, admittedSteps: 4).Facts, 1),
+        LoadingBayAdmittedStepTicks.At(Update(step: 0, admittedSteps: 4).Facts, 2),
+        LoadingBayAdmittedStepTicks.At(Update(step: 0, admittedSteps: 4).Facts, 3),
+    }.SequenceEqual([0UL, 1UL, 2UL, 3UL]), "first catch-up batch did not preserve Engine-admitted tick identities");
+bool admittedTickOverflowRejected = false;
+try { _ = LoadingBayAdmittedStepTicks.At(Update(step: ulong.MaxValue, admittedSteps: 2).Facts, 1); }
+catch (OverflowException) { admittedTickOverflowRejected = true; }
+Require(admittedTickOverflowRejected, "admitted movement tick overflow was not rejected");
+bool requireSingleEmptyRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(ReadOnlyMemory<ContentReferenceInfo>.Empty, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleEmptyRejected = true; }
+Require(requireSingleEmptyRejected, "admission trust did not reject an empty Engine content readout");
+bool requireSingleZeroLengthRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", default, 0) }, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleZeroLengthRejected = true; }
+Require(requireSingleZeroLengthRejected, "admission trust did not reject a zero-length Engine content entry");
+bool requireSingleWrongPathRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("evil.json", default, 100) }, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleWrongPathRejected = true; }
+Require(requireSingleWrongPathRejected, "admission trust did not reject a wrong-path Engine content entry");
+bool requireSingleMultipleRejected = false;
+try { _ = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", default, 100), new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", default, 100) }, "doom-e1m1/doom-e1m1.voxel.json"); }
+catch (InvalidOperationException) { requireSingleMultipleRejected = true; }
+Require(requireSingleMultipleRejected, "admission trust did not reject a multi-entry Engine content readout");
+ContentReferenceInfo trustedEntry = LoadingBayAdmittedContent.RequireSingle(new[] { new ContentReferenceInfo("doom-e1m1/doom-e1m1.voxel.json", new ContentSha256(1, 2, 3, 4), 100) }, "doom-e1m1/doom-e1m1.voxel.json");
+Require(trustedEntry.Path == "doom-e1m1/doom-e1m1.voxel.json" && trustedEntry.ByteLength == 100, "admission trust did not accept a path-matched Engine content entry regardless of hash");
+using (var supportWorld = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
+{
+    LoadingBayEntityMap supportMap = LoadingBayEntityMap.Bootstrap(supportWorld);
+    EntityId movingLift = supportMap.Runtime(147);
+    Transform advancedLiftTransform = new(new Vector3(112f, 6f, 76f), Quaternion.Identity, Vector3.One);
+    supportWorld.Set(movingLift, EngineComponentTypes.Transform, advancedLiftTransform);
+    supportWorld.Set(movingLift, EngineComponentTypes.Kinematic, new Kinematic(new Vector3(10f, 2f, 6f), new Vector3(0f, -1f, 0f)));
+    supportWorld.Set(movingLift, EngineComponentTypes.SpatialCollider, new SpatialCollider(new Vector3(-10f, -2f, -6f), new Vector3(10f, 2f, 6f), 2, uint.MaxValue, true, false, false));
+    CharacterSupport continuation = LoadingBayWorldInteractionCoordinator.ResolvePlatformSupport(
+        true, 147, new HashSet<ulong> { 147 }, supportWorld, supportMap);
+    CharacterObstacle obstacle = LoadingBayWorldInteractionCoordinator.ProjectPlatformObstacles(
+        new HashSet<ulong> { 147 }, supportWorld, supportMap).Single();
+    Require(continuation.Present && continuation.Lifecycle == CharacterSupportLifecycle.Active
+        && continuation.Entity == movingLift.Value && continuation.Transform == advancedLiftTransform
+        && obstacle.Entity == movingLift.Value && obstacle.Transform == advancedLiftTransform
+        && obstacle.LinearVelocity == new Vector3(0f, -1f, 0f),
+        "E1M1 platform carry did not supply the post-motion Engine support continuation");
+}
+using (var shuffledWorld = new EntityStore([EngineComponentTypes.Transform, EngineComponentTypes.Kinematic, EngineComponentTypes.SpatialCollider]))
+{
+    List<ulong> reverse = [];
+    for (ulong authored = LoadingBayE1M1SemanticCatalog.CanonicalEntityCount; authored >= 1; authored--) reverse.Add(authored);
+    LoadingBayEntityMap shuffled = LoadingBayEntityMap.Bootstrap(shuffledWorld, reverse);
+    Require(shuffled.Runtime(LoadingBayEntityMap.PlayerAuthoredId).Value != LoadingBayEntityMap.PlayerAuthoredId,
+        "reordered entity bootstrap did not actually differ in runtime allocation");
+    Require(shuffledWorld.GetTypeId(shuffled.Runtime(LoadingBayEntityMap.PlayerAuthoredId)).Value == LoadingBayEntityKinds.Player
+        && shuffledWorld.GetTypeId(shuffled.Runtime(141)).Value == LoadingBayEntityKinds.Door
+        && shuffledWorld.GetTypeId(shuffled.Runtime(78)).Value == LoadingBayEntityKinds.Pickup
+        && shuffledWorld.GetTypeId(shuffled.Runtime(2)).Value == LoadingBayEntityKinds.Enemy
+        && shuffledWorld.GetTypeId(shuffled.Runtime(145)).Value == LoadingBayEntityKinds.WorldObject,
+        "authored E1M1 identity did not resolve its runtime entity and kind after reordered allocation");
+    HashSet<ulong> allocated = [];
+    for (ulong authored = 1; authored <= LoadingBayE1M1SemanticCatalog.CanonicalEntityCount; authored++) allocated.Add(shuffled.Runtime(authored).Value);
+    Require(allocated.Count == (int)LoadingBayE1M1SemanticCatalog.CanonicalEntityCount && !shuffled.TryRuntime(999, out _),
+        "authored E1M1 mapping did not stay bijective over the canonical identities");
+}
+var product = new LoadingBayProduct(() =>
+{
+    attempts++; if (attempts == 3) throw new InvalidOperationException("expected replacement failure");
+    var session = new RecordingSession(); created.Add(session); return session;
+});
+Require(product.Update(Update()) == ProductUpdateResult.None && created[0].UpdateCount == 0, "updates before Start must be ignored");
+product.Start(); product.Update(Update()); Require(created[0].UpdateCount == 1, "running update was not delegated");
+product.Restart(); Require(created.Count == 2 && created[0].DisposeCount == 1 && created[1].PublishCount == 1, "restart did not replace after fresh publication");
+bool replacementFailed = false; try { product.Restart(); } catch (InvalidOperationException) { replacementFailed = true; }
+Require(replacementFailed && created[1].DisposeCount == 0, "failed replacement did not retain the current session");
+product.Update(Update()); Require(created[1].UpdateCount == 1, "current session was lost after failed replacement"); product.Shutdown(); Require(created[1].DisposeCount == 1, "shutdown did not dispose active replacement");
+
+var disposalSessions = new List<RecordingSession>(); int disposalAttempts = 0;
+var disposalProduct = new LoadingBayProduct(() =>
+{
+    RecordingSession session = disposalAttempts++ == 0 ? new ThrowingDisposeSession() : new RecordingSession();
+    disposalSessions.Add(session);
+    return session;
+});
+disposalProduct.Start();
+disposalProduct.Pause();
+disposalProduct.Restart();
+Require(disposalSessions[0].DisposeCount == 1, "restart did not attempt old-session disposal");
+disposalProduct.Update(Update());
+Require(disposalSessions[1].UpdateCount == 1, "replacement was not authoritative after old-session disposal failed");
+bool reportedRetirementFailure = false;
+try { disposalProduct.Shutdown(); }
+catch (AggregateException exception) { reportedRetirementFailure = exception.InnerExceptions.Any(candidate => candidate.Message == "expected old-session disposal failure"); }
+Require(reportedRetirementFailure && disposalSessions[1].DisposeCount == 1, "shutdown did not report old retirement failure after disposing the active replacement");
+
+var realSessions = new List<LoadingBaySession>();
+using (var realProduct = new LoadingBayProduct(() => { var session = new LoadingBaySession(); realSessions.Add(session); return session; }))
+{
+    realProduct.Start(); realProduct.Update(Update(step: 9)); realSessions[0].ApplyDamage("player", 15, "restart-proof");
+    long staleHealth = realSessions[0].Readout().Health;
+    realProduct.Restart();
+    LoadingBayReadout fresh = realSessions[1].Readout();
+    Require(staleHealth < fresh.Health && fresh.Generation == 0 && fresh.Facts.Length == 1, "restart retained stale gameplay state, facts, or generation");
+}
+
+using LoadingBaySession state = new();
+LoadingBayTuning spawnTuning = LoadingBayTuning.E1M1;
+Require(spawnTuning.AuthoredPlayerPosition == new Vector3(114f, 9.5f, 78f)
+    && MathF.Abs(spawnTuning.EngineCenterLift - .65f) < .0001f
+    && spawnTuning.InitialEngineCenter == new Vector3(114f, 10.15f, 78f)
+    && MathF.Abs(spawnTuning.EyeOffsetFromCenter - 1.4125f) < .0001f
+    && MathF.Abs(spawnTuning.InitialEngineCenter.Y + spawnTuning.EyeOffsetFromCenter - (spawnTuning.AuthoredPlayerPosition.Y + spawnTuning.AuthoredBaseEyeHeight)) < .0001f,
+    "E1M1 authored-base to Engine-center spawn conversion drifted");
+LoadingBaySnapshot preFirstStep = state.Capture("doom-e1m1");
+Require(preFirstStep.Player.Position == LoadingBayTuning.E1M1.InitialPosition && state.Restore(preFirstStep, "doom-e1m1").Accepted
+    && state.Capture("doom-e1m1").Player == preFirstStep.Player,
+    "pre-first-step snapshot did not retain its spawn pose through restore");
+state.Update(Update(step: 1));
+Require(state.Readout().Player.Value == 1, "E1M1 did not retain canonical player identity 1 after entity bootstrap");
+Require(LoadingBayE1M1SemanticCatalog.Floors.Single().PlatformBoundsMin != LoadingBayE1M1SemanticCatalog.Floors.Single().BoundsMin
+    && LoadingBayE1M1SemanticCatalog.Lifts.Single().PlatformBoundsMax != LoadingBayE1M1SemanticCatalog.Lifts.Single().BoundsMax,
+    "generated world target platform bounds drifted");
+Require(state.ApplyCanonicalHazard(137, 1).Accepted && !state.ApplyCanonicalHazard(137, 2).Accepted && state.ApplyCanonicalHazard(137, 56).Accepted, "canonical nukage did not retain its inclusive cooldown boundary");
+Require(state.ActivateCanonicalDoor(141, 1).Accepted, "canonical door did not enter opening state");
+Require(state.ActivateCanonicalFloor(146, 1).Accepted && state.ActivateCanonicalLift(148, 1).Accepted, "canonical floor or lift did not begin lowering");
+LoadingBaySnapshot worldStart = state.Capture("doom-e1m1");
+Require(worldStart.World.Doors.Single(door => door.EntityId == 141).State == LoadingBayDoorState.Opening
+    && worldStart.World.Floors.Single(floor => floor.EntityId == 146).State == LoadingBayFloorState.Lowering
+    && worldStart.World.Lifts.Single(lift => lift.EntityId == 148).State == LoadingBayLiftState.Lowering,
+    "world snapshot did not retain typed in-flight transitions");
+state.Update(Update(step: 59));
+state.Update(Update(step: 66));
+LoadingBaySnapshot lowered = state.Capture("doom-e1m1");
+Require(lowered.World.Doors.Single(door => door.EntityId == 141).State == LoadingBayDoorState.Open
+    && lowered.World.Floors.Single(floor => floor.EntityId == 146).State == LoadingBayFloorState.Lowered
+    && lowered.World.Lifts.Single(lift => lift.EntityId == 148).State == LoadingBayLiftState.Waiting,
+    "canonical due steps did not settle the door/floor/lift boundaries");
+Require(state.Restore(worldStart, "doom-e1m1").Accepted
+    && state.Capture("doom-e1m1").World.Doors.Single(door => door.EntityId == 141).State == LoadingBayDoorState.Opening,
+    "world snapshot restore did not rebuild semantic in-flight state");
+state.Update(Update(step: 59));
+state.Update(Update(step: 66));
+Require(state.Capture("doom-e1m1").World.Doors.Single(door => door.EntityId == 141).State == LoadingBayDoorState.Open
+    && state.Capture("doom-e1m1").World.Floors.Single(floor => floor.EntityId == 146).State == LoadingBayFloorState.Lowered,
+    "restored in-flight transitions did not settle on the resumed timeline");
+Require(!state.Restore(worldStart with { World = worldStart.World with { Floors = [worldStart.World.Floors[0] with { State = LoadingBayFloorState.Lowered, DueStep = 1 }] } }, "doom-e1m1").Accepted,
+    "world snapshot accepted an impossible settled floor due step");
+Require(state.DamageCanonicalBarrel(60, 20, 60).Accepted && state.Capture("doom-e1m1").World.Barrels.Single(barrel => barrel.EntityId == 60).Exploded,
+    "canonical barrel did not settle through the typed explosive state");
+Require(state.DiscoverCanonicalSecret(150).Accepted && !state.DiscoverCanonicalSecret(150).Accepted, "canonical secret was not one-shot");
+Require(state.CompleteCanonicalExit(149).Accepted, "canonical exit was incorrectly encounter-gated");
+Require(state.Readout().OwnedWeapons.SequenceEqual([LoadingBayDefinitions.Fist.Id, LoadingBayDefinitions.Pistol.Id], StringComparer.Ordinal), "E1M1 did not own fist and pistol");
+Require(state.Readout().EquippedWeapon == LoadingBayDefinitions.Pistol.Id && state.Readout().Bullets == 50, "E1M1 equipment or bullets drifted");
+using (var direct = new LoadingBaySession())
+{
+    LoadingBayWeaponFirePlan? directPlan = direct.PrepareWeaponFire(200);
+    Require(directPlan is not null && directPlan.WeaponId == LoadingBayDefinitions.Pistol.Id, "headless weapon fire did not prepare the equipped pistol plan");
+    ulong directBullets = direct.Readout().Bullets;
+    Require(direct.SettleWeaponFire(directPlan!, [new LoadingBayWeaponImpact(0, 7, 0, false), new LoadingBayWeaponImpact(0, 5, 1, true)]).Accepted
+        && direct.Readout().Facts.OfType<WeaponFiredFact>().Count() == 1
+        && direct.Readout().Facts.OfType<WeaponMissedFact>().Count() == 2
+        && direct.Readout().Bullets == directBullets - (ulong)directPlan!.AmmunitionCost,
+        "headless weapon settlement did not consume ammunition, record fire/miss facts, or set cooldown");
+    Require(!direct.SettleWeaponFire(directPlan!, []).Accepted, "headless weapon settlement ignored its cooldown gate");
+    long directHealth = direct.Readout().Health;
+    Require(direct.ApplyProjectileDamage(2, 10, 201).Accepted && direct.Readout().Health < directHealth
+        && direct.Readout().Facts.OfType<EnemyAttackFact>().Any(fact => fact.EnemyEntityId == 2 && fact.Kind == LoadingBayE1M1EnemyAttackKind.Projectile && fact.HitPlayer),
+        "headless projectile damage did not apply typed canonical damage");
+    direct.RecordProjectileOutcome(2, 201, "exercise.projectile-expired");
+    Require(direct.Readout().Facts.OfType<EnemyProjectileFact>().Any(fact => fact.EnemyEntityId == 2 && fact.Tick == 201), "headless projectile outcome was not recorded");
+    Require(direct.DamageCanonicalBarrel(60, 5, 202).Accepted
+        && direct.Capture("doom-e1m1").World.Barrels.Single(barrel => barrel.EntityId == 60).Health == 15
+        && !direct.Readout().Facts.OfType<BarrelExplosionFact>().Any(), "headless barrel damage did not commit scaled health without exploding");
+    Require(direct.DamageCanonicalBarrel(60, 20, 203).Accepted
+        && direct.Readout().Facts.OfType<BarrelExplosionFact>().Count(fact => fact.BarrelEntityId == 60) == 1
+        && direct.Readout().Facts.OfType<BarrelExplosionFact>().Single(fact => fact.BarrelEntityId == 60).Chained == false,
+        "headless barrel explosion did not record exactly one unchained explosion fact");
+    Require(direct.DamageCanonicalBarrel(60, 20, 204).Accepted
+        && direct.Readout().Facts.OfType<BarrelExplosionFact>().Count(fact => fact.BarrelEntityId == 60) == 1,
+        "headless barrel damage exploded the same barrel twice");
+    Require(!direct.DamageCanonicalBarrel(999, 10, 205).Accepted, "headless barrel damage accepted an unknown barrel");
+    LoadingBaySnapshot directValid = direct.Capture("doom-e1m1");
+    Mechanics.StatCapture[] hostileStats = directValid.PlayerVitals.Stats
+        .Select(stat => stat.Id == LoadingBayStatIds.HealthMax.Value ? stat with { Maximum = -1 } : stat).ToArray();
+    LoadingBaySnapshot hostileVitals = directValid with { PlayerVitals = new Mechanics.StatsComponentSnapshot(hostileStats, directValid.PlayerVitals.Tracks) };
+    long beforeHostile = direct.Readout().Health;
+    ulong beforeHostileBullets = direct.Readout().Bullets;
+    Require(!direct.Restore(hostileVitals, "doom-e1m1").Accepted
+        && direct.Readout().Health == beforeHostile && direct.Readout().Bullets == beforeHostileBullets,
+        "hostile vitals maximum was accepted or mutated state");
+    LoadingBaySnapshot directCooldown = direct.Capture("doom-e1m1");
+    using (var resumed = new LoadingBaySession())
+    {
+        Require(resumed.Restore(directCooldown, "doom-e1m1").Accepted
+            && resumed.Readout().WeaponCooldowns.Any(cooldown => cooldown.WeaponId == LoadingBayDefinitions.Pistol.Id)
+            && !resumed.SettleWeaponFire(directPlan!, []).Accepted, "weapon cooldown did not survive restore onto the resumed timeline");
+    }
+}
+Require(state.DeveloperSetTrack(1, "health", 99, "canonical-pickup").Accepted, "exercise could not establish a health-bonus delta");
+Require(state.CollectCanonicalPickup(78).Accepted && state.Readout().Health == 100, "canonical health pickup did not use generated E1M1 semantics");
+Require(!state.CollectCanonicalPickup(78).Accepted, "canonical health pickup collected more than once");
+LoadingBaySnapshot collectedSnapshot = state.Capture("doom-e1m1");
+Require(state.ApplyDamage("player", 20, "post-pickup").Accepted && state.Restore(collectedSnapshot, "doom-e1m1").Accepted && state.Readout().Health == 100, "canonical pickup snapshot did not restore its health result");
+using (var pickupCapSession = new LoadingBaySession())
+{
+    Require(pickupCapSession.DeveloperSetTrack(0, "health", 200, "health-bonus-at-cap").Accepted
+        && pickupCapSession.CollectPickup("health-bonus-at-cap", LoadingBayDefinitions.HealthBonus, 1).Accepted
+        && pickupCapSession.Readout().Health == 200, "health bonus was not consumed without lowering health at its authored cap");
+    LoadingBayItem lowerHealthCap = LoadingBayDefinitions.HealthBonus with
+    {
+        PickupPolicy = new LoadingBayPickupPolicy.Restore(1, 100, ConsumeAtCap: true),
+    };
+    Require(pickupCapSession.DeveloperSetTrack(0, "health", 150, "health-above-local-cap").Accepted
+        && !pickupCapSession.CollectPickup("health-bonus-above-local-cap", lowerHealthCap, 1).Accepted
+        && pickupCapSession.Readout().Health == 150, "health pickup above its local cap was consumed or lowered health");
+    LoadingBayPickupPolicy.RestoreArmor armorBonus = (LoadingBayPickupPolicy.RestoreArmor)LoadingBayDefinitions.ArmorBonus.PickupPolicy!;
+    LoadingBayItem lowerArmorCap = LoadingBayDefinitions.ArmorBonus with
+    {
+        PickupPolicy = armorBonus with { Maximum = 100 },
+    };
+    Require(pickupCapSession.DeveloperSetTrack(0, "armor", 150, "armor-above-local-cap").Accepted
+        && !pickupCapSession.CollectPickup("armor-bonus-above-local-cap", lowerArmorCap, 1).Accepted
+        && pickupCapSession.Readout().Armor == 150, "armor pickup above its local cap was consumed or lowered armor");
+}
+Require(!state.CollectPickup("medikit-full", LoadingBayDefinitions.Medikit, 1).Accepted, "full-health medikit was consumed");
+Require(state.ApplyDamage("player", 30, "exercise").Accepted, "damage was rejected");
+Require(state.CollectPickup("medikit-full", LoadingBayDefinitions.Medikit, 1).Accepted, "rejected medikit was incorrectly retired");
+Require(state.DeveloperSetTrack(1, "armor", 90, "exercise").Accepted, "exercise could not establish partial green armor");
+Require(state.CollectPickup("armor-1", LoadingBayDefinitions.GreenArmor, 1).Accepted && state.Readout().Armor == 100, "green armor did not set 90 armor to its minimum");
+Require(!state.CollectPickup("armor-full", LoadingBayDefinitions.GreenArmor, 1).Accepted, "unneeded green armor was consumed");
+LoadingBaySnapshot greenArmorSnapshot = state.Capture("doom-e1m1");
+long greenHealth = state.Readout().Health;
+Require(state.ApplyDamage("player", 9, "green-armor").Accepted && state.Readout().Health == greenHealth - 6 && state.Readout().ArmorProtection.Mode == LoadingBayArmorProtectionMode.Green && state.Readout().ArmorProtection.AbsorptionDivisor == 3, "green armor did not retain its typed divisor");
+Require(state.DeveloperSetTrack(1, "armor", 0, "bonus").Accepted && state.CollectPickup("armor-bonus", LoadingBayDefinitions.ArmorBonus, 1).Accepted && state.Readout().ArmorProtection.Mode == LoadingBayArmorProtectionMode.Bonus, "armor bonus did not select its typed protection mode");
+Require(state.DeveloperSetTrack(1, "armor", 9, "bonus-divisor").Accepted, "exercise could not establish bonus armor protection");
+long bonusHealth = state.Readout().Health;
+Require(state.ApplyDamage("player", 9, "bonus-armor").Accepted && state.Readout().Health == bonusHealth - 6, "armor bonus did not use divisor three");
+Require(state.CollectPickup("armor-blue", LoadingBayDefinitions.BlueArmor, 1).Accepted && state.Readout().ArmorProtection.Mode == LoadingBayArmorProtectionMode.Blue, "blue armor did not select its typed protection mode");
+Require(state.CollectPickup("armor-bonus-after-blue", LoadingBayDefinitions.ArmorBonus, 1).Accepted && state.Readout().ArmorProtection.Mode == LoadingBayArmorProtectionMode.Blue && state.Readout().ArmorProtection.AbsorptionDivisor == 2, "armor bonus replaced blue armor protection instead of preserving it");
+long blueHealth = state.Readout().Health;
+Require(state.ApplyDamage("player", 10, "blue-armor").Accepted && state.Readout().Health == blueHealth - 5, "blue armor did not use divisor two");
+Require(state.Restore(greenArmorSnapshot, "doom-e1m1").Accepted && state.Readout().ArmorProtection.Mode == LoadingBayArmorProtectionMode.Green && state.Readout().ArmorProtection.AbsorptionDivisor == 3, "snapshot restore did not preserve typed armor protection");
+Require(state.CollectCanonicalPickup(108).Accepted && state.Readout().OwnedWeapons.Contains(LoadingBayDefinitions.Shotgun.Id, StringComparer.Ordinal) && state.Readout().Shells == 8, "authored shotgun pickup did not atomically grant equipment and starter shells");
+Require(!state.CollectCanonicalPickup(25).Accepted, "dormant enemy shotgun drop was collectable before its owner materialized it");
+Require(state.Restore(collectedSnapshot, "doom-e1m1").Accepted && !state.Readout().OwnedWeapons.Contains(LoadingBayDefinitions.Shotgun.Id, StringComparer.Ordinal) && state.Readout().Shells == 0, "snapshot restore did not remove later-acquired Engine equipment and shells");
+Require(state.CollectPickup("shell-cap", LoadingBayDefinitions.Shells, LoadingBayDefinitions.Shells.MechanicsDefinition.MaximumQuantity).Accepted && !state.CanCollectCanonicalPickup(108) && !state.CollectCanonicalPickup(108).Accepted && !state.Readout().OwnedWeapons.Contains(LoadingBayDefinitions.Shotgun.Id, StringComparer.Ordinal), "starter-ammo overflow staged a weapon or retired its pickup");
+LoadingBaySnapshot snapshot = state.Capture("doom-e1m1"); state.ApplyDamage("player", 20, "exercise");
+Require(snapshot.Player.Position == LoadingBayTuning.E1M1.InitialPosition
+    && snapshot.Player.Look.YawRadians == -(LoadingBayTuning.E1M1.InitialYawDegrees * (MathF.PI / 180f))
+    && snapshot.Pickups.Length == LoadingBayE1M1SemanticCatalog.Pickups.Length,
+    "semantic snapshot omitted canonical player pose/look or typed pickup state");
+Require(!state.Restore(snapshot with { WeaponCooldowns = [new LoadingBayWeaponCooldownSnapshot("weapon/not-owned", 1)] }, "doom-e1m1").Accepted,
+    "snapshot accepted a cooldown for an unowned weapon");
+Require(!state.Restore(snapshot with { EquippedWeapon = "weapon/not-owned" }, "doom-e1m1").Accepted, "invalid equipped weapon was accepted");
+long beforeImpossibleEncounter = state.Readout().Health;
+Require(!state.Restore(snapshot with { Encounters = [snapshot.Encounters[0] with { Activated = false, Cleared = true }, .. snapshot.Encounters[1..]] }, "doom-e1m1").Accepted && state.Readout().Health == beforeImpossibleEncounter, "impossible encounter activation state was accepted or mutated gameplay");
+Require(state.Restore(snapshot with { EquippedWeapon = LoadingBayDefinitions.Fist.Id }, "doom-e1m1").Accepted && state.Readout().EquippedWeapon == LoadingBayDefinitions.Fist.Id, "restore did not swap the actual Engine equipment slot");
+Require(state.Restore(snapshot, "doom-e1m1").Accepted, "valid snapshot did not restore atomically");
+Require(!state.Restore(snapshot with { Pickups = [.. snapshot.Pickups[..^1], snapshot.Pickups[^1] with { ItemId = "pickup/00078" }] }, "doom-e1m1").Accepted, "snapshot accepted a noncanonical pickup alias");
+Require(!state.Restore(snapshot with { Pickups = [snapshot.Pickups[0] with { EntityId = ulong.MaxValue }, .. snapshot.Pickups[1..]] }, "doom-e1m1").Accepted,
+    "snapshot with an unknown pickup id threw or was accepted");
+
+LoadingBayE1M1EnemyDefinition hitscanEnemy = LoadingBayE1M1SemanticCatalog.Enemies.First(enemy => enemy.AttackKind == LoadingBayE1M1EnemyAttackKind.Hitscan);
+LoadingBayE1M1EncounterDefinition hitscanEncounter = LoadingBayE1M1SemanticCatalog.Encounters.First(encounter => encounter.Members.Contains(hitscanEnemy.EntityId));
+Require(state.ActivateEncounter(hitscanEncounter.EntityId, 70).Accepted, "canonical hitscan encounter did not activate");
+Require(!state.PrepareEnemyAttacks(70, new HashSet<ulong>(), 0, 0).Any(plan => plan.EnemyEntityId == hitscanEnemy.EntityId), "distance-rejected enemy without a Perception pair was treated as visible");
+LoadingBayEnemyAttackPlan hitscanPlan = state.PrepareEnemyAttacks(70, new HashSet<ulong> { hitscanEnemy.EntityId }, 1, 0).Single(plan => plan.EnemyEntityId == hitscanEnemy.EntityId);
+long beforeEnemyAttack = state.Readout().Health;
+Require(state.SettleEnemyAttack(hitscanPlan, true, "exercise.hitscan").Accepted && state.Readout().Health == beforeEnemyAttack - hitscanEnemy.AttackDamage, "Engine-backed enemy attack settlement did not apply typed canonical damage");
+Require(!state.PrepareEnemyAttacks(71, new HashSet<ulong> { hitscanEnemy.EntityId }, 1, 0).Any(plan => plan.EnemyEntityId == hitscanEnemy.EntityId), "enemy cooldown admitted a repeated attack early");
+LoadingBayE1M1EncounterDefinition combatEncounter = LoadingBayE1M1SemanticCatalog.Encounters.First(encounter => encounter.EntityId != hitscanEncounter.EntityId);
+Require(state.ActivateEncounter(combatEncounter.EntityId, 80).Accepted, "canonical encounter did not activate its members");
+bool allEnemiesDefeated = true;
+foreach (ulong enemyId in combatEncounter.Members)
+{
+    LoadingBayE1M1EnemyDefinition enemy = LoadingBayE1M1SemanticCatalog.Enemy(enemyId);
+    allEnemiesDefeated &= state.ApplyWeaponDamage(enemyId, LoadingBayDefinitions.Fist.Id, enemy.MaximumHealth, 81).Accepted;
+}
+Require(allEnemiesDefeated, "canonical enemy did not accept an admitted lethal hit");
+Require(state.Capture("doom-e1m1").Pickups.Where(pickup => pickup.Lifecycle == LoadingBayPickupLifecycle.Active).Any(pickup => pickup.Cause == "enemy.drop-materialized") && state.Readout().Facts.OfType<EnemyDefeatedFact>().Any() && state.Readout().Facts.OfType<EncounterChangedFact>().Any(fact => fact.Encounter == combatEncounter.Label && fact.Cleared), "same-tick enemy defeat did not materialize its dormant drop state and clear the encounter");
+LoadingBaySnapshot canonicalCombatSnapshot = state.Capture("doom-e1m1");
+Require(canonicalCombatSnapshot.Actors.Length == LoadingBayE1M1SemanticCatalog.Enemies.Length
+    && canonicalCombatSnapshot.Encounters.Length == LoadingBayE1M1SemanticCatalog.Encounters.Length
+    && canonicalCombatSnapshot.Encounters.Single(encounter => encounter.EntityId == combatEncounter.EntityId) is { Activated: true, Cleared: true }
+    && canonicalCombatSnapshot.Actors.Where(actor => combatEncounter.Members.Contains(actor.EntityId)).All(actor => actor.Posture == LoadingBayEnemyPosture.Defeated && actor.Health == 0), "canonical actor/encounter snapshot did not capture activation and defeat state");
+Require(state.Restore(canonicalCombatSnapshot, "doom-e1m1").Accepted && state.Readout().Enemies.Where(enemy => combatEncounter.Members.Contains(enemy.EntityId)).All(enemy => enemy.Posture == LoadingBayEnemyPosture.Defeated), "canonical actor snapshot did not restore defeated actor state");
+ulong bulletDrop = combatEncounter.Members.Select(LoadingBayE1M1SemanticCatalog.Enemy)
+    .First(enemy => enemy.DropPickupEntityId != 0 && LoadingBayE1M1SemanticCatalog.Pickup(enemy.DropPickupEntityId).ItemId == LoadingBayDefinitions.Bullets.Id).DropPickupEntityId;
+LoadingBaySnapshot activeDropSnapshot = state.Capture("doom-e1m1");
+Require(state.CanCollectCanonicalPickup(bulletDrop) && state.CollectCanonicalPickup(bulletDrop).Accepted && state.Readout().Bullets == 55, "defeated enemy's activated dormant drop was not collectible through the canonical pickup policy");
+Require(state.Restore(activeDropSnapshot, "doom-e1m1").Accepted && state.CanCollectCanonicalPickup(bulletDrop), "snapshot restore did not retain an active canonical enemy drop lifecycle");
+for (int index = 0; index < 40; index++) _ = state.CollectCanonicalPickup(78);
+Require(state.Readout().DroppedFacts > 0 && state.Readout().Facts.OfType<RejectedFact>().Any(fact => fact.Code == "pickup.already-collected"), "bounded pickup fact journal lost its repeated-collection observability");
+state.Dispose();
+
+var persistence = new InMemoryPersistenceService(); using var persisted = new LoadingBaySession(persistence); persisted.Update(Update(step: 7)); persisted.ApplyDamage("player", 12, "persistence"); long savedHealth = persisted.Readout().Health;
+Require(persisted.Save("e1m1").Accepted, "Engine ProductStateStore did not save"); persisted.ApplyDamage("player", 20, "mutation"); Require(persisted.Load("e1m1").Accepted && persisted.Readout().Health == savedHealth, "Engine ProductStateStore did not restore");
+persistence.Seed("loading-bay", "corrupt", [0xff]); long beforeCorrupt = persisted.Readout().Health; bool corruptRejected = false; try { persisted.Load("corrupt"); } catch (Exception) { corruptRejected = true; }
+Require(corruptRejected && persisted.Readout().Health == beforeCorrupt, "corrupt persistence mutated state");
+persistence.Seed("loading-bay", "shapeless", System.Text.Encoding.UTF8.GetBytes("{\"ContentIdentity\":\"doom-e1m1\"}"));
+long beforeShapeless = persisted.Readout().Health;
+ulong beforeShapelessBullets = persisted.Readout().Bullets;
+Require(!persisted.Load("shapeless").Accepted, "shapeless JSON was accepted");
+Require(persisted.Readout().Health == beforeShapeless && persisted.Readout().Bullets == beforeShapelessBullets, "shapeless JSON mutated state");
+
+
+
+    }
+    private static ProductUpdate Update(ulong step = 1, uint admittedSteps = 1) => new(new ProductUpdateFacts(ProductUpdateMode.Demand, ProductLifecycleState.Running, 1, 1, 0, step, 0, admittedSteps, 0, 0), ReadOnlySpan<ProductInputEvent>.Empty);
+}
+
+file class RecordingSession : ILoadingBaySession
+{
+    public int UpdateCount { get; private set; }
+    public int PublishCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public ProductUpdateResult Update(ProductUpdate update)
+    {
+        UpdateCount++;
+        return ProductUpdateResult.None;
+    }
+
+    public void Publish() => PublishCount++;
+    public void ActivateSharedRealizations() { }
+    public void DeactivateSharedRealizations() { }
+    public virtual void Dispose() => DisposeCount++;
+
+    public LoadingBayReadout Readout() =>
+        throw new InvalidOperationException("The lifecycle fake has no gameplay readout.");
+
+    public LoadingBayReceipt DeveloperSetTrack(ulong generation, string track, int value, string correlation) =>
+        throw new InvalidOperationException("The lifecycle fake has no developer mutation surface.");
+}
+file sealed class ThrowingDisposeSession : RecordingSession { public override void Dispose() { base.Dispose(); throw new InvalidOperationException("expected old-session disposal failure"); } }
+file sealed class InMemoryPersistenceService : IPersistenceService
+{
+    private sealed record Saved(ulong Revision, byte[] Payload); private readonly Dictionary<ulong, string> _scopes = []; private readonly Dictionary<ulong, Saved> _blobs = []; private readonly Dictionary<(string Scope, string Key), Saved> _saved = []; private ulong _next = 1;
+    public PersistenceStore OpenStore(PersistenceOpenRequest request) { ulong handle = _next++; _scopes.Add(handle, request.Scope); return new(new PersistenceStoreHandle(handle), () => _scopes.Remove(handle)); }
+    public PersistenceSaveReceipt Save(PersistenceSaveRequest request) { var key = (_scopes[request.Store.Handle.Value], request.Key); _saved.TryGetValue(key, out Saved? old); ulong revision = (old?.Revision ?? 0) + 1; _saved[key] = new(revision, request.Payload.ToArray()); return new(PersistenceSaveOutcome.Saved, revision); }
+    public PersistenceDeleteReceipt Delete(PersistenceDeleteRequest request)
+    {
+        var key = (_scopes[request.Store.Handle.Value], request.Key);
+        _saved.TryGetValue(key, out Saved? saved);
+        bool matches = request.RevisionGuard switch {
+            PersistenceRevisionGuard.Any => true,
+            PersistenceRevisionGuard.Exact => saved is not null && saved.Revision == request.ExpectedRevision,
+            PersistenceRevisionGuard.Absent => saved is null,
+            _ => false,
+        };
+        if (!matches) return new(PersistenceDeleteOutcome.RevisionConflict, saved?.Revision ?? 0);
+        if (saved is null) return new(PersistenceDeleteOutcome.Missing, 0);
+        _saved.Remove(key);
+        return new(PersistenceDeleteOutcome.Deleted, saved.Revision);
+    }
+    public PersistenceBlob Load(PersistenceLoadRequest request) { _saved.TryGetValue((_scopes[request.Store.Handle.Value], request.Key), out Saved? saved); ulong handle = _next++; _blobs.Add(handle, saved ?? new(0, [])); return new(new PersistenceBlobHandle(handle), () => _blobs.Remove(handle)); }
+    public PersistenceBlobInfo DescribeBlob(PersistenceBlob blob) { Saved saved = _blobs[blob.Handle.Value]; return new(saved.Revision != 0, saved.Revision, (nuint)saved.Payload.Length); }
+    public void CopyBlob(PersistenceCopyBlobRequest request) => _blobs[request.Blob.Handle.Value].Payload.CopyTo(request.Destination.Span);
+    public ReadOnlyMemory<byte> ReadBlobBytes(PersistenceBlob blob) => _blobs[blob.Handle.Value].Payload;
+    public void Seed(string scope, string key, byte[] payload) => _saved[(scope, key)] = new(1, payload);
+}

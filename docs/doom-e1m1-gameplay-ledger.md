@@ -18,4 +18,4 @@ release/repress and discrete firing, not sustained combat. This evidence does no
 establish every authored combat, encounter, pickup, door, secret, exit, or full
 traversal behavior. Keep future claims tied to direct, current observations.
 
-`pnpm run certify:e1m1` is manual/release work and currently stalls at `[127,121]`; it is an active limitation rather than a passing route.
+The retired E1M1 certifier stopped at `[127,121]`; no current certification command or passing complete traversal is claimed.

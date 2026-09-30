@@ -2,12 +2,12 @@ using LoadingBay.Game;
 
 internal static class RecipeAnimationExercise
 {
-    internal static void Run()
+    internal static void Run(Action<bool, string>? assertion = null)
     {
         var fist = LoadingBayRecipeAnimation.Fist;
         var pistol = LoadingBayRecipeAnimation.Pistol;
         var shotgun = LoadingBayRecipeAnimation.Shotgun;
-        static void Check(bool ok, string reason) { if (!ok) throw new InvalidOperationException(reason); }
+        void Check(bool ok, string reason) { if (assertion is not null) assertion(ok, reason); else if (!ok) throw new InvalidOperationException(reason); }
         Check(LoadingBayRecipeAnimation.Idle(RecipeWeapon.Fist) == "PUNGA0", "Fist ready pose missing");
         Check(LoadingBayRecipeAnimation.At(fist, 0) == "PUNGB0" && LoadingBayRecipeAnimation.At(fist, 4.0/35) == "PUNGC0" && LoadingBayRecipeAnimation.At(fist, 8.0/35) == "PUNGD0", "Punch must reach all forward poses");
         Check(LoadingBayRecipeAnimation.At(fist, 13.0/35) == "PUNGC0" && LoadingBayRecipeAnimation.At(fist, 17.0/35) == "PUNGB0" && LoadingBayRecipeAnimation.At(fist, 22.0/35) is null, "Punch must recover to ready");
@@ -25,11 +25,9 @@ internal static class RecipeAnimationExercise
         Check(imp.Sprite(2) == "TROOI0" && imp.Sprite(2+16.0/35) == "TROOK0" && imp.Sprite(20) == "TROOM0", "Imp death must animate before retaining the corpse");
         var guard = new RecipeEnemy(2, default, false) { Health = 0, DeathStarted = 2 };
         Check(guard.Sprite(2) == "POSSH0" && guard.Sprite(2+10.0/35) == "POSSJ0" && guard.Sprite(20) == "POSSL0", "Trooper death must animate before retaining the corpse");
-        foreach (var frame in fist.Concat(pistol).Concat(shotgun).Concat(LoadingBayRecipeAnimation.PistolFlash).Concat(LoadingBayRecipeAnimation.ShotgunFlash))
-        {
-            var sprite = LoadingBayRecipeSprites.Frame("view/" + frame.Name);
-            Check(sprite.Size == new System.Numerics.Vector2(10, 6.3f), "Weapon frames must share one canvas and pixel aspect");
-        }
+        Check(fist.Concat(pistol).Concat(shotgun).Concat(LoadingBayRecipeAnimation.PistolFlash).Concat(LoadingBayRecipeAnimation.ShotgunFlash)
+            .All(frame => LoadingBayRecipeSprites.Frame("view/" + frame.Name).Size == new System.Numerics.Vector2(10, 6.3f)),
+            "Weapon frames must share one canvas and pixel aspect");
         Console.WriteLine("Recipe weapon/actor animation exercise passed.");
     }
 }

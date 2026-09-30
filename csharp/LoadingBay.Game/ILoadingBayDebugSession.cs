@@ -8,26 +8,18 @@ internal interface ILoadingBayDebugSession
 {
     EntityStore DebugEntityWorld { get; }
 
-    /// <summary>Receives a replacement whenever persistence installs a fresh Engine projection.</summary>
-    void SetDebugEntityWorldChanged(Action<EntityStore>? callback);
-}
-
-/// <summary>Optional live spatial inspection seam. Legacy sessions intentionally do not emulate it.</summary>
-internal interface ILoadingBaySpatialObservationSession
-{
-    DebugCommandResult ReadSpatialMap(string format, int radius, double cellSize);
-
-    DebugCommandResult ReadSpatialMapAt(string format, double centerX, double centerZ, double supportY, int radius, double cellSize);
-
-    DebugCommandResult ReadCombatObservation();
-
-    DebugCommandResult ReadNavigationTargets();
-
-    DebugCommandResult ReadNavigationRoute(string targetId);
 }
 
 /// <summary>Exposes the Engine-owned interaction command surface over the session's ordinary use handler.</summary>
 internal interface ILoadingBayInteractionDebugSession
 {
     IDebugCommandModule InteractionDebugModule { get; }
+}
+
+/// <summary>Optional experiment integration; the E1M1 product owns no experiment gameplay.</summary>
+internal interface ILoadingBayExperimentSession
+{
+    string DiagnosticReadout { get; }
+    void Restart();
+    void RegisterDebugCommands(IDebugCommandModuleRegistrar registrar);
 }

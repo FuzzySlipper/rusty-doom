@@ -3,8 +3,13 @@ using LoadingBay.Game;
 
 internal static class StudyDoorExercise
 {
-    internal static void Run()
+    internal static void Run(Action<bool, string>? assertion = null)
     {
+        void Require(bool condition, string message)
+        {
+            if (assertion is not null) assertion(condition, message);
+            else if (!condition) throw new InvalidOperationException(message);
+        }
         LoadingBayStudyDoor door = new();
         Require(!door.Use(Vector3.Zero) && !door.Advance(1), "Remote use opened the study door");
         Require(door.Height == 0, "Door must initially block traversal");
@@ -25,9 +30,5 @@ internal static class StudyDoorExercise
         Require(second.Use(new(54, .2f, -14)) && second.Advance(2), "Southern-door bounds did not admit local use");
         Require(second.Obstacle.Transform.Translation.Y == LoadingBayStudyDoor.Travel && door.Height == LoadingBayStudyDoor.Travel,
             "Independent door motion did not retain the first opening");
-    }
-    private static void Require(bool condition, string message)
-    {
-        if (!condition) throw new InvalidOperationException(message);
     }
 }

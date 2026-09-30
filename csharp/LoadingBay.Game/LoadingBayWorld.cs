@@ -15,7 +15,6 @@ internal sealed class LoadingBayWorld
     private readonly LoadingBayCombat _combat;
     private readonly Mechanics.StatsComponent _playerStats;
     private readonly Action<LoadingBayFact> _record;
-    private readonly Action<ulong> _schedule;
     private readonly HashSet<string> _secrets = new(StringComparer.Ordinal);
     private bool _complete;
 
@@ -23,14 +22,12 @@ internal sealed class LoadingBayWorld
         LoadingBayWorldState world,
         LoadingBayCombat combat,
         Mechanics.StatsComponent playerStats,
-        Action<LoadingBayFact> record,
-        Action<ulong> schedule)
+        Action<LoadingBayFact> record)
     {
         _world = world ?? throw new ArgumentNullException(nameof(world));
         _combat = combat ?? throw new ArgumentNullException(nameof(combat));
         _playerStats = playerStats ?? throw new ArgumentNullException(nameof(playerStats));
         _record = record ?? throw new ArgumentNullException(nameof(record));
-        _schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
     }
 
     internal bool Complete => _complete;
@@ -53,7 +50,7 @@ internal sealed class LoadingBayWorld
         try
         {
             if (_world.FloorState(floorEntityId).State != LoadingBayFloorState.Armed) return Reject("floor.unavailable");
-            LoadingBayFloorSnapshot state = _world.ActivateFloor(floorEntityId, tick, Record); if (state.DueStep > tick) _schedule(state.DueStep); return Accept("floor.lowering");
+            _world.ActivateFloor(floorEntityId, tick, Record); return Accept("floor.lowering");
         }
         catch (InvalidOperationException) { return Reject("floor.unknown"); }
     }
@@ -63,7 +60,7 @@ internal sealed class LoadingBayWorld
         try
         {
             if (_world.LiftState(liftEntityId).State != LoadingBayLiftState.Raised) return Reject("lift.unavailable");
-            LoadingBayLiftSnapshot state = _world.ActivateLift(liftEntityId, tick, Record); if (state.DueStep > tick) _schedule(state.DueStep); return Accept("lift.lowering");
+            _world.ActivateLift(liftEntityId, tick, Record); return Accept("lift.lowering");
         }
         catch (InvalidOperationException) { return Reject("lift.unknown"); }
     }
@@ -85,8 +82,7 @@ internal sealed class LoadingBayWorld
         try
         {
             if (_world.DoorState(doorEntityId).State is not (LoadingBayDoorState.Closed or LoadingBayDoorState.Closing)) return Reject("door.unavailable");
-            LoadingBayDoorSnapshot state = _world.ActivateDoor(doorEntityId, tick, Record);
-            if (state.DueStep > tick) _schedule(state.DueStep);
+            _world.ActivateDoor(doorEntityId, tick, Record);
             Record(new DoorChangedFact(LoadingBayE1M1SemanticCatalog.Doors.Single(value => value.EntityId == doorEntityId).Label, true));
             return Accept("door.opening");
         }

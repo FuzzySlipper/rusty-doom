@@ -1,10 +1,10 @@
 # E1M1 source provenance
 
-Loading Bay ships one authored content closure: `content/projects/doom-e1m1.project.json` and its direct `content/doom-e1m1/` inputs. The WAD is an offline authoring source only. No WAD bytes, Doom runtime code, music, story text, or trade dress are read or shipped at runtime. Five sound effects are shipped as derived WAV files; see "Derived Doom sounds" below.
+Loading Bay ships one authored content closure: `content/projects/doom-e1m1.project.json` and its direct `content/doom-e1m1/` inputs. The WAD is an offline authoring source only. The original WAD is not parsed at runtime. Derived map geometry, textures, sprites and five sound effects are shipped. These assets remain the work of id Software or their respective owners and are outside this repository’s MIT licence. See "Derived Doom assets" below and the README ownership notice.
 
 ## Offline E1M1 source
 
-The forge reads the id Software shareware IWAD at `/home/research/doom.ts/public/doom1.wad`: 4,196,020 bytes, SHA-256 `1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771`, `IWAD`, 1,264 lumps. E1M1 is lump 6. The checked intermediate record retains 467 vertices, 475 linedefs, and 138 Things. The WAD's license/status is not changed by this repository; do not infer distribution permission from this record.
+The recorded authoring source is the id Software shareware IWAD at `/home/research/doom.ts/public/doom1.wad`: 4,196,020 bytes, SHA-256 `1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771`, `IWAD`, 1,264 lumps. E1M1 is lump 6. The checked intermediate record retains 467 vertices, 475 linedefs, and 138 Things. The WAD's license/status is not changed by this repository; do not infer distribution permission from this record.
 
 `ts/packages/doom-e1m1-authoring` is the project-local deterministic decoder/forge. `doom.ts` is an offline reading reference only; no source file is copied from it. The mapping uses 16 Doom map units per Engine unit. The authoritative product runtime admits the result through Engine services; neither the forge nor the browser evaluates gameplay.
 
@@ -28,7 +28,7 @@ At runtime, `LoadingBayAudioPolicy` opens the clips through the Engine `Audio` s
 - the fist only when a punch lands, as in Doom;
 - the door opening sound from the door's position when a study door starts to open.
 
-The study doors never close, so `DSDORCLS` is shipped for the project's door definitions but not played. The legacy voxel scene opens the clips but emits nothing yet.
+The study doors never close, so `DSDORCLS` is shipped for the project’s door definitions but not played. The supported voxel scene does not open or emit these clips yet.
 
 ## Semantic catalog provenance
 
@@ -64,36 +64,14 @@ The opt-in `room-study` scene is original product-owned C# construction code in 
 
 ## Offline recipe-scanner experiment
 
-`scripts/scan-e1m1-recipes.mjs` reads the retained `e1m1.intermediate.json` offline and writes measured plans and tentative construction suggestions under `docs/experiments/e1m1-spawn-scan/` and `docs/experiments/e1m1-full-scan/`. The outputs retain the WAD identity and intermediate SHA-256; the manually editable draft records interpretations separately. They are authoring references, not new shipped runtime content. No doom.ts source implementation or new asset bytes are imported. See `docs/e1m1-recipe-scanner.md`.
+`scripts/scan-e1m1-recipes.mjs` reads the retained `e1m1.intermediate.json` offline and writes measured plans and tentative construction suggestions to an explicit operator-selected output directory. The outputs retain the WAD identity and intermediate SHA-256; the manually editable draft records interpretations separately. They are authoring references, not new shipped runtime content. No doom.ts source implementation or new asset bytes are imported. See `docs/e1m1-recipe-scanner.md`.
 
 
-The connected north-wing study adds manually authored `LoadingBayNorthWingRecipe.cs`, guided by the full-map scanner's sectors 2/3/4/0/7 and overhead/step detail measurements. It retains no runtime dependency on scanner JSON. DOOR3 uses the already closed texture manifest. Local extension coordinates use 32 Doom units per Engine unit and an explicit origin alignment to the stylized spawn room; this does not change the authored E1M1 port's source scale. See `docs/room-study.md` for the simplifications and native traversal evidence.
-
-
-`LoadingBayEastWingRecipe.cs` manually refines the measured eastern connector, zigzag and southern-room groups, using the same local 32-unit mapping as the north wing. BROWN1, FLOOR5_2 and NUKAGE3 are existing manifest-closed textures; no bytes or asset closure changed. The basin, walkway, recovery steps and independent second door are original construction-policy interpretations. The scanner remains offline; runtime construction reads only typed C# recipe values.
-
-The construction study's `LoadingBayTerminalRecipe.cs` manually interprets scanner sectors 78–84 after the simplified southern room: a narrowing approach, sector-81-inspired opening door, and terminal chamber. Coordinates retain the extension's 32-source-unit scale and local alignment. Existing BROWN1, FLOOR5_2, COMPSPAN, CEIL3_5 and DOOR3 assets are reused without new source bytes. Suspended strips interpret sectors 79/83 with the existing trim palette rather than claiming exact source lighting. This adds architecture, not Doom exit-switch or level-completion semantics.
-
-`LoadingBayWestWingRecipe.cs` manually interprets sectors 24–45: the angled western chamber, paired raised/suspended blocks, stair sequence, gallery and larger outer hall. The source draft guides dimensions and heights at the existing 32-unit mapping; the spawn-side approach is deliberately rerouted around the study's retained window bay. Half-unit source stair rises are split into quarter-unit treads, and a new return staircase makes the lower hall recoverable. The outer chamber outline and gallery centerpiece are simplified. All textures reuse the existing palette; this is construction refinement, not a claim of exact WAD topology or gameplay.
-
-`LoadingBayCourtyardRecipe.cs` manually interprets source sectors 5/13 as an open-air central court and recessed polygonal pool. The western edge is moved clear of the retained stylized spawn hall, and a new quarter-unit descent connects the north room. Pool recovery steps are a deliberate author refinement. The existing admitted SKY1 asset is selected through `LoadingBaySkyBackground`; its source hash/length validation is unchanged. Existing BROWN1, FLOOR5_2, NUKAGE3 and COMPSPAN textures supply the study palette. Source topology, exact texture offsets and damaging-floor semantics are not claimed.
-
-`LoadingBaySouthPassageRecipe.cs` manually interprets scanner sectors 16–23, 48–50, 63–68 and 77 as a courtyard-to-east lower passage with quarter-unit stairs and a fourth usable door. The shared 32-source-unit mapping informs the proportions; bends, openings and stair placement are manually refined to connect the existing simplified court and eastern walkway. It reuses BROWN1, FLOOR5_2, COMPSPAN, CEIL3_5 and DOOR3 from the existing manifest without new source bytes. It does not implement source secret-discovery semantics. The first north doorway ceiling transition is also closed by extending its existing roof/header solids to their common top.
-
-The #8259 continuity-audit refinement changes only authored dogleg solid extents: floor/ceiling slabs cover the wall thickness, and an inset wall-top seat meets the ceiling while preserving its visible height. Existing doorway openings and source assets remain unchanged. Engine-owned diagnostics are consumed from matched package `0.1.0-dev.e4b95f4207dc`; no downstream mesher, welding pass or alternate render path is introduced.
-
-
-### Measured spawn refinement and study orientation (2026-09-13)
-
-The current `LoadingBayRoomRecipe` replaces the stylized raised spawn deck/window bay with manually authored footprints and height changes measured from sectors 14/15 and 37–41, including the original start niche, blue recess, perimeter walkway, attached supports and western alcove. The original WAD at `/home/research/doom.ts/public/doom1.wad` was rechecked against SHA-256 `1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771` (4,196,020 bytes); the offline full-scan measurements and original source were consulted directly because the configured code index had no Doom project. No new source code or asset bytes were copied.
-
-Recipe plan coordinates remain `x=(mapX-1280)/32`, `north=20+(mapY+2880)/32`, with vertical height divided by 32. `LoadingBayStudyCoordinates` converts north to Engine world `-Z` for field extraction, placements, spawn, door bounds and audit intent. This corrects the earlier mirrored study; historical playtest positions above use the old positive-Z north convention. Engine transforms the field before extraction, preserving outward normals without a downstream mesh rewrite.
-
-The invented western approach is removed, and the courtyard west boundary now meets the original eastern windows. Small alcove jamb notches, exact texture offsets, source lighting and decoration are simplified; the retained onward rooms are not newly certified as source-exact. Slab thickness, inset wall seats and slightly inset window jambs are recipe adaptations for robust joins. The east connector uses finer 0.125 requested sampling and a seated ceiling/wall contact. Existing immutable Engine APIs perform all geometry generation and analysis.
+The optional study recipes live under `csharp/LoadingBay.RoomStudy`. Their construction coordinates use `x=(mapX-1280)/32`, `north=20+(mapY+2880)/32`, with Engine world Z equal to negative north. Geometry, stairs and routes are simplified interpretations. Historical measured plans, comparisons and traversal observations are in Den `[doc: rusty-doom/campaign-8976-evidence-archive]`.
 
 ### Generated mountain sky replacement
 
-At the owner's request, the selected sky is now `content/loading-bay/sky/mountain-panorama.png`, a built-in image-tool reinterpretation of retained `SKY1.png`, followed by a reference-guided horizontal-wrap edit. It is not a source Doom asset. The original 256×128 texture and WAD manifest remain intact. The generated asset's independent hash/length/dimensions and reference hash are recorded in `content/loading-bay/sky/manifest.json`, validated by the retained-content check and runtime exact-identity admission. Prompts, candidate and wrap details are in `docs/experiments/sky-candidate/README.md`. The existing Engine CameraView path selects the new image in both the study and ordinary product; renderer projection and resource ownership are unchanged.
+At the owner's request, the selected sky is now `content/loading-bay/sky/mountain-panorama.png`, a built-in image-tool reinterpretation of retained `SKY1.png`, followed by a reference-guided horizontal-wrap edit. It is not a source Doom asset. The original 256×128 texture and WAD manifest remain intact. The generated asset's independent hash/length/dimensions and reference hash are recorded in `content/loading-bay/sky/manifest.json`, validated by the retained-content check and runtime exact-identity admission. Prompts, candidate and wrap details are preserved in Den `[doc: rusty-doom/archive-8976-docs-experiments-sky-candidate-README-md]`. The existing Engine CameraView path selects the new image in both the study and ordinary product; renderer projection and resource ownership are unchanged.
 
 ### Eastern upper gallery recipe
 

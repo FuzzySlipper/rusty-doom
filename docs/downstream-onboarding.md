@@ -1,43 +1,19 @@
 # Loading Bay onboarding
 
-Loading Bay is a complete-but-narrow ordinary C# consumer example. Copy its ownership boundaries, not its Doom-specific values or content.
+Loading Bay is an ordinary C# consumer of the packaged Rusty Engine SDK. Its supported authored content is E1M1. Copy its ownership boundaries rather than its Doom-specific policy or assets.
 
-## Prerequisites
-
-- Node and the pinned pnpm version for the Angular product UI.
-- A .NET SDK for the packaged CoreCLR product and the explicit `linux-x64` NativeAOT check.
-- The Engine `rusty` CLI (bootstrap: `curl -fsSL https://raw.githubusercontent.com/FuzzySlipper/rusty-engine/main/scripts/install-rusty.sh | bash`). The Engine SDK/runtime pair is pinned in `Directory.Build.props`; `rusty install` installs it and `rusty update` moves it.
-
-No WAD is required to build or run the committed demo. It is only an offline source for deliberate asset regeneration; preserve the provenance record when that happens.
-
-## Start
+Install .NET 10, Node 24 and the pinned pnpm. Bootstrap the Engine CLI with `curl -fsSL https://raw.githubusercontent.com/FuzzySlipper/rusty-engine/main/scripts/install-rusty.sh | bash`, then run:
 
 ```bash
+rusty install --project csharp/LoadingBay.Game/LoadingBay.Game.csproj
 pnpm install --frozen-lockfile
-pnpm run build:shell
-./scripts/verify-csharp-spine.sh
 ./scripts/run-csharp-product.sh
 ```
 
-The final command asks `rusty dev` to build and stage `LoadingBay.Game` through the package, then starts the CoreCLR product with the selected runtime pack. It prints the local browser URL. The package and runtime validate their generated ABI identity before product construction.
+`Directory.Build.props` selects the immutable SDK/runtime pair. `rusty dev` restores/builds the C# product, builds the Angular UI through the declared SDK command, stages content and runs CoreCLR. No source WAD or prebuilt UI is required. Host, port, output and live debugging use CLI flags. An Engine contributor may explicitly append `--engine-source /absolute/rusty-engine`.
 
-Engine contributor work may append `--engine-source /absolute/rusty-engine` to the launcher. That is an explicit source override, not an ordinary downstream setup.
+The C# product owns gameplay, state, save meaning and HUD projection. Engine generates composition below `obj` and owns runtime, renderer, canvas, input and lifecycle. Angular only mounts the DOM HUD from the packaged typed UI contract. Committed E1M1 content is an immutable create-time snapshot; content edits replace the runtime rather than opening independent bundles. Angular is retained as the declared product UI framework, with unused workspace topology removed. The optional room study is a separate ordinary product; see [room study](room-study.md).
 
-## Copyable shape
+`pnpm run verify` runs typechecking, retained content checks, TypeScript tests, focused C# tests, managed build, CoreCLR staging and the lifecycle exercise. The absent offline WAD skips only WAD-backed tests; malformed/synthetic tests and retained-content checks remain active. Set `DOOM1_WAD` to the recorded archive for full offline source tests. Deliberate regeneration needs the source and must preserve [provenance](source-provenance.md).
 
-| Concern | Loading Bay owner | Rule to copy |
-| --- | --- | --- |
-| Product policy and state | `csharp/LoadingBay.Game` | Use named, typed C# definitions/tuning/session records. |
-| Product composition | packaged `Rusty.Engine` | Declare one entry type plus explicit UI/content/lifecycle facts; generated composition stays below `obj`. |
-| Generic runtime mechanisms | Rusty Engine | Use public lifecycle, content, spatial, presentation, UI, and persistence services rather than recreating them. |
-| Browser shell | matched runtime pack | Owns browser transport, renderer preload, canvas, input, and lifecycle. |
-| Browser UI | `apps/loading-bay` | Export a DOM UI mount and present immutable UI projection only. |
-| Authored assets and provenance | `content/` and `docs/source-provenance.md` | Keep source/derived artifact closure distinct from live product state. |
-
-For another product, create its own C# vocabulary and values. Do not import Doom labels, coordinates, content hashes, or Loading Bay policy as an Engine feature. When a missing mechanism is generally Engine-owned, demonstrate the narrow need and promote the seam upstream rather than adding a downstream shim.
-
-## Verification posture
-
-Run `./scripts/verify-csharp-spine.sh` for C# changes. It stages CoreCLR and runs the NativeAOT fidelity target, but neither proves visible browser behavior. For browser changes, build the shell and observe the affected path. Content changes need focused deterministic/provenance checks.
-
-The manual `pnpm run certify:e1m1` route currently stalls at `[127,121]`; it is not an onboarding gate or evidence of a complete route.
+Use `./scripts/verify-csharp-spine.sh --aot` only for a real NativeAOT fidelity question. Browser evidence must answer the affected visible interaction. The retired certifier stopped at `[127,121]`; no complete E1M1 traversal certificate is claimed.

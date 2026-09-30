@@ -7,20 +7,20 @@ namespace LoadingBay.Game;
 internal sealed class LoadingBayHudProjection : IDisposable
 {
     private readonly IUiService _ui;
-    private readonly UiStream _stream;
+    private UiStream? _stream;
     private ulong _sequence;
     private bool _disposed;
 
     internal LoadingBayHudProjection(IUiService ui)
     {
         _ui = ui ?? throw new ArgumentNullException(nameof(ui));
-        _stream = _ui.OpenStream(new UiStreamRequest("loading-bay.hud", "loading-bay.hud.snapshot.v1"));
     }
 
     /// <summary>Publishes a complete snapshot only after the session has found a gameplay change or requested a diagnostic sample.</summary>
     internal void Publish(LoadingBayReadout readout, string projectPath, string voxelPath, LoadingBayEngineServiceReadout services, bool diagnosticsEnabled)
     {
         if (_disposed) return;
+        _stream ??= _ui.OpenStream(new UiStreamRequest("loading-bay.hud", "loading-bay.hud.snapshot.v1"));
         LoadingBayUiValueBuilder value = new();
         // Input intent can arrive every frame without changing gameplay. Keep it in
         // the diagnostic stream, but do not make the default HUD churn on it.
@@ -117,8 +117,12 @@ internal sealed class LoadingBayHudProjection : IDisposable
             ("armorAbsorptionDivisor", value.Number(readout.ArmorProtection.AbsorptionDivisor)),
             ("bullets", value.Number(readout.Bullets)),
             ("shells", value.Number(readout.Shells)),
-            ("enemyCount", value.Number(readout.Enemies.Length)),
-            ("defeatedEnemies", value.Number(readout.Enemies.Count(enemy => enemy.Posture == LoadingBayEnemyPosture.Defeated))),
+            ("weapon", value.String(readout.EquippedWeapon switch { "weapon/fist" => "Fist", "weapon/pistol" => "Pistol", "weapon/shotgun" => "Shotgun", _ => "" })),
+            ("totalEnemies", value.Number(readout.Enemies.Length)),
+            ("kills", value.Number(readout.Enemies.Count(enemy => enemy.Posture == LoadingBayEnemyPosture.Defeated))),
+            ("totalPickups", value.Number(readout.Pickups.Length)),
+            ("collected", value.Number(readout.Pickups.Count(pickup => pickup.Lifecycle == LoadingBayPickupLifecycle.Collected))),
+            ("dead", value.Bool(readout.Health <= 0)),
             ("generation", value.Number(readout.Generation)),
             ("step", value.Number(diagnosticsEnabled ? readout.Step : 0)),
             ("updateMode", value.String(readout.UpdateFacts.Mode.ToString())),
@@ -200,7 +204,7 @@ internal sealed class LoadingBayHudProjection : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _stream.Dispose();
+        _stream?.Dispose();
     }
 }
 

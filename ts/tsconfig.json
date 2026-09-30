@@ -1,6 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/project-content" }
+    {
+      "path": "./packages/doom-e1m1-authoring"
+    }
   ]
 }

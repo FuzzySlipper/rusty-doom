@@ -1,6 +1,0 @@
-[mcp_servers.codebase-memory]
-command = "/home/agent/.local/bin/codebase-memory-mcp"
-args = ["--tool-profile=analysis"]
-
-[mcp_servers.codebase-memory.env]
-CBM_CACHE_DIR = "/home/agent/.local/share/codebase-memory-mcp"
