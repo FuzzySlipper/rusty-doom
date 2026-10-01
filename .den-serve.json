@@ -1,7 +1,7 @@
 {
   "project": "rusty-doom",
   "serve": {
-    "command": "bash scripts/serve-den.sh --host {host} --port {port}",
+    "command": "bash scripts/serve-den.sh --host {host} --port {port} --diagnostics-log {session_dir}/rusty-engine-diagnostics.ndjson",
     "preferredPort": 0,
     "healthUrl": "/",
     "readyText": "Rusty Product Host",

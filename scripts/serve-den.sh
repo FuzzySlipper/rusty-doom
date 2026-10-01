@@ -4,6 +4,7 @@ set -euo pipefail
 DEMO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEMO_BIND_HOST=""
 DEMO_BIND_PORT=""
+DEMO_EXTRA=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --)
@@ -15,6 +16,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --port)
       DEMO_BIND_PORT="${2:-}"
+      shift 2
+      ;;
+    --diagnostics-log)
+      DEMO_EXTRA+=(--diagnostics-log "${2:-}")
       shift 2
       ;;
     *)
@@ -33,4 +38,4 @@ if [[ ! "$DEMO_BIND_PORT" =~ ^[0-9]+$ ]] || (( DEMO_BIND_PORT < 1 || DEMO_BIND_P
   exit 2
 fi
 cd "$DEMO_ROOT"
-exec "$DEMO_ROOT/scripts/run-csharp-product.sh" --port "$DEMO_BIND_PORT" --bind-host "$DEMO_BIND_HOST" --live-debug
+exec "$DEMO_ROOT/scripts/run-csharp-product.sh" --port "$DEMO_BIND_PORT" --bind-host "$DEMO_BIND_HOST" --live-debug "${DEMO_EXTRA[@]}"
