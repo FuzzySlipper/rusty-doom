@@ -84,7 +84,7 @@ internal sealed partial class LoadingBayRoomStudy : ILoadingBaySession, ILoading
     private readonly WorldInteraction _worldInteraction = null!;
     private readonly InteractionDebugModule _interactionDebug = null!;
     private readonly LoadingBayNavigationVisits _navigationVisits = new();
-    private readonly NavigationReplaceReceipt _navigationProjection;
+    private readonly CollisionNavigationReplaceReceipt _navigationProjection;
     private AimAssistReadout? _aimReadout;
     private ulong _interactionIncarnation = 1;
     private ulong _publishedRevision = ulong.MaxValue;

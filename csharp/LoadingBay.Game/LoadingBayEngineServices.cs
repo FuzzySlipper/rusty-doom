@@ -374,7 +374,7 @@ internal sealed class LoadingBayPlayerScene : IDisposable
     }
 
     /// <summary>Builds the retained Engine-owned navigation projection from already admitted mesh collision.</summary>
-    internal NavigationReplaceReceipt ReplaceCollisionNavigation(Vector3 worldMin, Vector3 worldMax, CollisionNavigationConfig config)
+    internal CollisionNavigationReplaceReceipt ReplaceCollisionNavigation(Vector3 worldMin, Vector3 worldMax, CollisionNavigationConfig config)
     {
         ThrowIfDisposed();
         if (!_voxelPublished) throw new InvalidOperationException("Room collision must be staged before navigation is derived.");
