@@ -7,17 +7,17 @@ Loading Bay is a free experimental Rusty Engine test repository. The supported p
 ```bash
 rusty install
 pnpm install --frozen-lockfile
-./scripts/run-csharp-product.sh --live-debug
+rusty dev --port 4394 --live-debug
 ```
 
-`rusty install` installs the Engine pair pinned in `Directory.Build.props` into the shared cache. Only `rusty update` changes that pin. The SDK builds the Angular HUD from source, stages the product and starts the matching runtime. The default URL is `http://127.0.0.1:4394`. `.runtime/` contains development persistence, not the Engine installation.
-
-Pass Engine CLI options directly:
+`rusty install` installs the Engine pair pinned in `Directory.Build.props` into the shared cache. Only `rusty update` changes that pin. The SDK builds the Angular HUD from source, stages the product and starts the matching runtime. The default URL is `http://127.0.0.1:4394`. `.runtime/` contains development persistence, not the Engine installation. `Directory.Build.props` names the E1M1 project as the default, so these commands work from anywhere in the repository on Linux and Windows; one `pnpm install` serves both, since `pnpm-workspace.yaml` fetches the Windows builds of the UI toolchain's native packages too.
 
 ```bash
-./scripts/run-csharp-product.sh --port 4397 --bind-host 127.0.0.1 --live-debug
-./scripts/run-csharp-product.sh --output window --live-debug
+rusty dev --port 4397 --live-debug
+rusty dev --output window --live-debug
 ```
+
+`scripts/run-csharp-product.sh` (Linux) is the same launch bound to `127.0.0.1:4394` for service managers.
 
 Engine contributors can explicitly pass `--engine-source /absolute/rusty-engine`. Normal product work uses the installed package pair.
 
@@ -42,10 +42,10 @@ The historical manual traversal stalled at waypoint `[127,121]`; its retired `ce
 ## Optional room-study experiment
 
 ```bash
-./scripts/run-room-study.sh
+rusty dev --project csharp/LoadingBay.RoomStudy/LoadingBay.RoomStudy.csproj --port 4395 --live-debug
 ```
 
-This selects the separate ordinary SDK product `csharp/LoadingBay.RoomStudy/LoadingBay.RoomStudy.csproj` on port 4395, with live debug enabled. Its construction recipes, alternate gameplay and authoring audits are excluded from the default E1M1 assembly. Set `auditGeometry` in `content/loading-bay/room-study.settings.json` to enable construction captures. No environment variable selects the scene or host behaviour.
+(`scripts/run-room-study.sh` on Linux.) This selects the separate ordinary SDK product `csharp/LoadingBay.RoomStudy/LoadingBay.RoomStudy.csproj` on port 4395, with live debug enabled. Its construction recipes, alternate gameplay and authoring audits are excluded from the default E1M1 assembly. Set `auditGeometry` in `content/loading-bay/room-study.settings.json` to enable construction captures. No environment variable selects the scene or host behaviour.
 
 ## Licence and asset notice
 

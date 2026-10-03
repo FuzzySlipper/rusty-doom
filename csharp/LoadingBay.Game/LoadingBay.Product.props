@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <RustyEngineProductUiSourceRoot>$(MSBuildThisFileDirectory)../../apps/loading-bay/src</RustyEngineProductUiSourceRoot>
-    <RustyEngineProductUiBuildCommand>bash &quot;$(MSBuildThisFileDirectory)../../scripts/build-product-ui.sh&quot; &quot;$(RustyEngineProductUiTypes)&quot;</RustyEngineProductUiBuildCommand>
+    <RustyEngineProductUiBuildCommand>node &quot;$(MSBuildThisFileDirectory)../../node_modules/nx/dist/bin/nx.js&quot; build loading-bay --skip-nx-cache</RustyEngineProductUiBuildCommand>
     <RustyEngineProductUiRoot>$(MSBuildThisFileDirectory)../../dist/apps/loading-bay/browser</RustyEngineProductUiRoot>
     <RustyEngineProductContentRoot>$(MSBuildThisFileDirectory)../../content</RustyEngineProductContentRoot>
     <RustyEngineProductUiProjectionStream>loading-bay.hud</RustyEngineProductUiProjectionStream>
@@ -22,7 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../apps/loading-bay/project.json;$(MSBuildThisFileDirectory)../../apps/loading-bay/tsconfig*.json;$(MSBuildThisFileDirectory)../../tsconfig.angular.json;$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../pnpm-lock.yaml;$(MSBuildThisFileDirectory)../../scripts/build-product-ui.sh;$(MSBuildThisFileDirectory)../../scripts/prepare-product-ui-types.sh;$(RustyEngineProductUiTypes)" />
+    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../apps/loading-bay/project.json;$(MSBuildThisFileDirectory)../../apps/loading-bay/tsconfig*.json;$(MSBuildThisFileDirectory)../../tsconfig.angular.json;$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../pnpm-lock.yaml;$(RustyEngineProductUiTypes)" />
     <PackageReference Include="Rusty.Engine" Version="[$(RustyEnginePackageVersion)]" ExcludeAssets="$(RustyEnginePackageExcludeAssets)" />
     <RustyEngineProductInputIntent Include="player.move.forward" Value="digital" />
     <RustyEngineProductInputIntent Include="player.move.left" Value="digital" />
@@ -65,4 +65,11 @@
     <RustyEngineProductInputIntent Include="player.restart" Value="digital" />
     <RustyEngineProductInputMapping Include="player.restart" Intent="player.restart" Trigger="key:key-r:pressed" />
   </ItemGroup>
+
+  <!-- The UI compiles against the pair's declarations, copied beside its
+       sources. MSBuild copies them, so the command above is one node call
+       that cmd.exe and sh both run. -->
+  <Target Name="CopyEngineUiTypes" BeforeTargets="BuildRustyEngineProductUi">
+    <Copy SourceFiles="$(RustyEngineProductUiTypes)" DestinationFiles="$(MSBuildThisFileDirectory)../../apps/loading-bay/src/rusty-engine-product-ui.generated.d.ts" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

@@ -9,3 +9,10 @@ allowBuilds:
   "lmdb": true
   "msgpackr-extract": true
   "nx": true
+
+# One install serves Linux and Windows from a shared checkout: the native
+# packages nx, esbuild and rollup need are fetched for both.
+supportedArchitectures:
+  os: [current, win32]
+  cpu: [current, x64]
+  libc: [current]
