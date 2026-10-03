@@ -47,5 +47,6 @@
         "targetName": "lint"
       }
     }
-  ]
+  ],
+  "useDaemonProcess": false
 }
