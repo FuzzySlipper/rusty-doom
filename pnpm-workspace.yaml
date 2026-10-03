@@ -11,7 +11,10 @@ allowBuilds:
   "nx": true
 
 # One install serves Linux and Windows from a shared checkout: the native
-# packages nx, esbuild and rollup need are fetched for both.
+# packages nx, esbuild and rollup need are fetched for both, and the packages
+# are laid out flat, since Windows cannot follow the symlinks of pnpm's
+# default layout through a Samba share.
+nodeLinker: hoisted
 supportedArchitectures:
   os: [current, win32]
   cpu: [current, x64]
